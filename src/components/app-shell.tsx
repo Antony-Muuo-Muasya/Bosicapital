@@ -24,16 +24,26 @@ import {
   Menu,
   Settings,
   Users,
+  ShieldCheck,
+  Building,
+  FileKey,
+  BarChart,
+  UserCog
 } from 'lucide-react';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUserProfile } from '@/firebase';
 import { ThemeToggle } from './theme-toggle';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/loans', label: 'Loans', icon: CircleDollarSign },
-  { href: '/borrowers', label: 'Borrowers', icon: Users },
-  { href: '/repayments', label: 'Repayments', icon: FileText },
-  { href: '/settings', label: 'Settings', icon: Settings },
+
+const allNavItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'manager', 'loan_officer', 'auditor'] },
+  { href: '/loans', label: 'Loans', icon: CircleDollarSign, roles: ['admin', 'manager', 'loan_officer', 'auditor'] },
+  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['admin', 'manager'] },
+  { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer', 'auditor'] },
+  { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
+  { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager', 'auditor'] },
+  { href: '/users', label: 'Users', icon: UserCog, roles: ['admin'] },
+  { href: '/branches', label: 'Branches', icon: Building, roles: ['admin'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ];
 
 const NavLink = ({
@@ -46,7 +56,7 @@ const NavLink = ({
   icon: React.ElementType;
 }) => {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const isActive = pathname.startsWith(href);
 
   return (
     <Link
@@ -63,6 +73,13 @@ const NavLink = ({
 };
 
 function SidebarNav() {
+  const { userRole } = useUserProfile();
+
+  const navItems = React.useMemo(() => {
+    if (!userRole) return [];
+    return allNavItems.filter(item => item.roles.includes(userRole.id));
+  }, [userRole]);
+
   return (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
       {navItems.map((item) => (
@@ -74,10 +91,10 @@ function SidebarNav() {
 
 function Header() {
   const auth = useAuth();
-  const { user } = useUser();
-
-  const displayName = user?.displayName || user?.email;
-  const nameParts = user?.displayName?.split(' ') || [];
+  const { user, userProfile } = useUserProfile();
+  
+  const displayName = userProfile?.fullName || user?.email;
+  const nameParts = userProfile?.fullName?.split(' ') || [];
   const fallback =
     nameParts.length > 1 && nameParts[0] && nameParts[1]
       ? `${nameParts[0].charAt(0)}${nameParts[1].charAt(0)}`
@@ -102,9 +119,7 @@ function Header() {
               <AdooLogo className="h-6 w-6 text-primary" />
               <span className="font-headline text-xl">Adoo</span>
             </Link>
-            {navItems.map((item) => (
-              <NavLink key={item.href} {...item} />
-            ))}
+             <SidebarNav />
           </nav>
         </SheetContent>
       </Sheet>
@@ -118,7 +133,7 @@ function Header() {
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || ''} />
+              <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
               <AvatarFallback>{fallback}</AvatarFallback>
             </Avatar>
             <span className="sr-only">Toggle user menu</span>

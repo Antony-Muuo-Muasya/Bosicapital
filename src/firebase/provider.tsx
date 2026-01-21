@@ -2,9 +2,12 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore } from 'firebase/firestore';
+import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { useDoc } from './firestore/use-doc';
+import type { User as AppUser, Role } from '@/lib/types';
+
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -48,6 +51,15 @@ export interface UserHookResult { // Renamed from UserAuthHookResult for consist
   isUserLoading: boolean;
   userError: Error | null;
 }
+
+export interface UserProfileHookResult {
+  user: User | null;
+  userProfile: WithId<AppUser> | null;
+  userRole: WithId<Role> | null;
+  isLoading: boolean;
+}
+
+type WithId<T> = T & { id: string };
 
 // React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
@@ -170,7 +182,39 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
  * This provides the User object, loading status, and any auth errors.
  * @returns {UserHookResult} Object with user, isUserLoading, userError.
  */
-export const useUser = (): UserHookResult => { // Renamed from useAuthUser
-  const { user, isUserLoading, userError } = useFirebase(); // Leverages the main hook
+export const useUser = (): UserHookResult => {
+  const { user, isUserLoading, userError } = useFirebase();
   return { user, isUserLoading, userError };
+};
+
+/**
+ * Hook to get the current user, their profile from Firestore, and their role.
+ * This is the primary hook for handling user data and permissions in the UI.
+ * @returns {UserProfileHookResult} Object with user, userProfile, userRole, and loading state.
+ */
+export const useUserProfile = (): UserProfileHookResult => {
+  const { user, isUserLoading: isAuthLoading } = useUser();
+  const firestore = useFirestore();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userProfileRef);
+
+  const roleRef = useMemoFirebase(() => {
+    if (!userProfile) return null;
+    // @ts-ignore
+    return doc(firestore, 'roles', userProfile.roleId);
+  }, [userProfile, firestore]);
+
+  const { data: userRole, isLoading: isRoleLoading } = useDoc<Role>(roleRef);
+
+  return {
+    user,
+    userProfile,
+    userRole,
+    isLoading: isAuthLoading || isProfileLoading || isRoleLoading,
+  };
 };

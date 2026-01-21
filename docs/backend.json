@@ -1,33 +1,78 @@
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
-      "type": "object",
       "description": "Represents a user of the application.",
+      "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the User entity."
+          "description": "Unique identifier for the User entity, matches Firebase Auth UID."
+        },
+        "organizationId": {
+            "type": "string",
+            "description": "The ID of the organization the user belongs to."
+        },
+        "fullName": {
+          "type": "string",
+          "description": "The full name of the user."
         },
         "email": {
           "type": "string",
           "description": "The email address of the user.",
           "format": "email"
         },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the user."
+        "roleId": {
+            "type": "string",
+            "description": "The ID of the role assigned to the user."
         },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the user."
+        "branchIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "An array of branch IDs the user is associated with."
+        },
+        "status": {
+            "type": "string",
+            "enum": ["active", "suspended"],
+            "description": "The status of the user account."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the user was created."
         }
       },
-      "required": [
-        "id",
-        "email"
-      ]
+      "required": ["id", "email", "fullName", "roleId", "status", "organizationId", "createdAt"]
+    },
+    "Role": {
+        "title": "Role",
+        "description": "Defines a user role and its associated permissions.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "organizationId": { "type": "string" },
+            "name": { "type": "string" },
+            "systemRole": { "type": "boolean" },
+            "permissions": {
+                "type": "array",
+                "items": { "type": "string" }
+            }
+        },
+        "required": ["id", "name", "systemRole", "permissions"]
+    },
+    "AuditLog": {
+        "title": "Audit Log",
+        "description": "Logs administrative actions performed on users.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "action": { "type": "string" },
+            "performedBy": { "type": "string" },
+            "targetUserId": { "type": "string" },
+            "organizationId": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "action", "performedBy", "organizationId", "timestamp"]
     },
     "Borrower": {
       "title": "Borrower",
@@ -314,7 +359,23 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user data."
+          "description": "Stores user data, including roles and permissions."
+        }
+      },
+       {
+        "path": "/roles/{roleId}",
+        "definition": {
+          "entityName": "Role",
+          "schema": { "$ref": "#/backend/entities/Role" },
+          "description": "Stores role definitions and permissions."
+        }
+      },
+      {
+        "path": "/auditLogs/{logId}",
+        "definition": {
+          "entityName": "AuditLog",
+          "schema": { "$ref": "#/backend/entities/AuditLog" },
+          "description": "Stores audit trails for important user actions."
         }
       },
       {

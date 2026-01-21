@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth, useFirestore, useUser, setDocumentNonBlocking } from '@/firebase';
+import { useAuth, useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,57 +14,51 @@ import { useState } from 'react';
 import { updateProfile } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Shield } from 'lucide-react';
 
 const profileSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
+  fullName: z.string().min(1, 'Full name is required'),
   email: z.string().email(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user } = useUser();
+  const { user, userProfile, userRole } = useUserProfile();
   const auth = useAuth();
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isReadOnly = userRole?.id !== 'admin';
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      firstName: user?.displayName?.split(' ')[0] || '',
-      lastName: user?.displayName?.split(' ').slice(1).join(' ') || '',
+    values: {
+      fullName: userProfile?.fullName || '',
       email: user?.email || '',
     },
   });
 
   const onSubmit = async (data: ProfileFormData) => {
-    if (!user) return;
+    if (!user || userRole?.id !== 'admin') return; // Should not happen if button is disabled
     setIsSubmitting(true);
     try {
-      // Update Firebase Auth profile
+      // Note: This only updates the Auth display name. The Firestore document update
+      // is handled by a separate process for admins on the /users page.
       await updateProfile(user, {
-        displayName: `${data.firstName} ${data.lastName}`,
+        displayName: data.fullName,
       });
-
-      // Update Firestore user document
-      const userDocRef = doc(firestore, 'users', user.uid);
-      setDocumentNonBlocking(userDocRef, {
-        firstName: data.firstName,
-        lastName: data.lastName,
-      }, { merge: true });
 
       toast({
         title: 'Success',
-        description: 'Your profile has been updated.',
+        description: 'Your display name has been updated.',
       });
     } catch (error) {
       console.error(error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to update profile.',
+        description: 'Failed to update profile display name.',
       });
     } finally {
       setIsSubmitting(false);
@@ -78,39 +72,34 @@ export default function ProfilePage() {
         <Card className="max-w-2xl">
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your personal details here.</CardDescription>
+            <CardDescription>View your personal details here.</CardDescription>
           </CardHeader>
           <CardContent>
+            {isReadOnly && (
+              <Alert className="mb-6">
+                <Shield className="h-4 w-4" />
+                <AlertTitle>Read-Only Access</AlertTitle>
+                <AlertDescription>
+                  Your profile is managed by an administrator. Please contact them to make changes.
+                </AlertDescription>
+              </Alert>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isReadOnly} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 <FormField
                   control={form.control}
                   name="email"
@@ -124,7 +113,7 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || isReadOnly}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Changes
                 </Button>

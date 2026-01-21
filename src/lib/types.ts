@@ -1,8 +1,33 @@
-export type User = {
-  id: string;
+export type Permission = 
+  | 'user.create'
+  | 'user.edit'
+  | 'user.delete'
+  | 'user.view'
+  | 'role.manage'
+  | 'branch.manage'
+  | 'loan.create'
+  | 'loan.approve'
+  | 'loan.view'
+  | 'repayment.create'
+  | 'reports.view';
+
+export type Role = {
+  id: 'admin' | 'manager' | 'loan_officer' | 'auditor';
+  organizationId: string;
   name: string;
+  systemRole: boolean;
+  permissions: Permission[];
+}
+
+export type User = {
+  id: string; // matches auth uid
+  organizationId: string;
+  fullName: string;
   email: string;
-  role: 'Admin' | 'Branch Manager' | 'Loan Officer' | 'Auditor';
+  roleId: Role['id'];
+  branchIds: string[];
+  status: 'active' | 'suspended';
+  createdAt: string; // ISO string
   avatarUrl?: string;
 };
 
