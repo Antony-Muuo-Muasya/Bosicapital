@@ -106,6 +106,198 @@
         "branchId",
         "userId"
       ]
+    },
+    "Loan": {
+      "title": "Loan",
+      "description": "Represents a loan in the microfinancing system.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "borrowerId": {
+          "type": "string"
+        },
+        "loanProductId": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "number"
+        },
+        "interestRate": {
+          "type": "number"
+        },
+        "totalPayable": {
+          "type": "number"
+        },
+        "installmentAmount": {
+          "type": "number"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "issueDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Draft",
+            "Pending Approval",
+            "Approved",
+            "Active",
+            "Completed",
+            "Rejected"
+          ]
+        },
+        "loanOfficerId": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "borrowerId",
+        "loanProductId",
+        "principal",
+        "issueDate",
+        "loanOfficerId",
+        "branchId",
+        "status",
+        "duration",
+        "interestRate",
+        "totalPayable",
+        "installmentAmount"
+      ]
+    },
+    "LoanProduct": {
+      "title": "Loan Product",
+      "description": "Defines a type of loan product offered.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "minAmount": {
+          "type": "number"
+        },
+        "maxAmount": {
+          "type": "number"
+        },
+        "interestRate": {
+          "type": "number"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "repaymentCycle": {
+          "type": "string",
+          "enum": [
+            "Weekly",
+            "Monthly"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "interestRate",
+        "duration",
+        "minAmount",
+        "maxAmount",
+        "repaymentCycle"
+      ]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "Represents a single repayment installment for a loan.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "loanId": {
+          "type": "string"
+        },
+        "installmentNumber": {
+          "type": "number"
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "expectedAmount": {
+          "type": "number"
+        },
+        "paidAmount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Paid",
+            "Unpaid",
+            "Partial",
+            "Overdue"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "loanId",
+        "dueDate",
+        "expectedAmount",
+        "installmentNumber",
+        "paidAmount",
+        "status"
+      ]
+    },
+    "Repayment": {
+      "title": "Repayment",
+      "description": "Represents a payment made for a loan.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "loanId": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "paymentDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "collectedById": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "Cash",
+            "Bank Transfer",
+            "Mobile Money"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "loanId",
+        "amount",
+        "paymentDate",
+        "collectedById"
+      ]
     }
   },
   "auth": {
@@ -122,13 +314,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user data.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
+          "description": "Stores user data."
         }
       },
       {
@@ -138,13 +324,47 @@
           "schema": {
             "$ref": "#/backend/entities/Borrower"
           },
-          "description": "Stores information about individual borrowers.",
-          "params": [
-            {
-              "name": "borrowerId",
-              "description": "The unique identifier of the borrower."
-            }
-          ]
+          "description": "Stores information about individual borrowers."
+        }
+      },
+      {
+        "path": "/loans/{loanId}",
+        "definition": {
+          "entityName": "Loan",
+          "schema": {
+            "$ref": "#/backend/entities/Loan"
+          },
+          "description": "Stores individual loan records."
+        }
+      },
+      {
+        "path": "/loans/{loanId}/installments/{installmentId}",
+        "definition": {
+          "entityName": "Installment",
+          "schema": {
+            "$ref": "#/backend/entities/Installment"
+          },
+          "description": "Stores installments for a specific loan."
+        }
+      },
+      {
+        "path": "/loanProducts/{loanProductId}",
+        "definition": {
+          "entityName": "LoanProduct",
+          "schema": {
+            "$ref": "#/backend/entities/LoanProduct"
+          },
+          "description": "Stores loan product definitions."
+        }
+      },
+      {
+        "path": "/repayments/{repaymentId}",
+        "definition": {
+          "entityName": "Repayment",
+          "schema": {
+            "$ref": "#/backend/entities/Repayment"
+          },
+          "description": "Stores repayment records."
         }
       }
     ]

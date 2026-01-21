@@ -21,5 +21,39 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
+
+    // Rules for loans collection
+    match /loans/{loanId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.loanOfficerId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.loanOfficerId == request.auth.uid;
+      // Disallow deletion of loans for data integrity
+      allow delete: if false;
+
+      // Rules for installments subcollection
+      match /installments/{installmentId} {
+        allow read: if isSignedIn();
+        // Allow updates to installments (e.g. marking as paid) by the loan officer
+        allow write: if isSignedIn() && get(/databases/$(database)/documents/loans/$(loanId)).data.loanOfficerId == request.auth.uid;
+      }
+    }
+     match /installments/{installmentId} {
+        allow read: if isSignedIn();
+      }
+
+    // Rules for loanProducts collection
+    match /loanProducts/{productId} {
+      allow read: if isSignedIn();
+      // Only admins can create/update/delete products. For now, disable writes.
+      allow write: if false;
+    }
+
+    // Rules for repayments collection
+    match /repayments/{repaymentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.collectedById == request.auth.uid;
+      // Repayments are records of transactions, so they should be immutable.
+      allow update, delete: if false;
+    }
   }
 }

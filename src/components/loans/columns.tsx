@@ -1,0 +1,134 @@
+'use client';
+
+import type { Loan, Borrower, LoanProduct } from '@/lib/types';
+import { ColumnDef } from '@tanstack/react-table';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '../ui/button';
+import { MoreHorizontal } from 'lucide-react';
+import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { formatCurrency } from '@/lib/utils';
+import { Badge } from '../ui/badge';
+
+type LoanWithDetails = Loan & {
+  borrowerName: string;
+  borrowerPhotoUrl?: string;
+  loanProductName: string;
+};
+
+
+const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'Pending Approval': return 'secondary';
+      case 'Active': return 'default';
+      case 'Completed': return 'outline';
+      case 'Rejected': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+const LoanActions = ({ loanId }: { loanId: string }) => {
+  const firestore = useFirestore();
+
+  const handleDelete = () => {
+    // In a real app, deleting a loan should be handled with care,
+    // maybe archiving it instead. For now, deletion is disabled by rules.
+    alert('Loan deletion is disabled for data integrity.');
+    // if (confirm('Are you sure you want to delete this loan? This cannot be undone.')) {
+    //   const loanDocRef = doc(firestore, 'loans', loanId);
+    //   deleteDocumentNonBlocking(loanDocRef);
+    // }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open menu</span>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(loanId)}>
+          Copy loan ID
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>View Details</DropdownMenuItem>
+        <DropdownMenuItem>Edit Loan</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+          Delete Loan
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+export const columns: ColumnDef<LoanWithDetails>[] = [
+  {
+    accessorKey: 'borrowerName',
+    header: 'Borrower',
+    cell: ({ row }) => {
+      const loan = row.original;
+      return (
+        <div className="flex items-center gap-3">
+          <Avatar className="hidden h-9 w-9 sm:flex">
+            <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
+            <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div className="grid gap-0.5">
+            <span className="font-medium">{loan.borrowerName}</span>
+            <span className="text-xs text-muted-foreground">{loan.borrowerId}</span>
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'loanProductName',
+    header: 'Loan Product',
+  },
+  {
+    accessorKey: 'principal',
+    header: () => <div className="text-right">Principal</div>,
+    cell: ({ row }) => {
+      const amount = parseFloat(row.getValue('principal'));
+      return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
+    },
+  },
+  {
+    accessorKey: 'status',
+    header: 'Status',
+    cell: ({ row }) => {
+        const status = row.getValue('status') as string;
+        return (
+          <Badge variant={getStatusVariant(status)} className="capitalize">
+            {status}
+          </Badge>
+        );
+      },
+  },
+  {
+    accessorKey: 'issueDate',
+    header: 'Issue Date',
+    cell: ({ row }) => {
+        const date = row.getValue('issueDate') as string;
+        return new Date(date).toLocaleDateString();
+    }
+  },
+  {
+    id: 'actions',
+    cell: ({ row }) => {
+      const loan = row.original;
+      return <LoanActions loanId={loan.id} />;
+    },
+  },
+];
