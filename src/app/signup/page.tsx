@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,9 @@ import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { doc } from 'firebase/firestore';
+import type { User as AppUser } from '@/lib/types';
+
 
 const signupSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
@@ -24,6 +27,7 @@ const signupSchema = z.object({
 
 export default function SignupPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
@@ -45,8 +49,22 @@ export default function SignupPage() {
       await updateProfile(userCredential.user, {
         displayName: values.fullName,
       });
-      // On success, the useEffect will redirect the user.
-      // The app layout will handle creating the Firestore document.
+
+      // Create the corresponding user document in Firestore.
+      // This is the correct place for this logic, as it only runs once upon successful user creation.
+      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+      const newUserProfile: AppUser = {
+          id: userCredential.user.uid,
+          organizationId: 'org_1',
+          fullName: values.fullName,
+          email: values.email,
+          roleId: 'user', // All new signups default to the 'user' role. An admin can change this later.
+          branchIds: ['branch-1'],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+      };
+      await setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
+
       toast({
         title: 'Account Created!',
         description: "You're now being redirected to the dashboard.",

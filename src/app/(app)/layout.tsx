@@ -102,26 +102,9 @@ export default function AppLayout({
             }
         };
 
-        const createInitialAdmin = async () => {
-            const userDocRef = doc(firestore, 'users', user.uid);
-            // Create user profile if it doesn't exist
-            if (!userProfile) {
-                const newUserProfile: AppUser = {
-                    id: user.uid,
-                    organizationId: 'org_1',
-                    fullName: user.displayName || 'New User',
-                    email: user.email!,
-                    // First user becomes an admin, others become users (borrowers)
-                    roleId: user.email === 'adminadoo@gmail.com' ? 'admin' : 'user',
-                    branchIds: ['branch-1'],
-                    status: 'active',
-                    createdAt: new Date().toISOString(),
-                };
-                setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
-            }
-        };
-
-        seedRoles().then(seedMainBranch).then(createInitialAdmin).catch(console.error);
+        // The user creation logic has been moved to the /signup page to prevent
+        // race conditions that were incorrectly overwriting user roles.
+        seedRoles().then(seedMainBranch).catch(console.error);
     }
   }, [user, userProfile, isLoading, router, firestore, pathname]);
   
