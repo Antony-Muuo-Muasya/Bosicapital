@@ -21,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 export default function UsersPage() {
   const { userRole, isLoading: isProfileLoading } = useUserProfile();
@@ -31,23 +32,6 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
-
-  useEffect(() => {
-    if (!isProfileLoading && userRole?.id !== 'admin') {
-      toast({
-        variant: 'destructive',
-        title: 'Access Denied',
-        description: "You don't have permission to view the user management page.",
-      });
-      router.replace('/dashboard');
-    }
-  }, [isProfileLoading, userRole, router, toast]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setSignupUrl(`${window.location.origin}/signup`);
-    }
-  }, []);
 
   const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
   const rolesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
@@ -72,8 +56,30 @@ export default function UsersPage() {
   
   const columns = useMemo(() => getUserColumns(handleEditUser), []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setSignupUrl(`${window.location.origin}/signup`);
+    }
+  }, []);
+  
+  useEffect(() => {
+    if (!isProfileLoading && userRole?.id !== 'admin') {
+      toast({
+        variant: 'destructive',
+        title: 'Access Denied',
+        description: "You don't have permission to view the user management page.",
+      });
+      router.replace('/dashboard');
+    }
+  }, [isProfileLoading, userRole, router, toast]);
+
   if (isProfileLoading || userRole?.id !== 'admin') {
-    return null;
+    return (
+        <div className="flex h-full flex-1 items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Verifying permissions...</p>
+        </div>
+    );
   }
   
   return (

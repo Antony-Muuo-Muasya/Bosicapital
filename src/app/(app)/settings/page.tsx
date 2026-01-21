@@ -6,6 +6,7 @@ import { LoanProductsManagement } from '@/components/settings/loan-products-mana
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 
 export default function SettingsPage() {
@@ -25,9 +26,14 @@ export default function SettingsPage() {
     }
   }, [isLoading, userRole, router, toast]);
 
-  // Render nothing or a loader while checking permissions
+  // Render a loader while checking permissions
   if (isLoading || userRole?.id !== 'admin') {
-    return null;
+    return (
+        <div className="flex h-full flex-1 items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Verifying permissions...</p>
+        </div>
+    );
   }
 
   return (
