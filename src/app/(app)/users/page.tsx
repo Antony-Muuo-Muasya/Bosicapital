@@ -20,15 +20,28 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 export default function UsersPage() {
   const { userRole, isLoading: isProfileLoading } = useUserProfile();
   const router = useRouter();
+  const { toast } = useToast();
   const firestore = useFirestore();
 
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
+
+  useEffect(() => {
+    if (!isProfileLoading && userRole?.id !== 'admin') {
+      toast({
+        variant: 'destructive',
+        title: 'Access Denied',
+        description: "You don't have permission to view the user management page.",
+      });
+      router.replace('/dashboard');
+    }
+  }, [isProfileLoading, userRole, router, toast]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

@@ -5,11 +5,25 @@ import { useUserProfile } from '@/firebase';
 import { LoanProductsManagement } from '@/components/settings/loan-products-management';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 
 export default function SettingsPage() {
   const { userRole, isLoading } = useUserProfile();
   const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // If loading is done and the user is not an admin, redirect.
+    if (!isLoading && userRole?.id !== 'admin') {
+      toast({
+        variant: 'destructive',
+        title: 'Access Denied',
+        description: "You don't have permission to view the settings page.",
+      });
+      router.replace('/dashboard');
+    }
+  }, [isLoading, userRole, router, toast]);
 
   // Render nothing or a loader while checking permissions
   if (isLoading || userRole?.id !== 'admin') {
