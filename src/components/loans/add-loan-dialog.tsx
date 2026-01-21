@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,9 +22,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,
@@ -35,12 +35,14 @@ import {
 } from "@/components/ui/select";
 import type { Borrower, LoanProduct } from '@/lib/types';
 import { add } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 
 const loanSchema = z.object({
   borrowerId: z.string().min(1, 'Please select a borrower.'),
   loanProductId: z.string().min(1, 'Please select a loan product.'),
-  principal: z.coerce.number().positive('Principal must be a positive number.'),
+  principal: z.coerce.number().positive('Principal must be a positive number.').max(1000000, 'Principal cannot exceed 1,000,000.'),
 });
 
 type LoanFormData = z.infer<typeof loanSchema>;
@@ -50,11 +52,12 @@ interface AddLoanDialogProps {
   onOpenChange: (open: boolean) => void;
   borrowers: Borrower[];
   loanProducts: LoanProduct[];
+  isLoading: boolean;
 }
 
-export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: AddLoanDialogProps) {
+export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading }: AddLoanDialogProps) {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,12 +65,27 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
     resolver: zodResolver(loanSchema),
   });
 
-  const selectedProductId = form.watch('principal');
-  const selectedProduct = loanProducts.find(p => p.id === form.watch('loanProductId'));
+  const selectedProductId = form.watch('loanProductId');
+  const selectedProduct = loanProducts.find(p => p.id === selectedProductId);
   
+  const eligibleBorrowers = useMemo(() => {
+    return borrowers.filter(b => b.registrationFeePaid);
+  }, [borrowers]);
+
+
   useEffect(() => {
     const principal = form.watch('principal');
-    if (selectedProduct && (principal < selectedProduct.minAmount || principal > selectedProduct.maxAmount)) {
+    if (!selectedProduct || !principal) return;
+    
+    if (principal > 1000000) {
+        form.setError('principal', {
+            type: 'manual',
+            message: 'Principal cannot exceed 1,000,000.',
+        });
+        return;
+    }
+
+    if (principal < selectedProduct.minAmount || principal > selectedProduct.maxAmount) {
       form.setError('principal', {
         type: 'manual',
         message: `Amount must be between ${selectedProduct.minAmount} and ${selectedProduct.maxAmount}`,
@@ -75,11 +93,11 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
     } else {
       form.clearErrors('principal');
     }
-  }, [form, selectedProduct]);
+  }, [form, selectedProduct, form.watch('principal')]);
 
 
   const onSubmit = async (values: LoanFormData) => {
-    if (!user || !firestore || !selectedProduct) {
+    if (!user || !firestore || !selectedProduct || !userProfile) {
         toast({ variant: 'destructive', title: 'Error', description: 'Missing required information.' });
         return;
     }
@@ -96,6 +114,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
 
         const newLoanData = {
           id: loanRef.id,
+          organizationId: userProfile.organizationId,
           borrowerId: values.borrowerId,
           loanProductId: values.loanProductId,
           principal: values.principal,
@@ -144,7 +163,6 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
     } catch (error) {
         console.error("Error creating loan:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to create loan.' });
-        // The permission error will be caught by the global handler
     } finally {
         setIsSubmitting(false);
     }
@@ -159,17 +177,26 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
             Select a borrower, loan product, and enter the principal amount.
           </DialogDescription>
         </DialogHeader>
+        {eligibleBorrowers.length === 0 && !isLoading && (
+             <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>No Eligible Borrowers</AlertTitle>
+                <AlertDescription>
+                There are no registered borrowers available to receive a loan. Please ensure borrowers have paid their registration fee.
+                </AlertDescription>
+            </Alert>
+        )}
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="borrowerId" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Borrower</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading || eligibleBorrowers.length === 0}>
                             <FormControl>
-                                <SelectTrigger><SelectValue placeholder="Select a borrower" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Select a registered borrower" /></SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                {borrowers.map(b => <SelectItem key={b.id} value={b.id}>{b.fullName}</SelectItem>)}
+                                {eligibleBorrowers.map(b => <SelectItem key={b.id} value={b.id}>{b.fullName}</SelectItem>)}
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -178,7 +205,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
                 <FormField control={form.control} name="loanProductId" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Loan Product</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading || loanProducts.length === 0}>
                             <FormControl>
                                 <SelectTrigger><SelectValue placeholder="Select a loan product" /></SelectTrigger>
                             </FormControl>
@@ -192,12 +219,12 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
                 <FormField control={form.control} name="principal" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Principal Amount (USD)</FormLabel>
-                        <FormControl><Input type="number" placeholder="1000" {...field} /></FormControl>
+                        <FormControl><Input type="number" placeholder="1000" {...field} disabled={!selectedProductId} /></FormControl>
                         <FormMessage />
                     </FormItem>
                 )}/>
                 
-                {selectedProduct && (
+                {selectedProduct && form.getValues('principal') > 0 && !form.formState.errors.principal && (
                     <div className="text-sm text-muted-foreground space-y-1 rounded-md bg-muted p-3">
                        <p>Interest Rate: <strong>{selectedProduct.interestRate}%</strong></p>
                        <p>Duration: <strong>{selectedProduct.duration} months</strong></p>
@@ -208,7 +235,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button type="submit" disabled={isSubmitting || !selectedProduct}>
+                    <Button type="submit" disabled={isSubmitting || !selectedProduct || isLoading || eligibleBorrowers.length === 0}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Create Loan
                     </Button>
@@ -218,8 +245,4 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts }: A
       </DialogContent>
     </Dialog>
   );
-}
-
-function formatCurrency(amount: number) {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }

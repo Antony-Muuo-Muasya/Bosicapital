@@ -79,77 +79,35 @@
       "description": "Represents a borrower in the microfinancing system.",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "The unique identifier of the borrower."
-        },
-        "fullName": {
-          "type": "string",
-          "description": "The full name of the borrower."
-        },
-        "dateOfBirth": {
-          "type": "string",
-          "format": "date",
-          "description": "The borrower's date of birth."
-        },
-        "gender": {
-          "type": "string",
-          "enum": [
-            "Male",
-            "Female",
-            "Other"
-          ]
-        },
-        "nationalId": {
-          "type": "string",
-          "description": "The national identification number of the borrower."
-        },
-        "phone": {
-          "type": "string",
-          "description": "The borrower's phone number."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The borrower's email address."
-        },
-        "address": {
-          "type": "string",
-          "description": "The borrower's physical address."
-        },
-        "employmentStatus": {
-          "type": "string",
-          "enum": [
-            "Employed",
-            "Self-employed",
-            "Unemployed"
-          ]
-        },
-        "monthlyIncome": {
-          "type": "number",
-          "description": "The borrower's monthly income."
-        },
-        "photoUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL to the borrower's photo."
-        },
-        "branchId": {
-          "type": "string",
-          "description": "The ID of the branch the borrower belongs to."
-        },
-        "userId": {
-          "type": "string",
-          "description": "The ID of the user who created this borrower."
-        }
+        "id": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "dateOfBirth": { "type": "string", "format": "date" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "nationalId": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" },
+        "employmentStatus": { "type": "string", "enum": ["Employed", "Self-employed", "Unemployed"] },
+        "monthlyIncome": { "type": "number" },
+        "photoUrl": { "type": "string", "format": "uri" },
+        "branchId": { "type": "string" },
+        "userId": { "type": "string" },
+        "registrationFeeRequired": { "type": "boolean", "default": true },
+        "registrationFeeAmount": { "type": "number", "default": 800 },
+        "registrationFeePaid": { "type": "boolean", "default": false },
+        "registrationFeePaidAt": { "type": "string", "format": "date-time", "nullable": true },
+        "registrationPaymentId": { "type": "string", "nullable": true }
       },
       "required": [
         "id",
+        "organizationId",
         "fullName",
         "nationalId",
         "phone",
         "branchId",
-        "userId"
+        "userId",
+        "registrationFeePaid"
       ]
     },
     "Loan": {
@@ -157,54 +115,23 @@
       "description": "Represents a loan in the microfinancing system.",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "borrowerId": {
-          "type": "string"
-        },
-        "loanProductId": {
-          "type": "string"
-        },
-        "principal": {
-          "type": "number"
-        },
-        "interestRate": {
-          "type": "number"
-        },
-        "totalPayable": {
-          "type": "number"
-        },
-        "installmentAmount": {
-          "type": "number"
-        },
-        "duration": {
-          "type": "number"
-        },
-        "issueDate": {
-          "type": "string",
-          "format": "date"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "Draft",
-            "Pending Approval",
-            "Approved",
-            "Active",
-            "Completed",
-            "Rejected"
-          ]
-        },
-        "loanOfficerId": {
-          "type": "string"
-        },
-        "branchId": {
-          "type": "string"
-        }
+        "id": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "borrowerId": { "type": "string" },
+        "loanProductId": { "type": "string" },
+        "principal": { "type": "number" },
+        "interestRate": { "type": "number" },
+        "totalPayable": { "type": "number" },
+        "installmentAmount": { "type": "number" },
+        "duration": { "type": "number" },
+        "issueDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Draft", "Pending Approval", "Approved", "Active", "Completed", "Rejected"] },
+        "loanOfficerId": { "type": "string" },
+        "branchId": { "type": "string" }
       },
       "required": [
         "id",
+        "organizationId",
         "borrowerId",
         "loanProductId",
         "principal",
@@ -223,37 +150,19 @@
       "description": "Defines a type of loan product offered.",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "category": {
-          "type": "string"
-        },
-        "minAmount": {
-          "type": "number"
-        },
-        "maxAmount": {
-          "type": "number"
-        },
-        "interestRate": {
-          "type": "number"
-        },
-        "duration": {
-          "type": "number"
-        },
-        "repaymentCycle": {
-          "type": "string",
-          "enum": [
-            "Weekly",
-            "Monthly"
-          ]
-        }
+        "id": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "minAmount": { "type": "number" },
+        "maxAmount": { "type": "number" },
+        "interestRate": { "type": "number" },
+        "duration": { "type": "number" },
+        "repaymentCycle": { "type": "string", "enum": ["Weekly", "Monthly"] }
       },
       "required": [
         "id",
+        "organizationId",
         "name",
         "interestRate",
         "duration",
@@ -267,82 +176,47 @@
       "description": "Represents a single repayment installment for a loan.",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "loanId": {
-          "type": "string"
-        },
-        "installmentNumber": {
-          "type": "number"
-        },
-        "dueDate": {
-          "type": "string",
-          "format": "date"
-        },
-        "expectedAmount": {
-          "type": "number"
-        },
-        "paidAmount": {
-          "type": "number"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "Paid",
-            "Unpaid",
-            "Partial",
-            "Overdue"
-          ]
-        }
+        "id": { "type": "string" },
+        "loanId": { "type": "string" },
+        "installmentNumber": { "type": "number" },
+        "dueDate": { "type": "string", "format": "date" },
+        "expectedAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Paid", "Unpaid", "Partial", "Overdue"] }
       },
-      "required": [
-        "id",
-        "loanId",
-        "dueDate",
-        "expectedAmount",
-        "installmentNumber",
-        "paidAmount",
-        "status"
-      ]
+      "required": ["id", "loanId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
     },
     "Repayment": {
       "title": "Repayment",
       "description": "Represents a payment made for a loan.",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "loanId": {
-          "type": "string"
-        },
-        "amount": {
-          "type": "number"
-        },
-        "paymentDate": {
-          "type": "string",
-          "format": "date"
-        },
-        "collectedById": {
-          "type": "string"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "Cash",
-            "Bank Transfer",
-            "Mobile Money"
-          ]
-        }
+        "id": { "type": "string" },
+        "loanId": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentDate": { "type": "string", "format": "date" },
+        "collectedById": { "type": "string" },
+        "method": { "type": "string", "enum": ["Cash", "Bank Transfer", "Mobile Money"] }
       },
-      "required": [
-        "id",
-        "loanId",
-        "amount",
-        "paymentDate",
-        "collectedById"
-      ]
+      "required": ["id", "loanId", "amount", "paymentDate", "collectedById"]
+    },
+    "RegistrationPayment": {
+      "title": "Registration Payment",
+      "description": "Represents a one-time registration fee payment for a borrower.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "borrowerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "default": "KES" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Bank Transfer", "Mobile Money"] },
+        "reference": { "type": "string" },
+        "collectedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["confirmed"], "default": "confirmed" }
+      },
+      "required": ["id", "organizationId", "borrowerId", "amount", "paymentMethod", "collectedBy", "createdAt"]
     }
   },
   "auth": {
@@ -356,9 +230,7 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
+          "schema": { "$ref": "#/backend/entities/User" },
           "description": "Stores user data, including roles and permissions."
         }
       },
@@ -382,9 +254,7 @@
         "path": "/borrowers/{borrowerId}",
         "definition": {
           "entityName": "Borrower",
-          "schema": {
-            "$ref": "#/backend/entities/Borrower"
-          },
+          "schema": { "$ref": "#/backend/entities/Borrower" },
           "description": "Stores information about individual borrowers."
         }
       },
@@ -392,9 +262,7 @@
         "path": "/loans/{loanId}",
         "definition": {
           "entityName": "Loan",
-          "schema": {
-            "$ref": "#/backend/entities/Loan"
-          },
+          "schema": { "$ref": "#/backend/entities/Loan" },
           "description": "Stores individual loan records."
         }
       },
@@ -402,9 +270,7 @@
         "path": "/loans/{loanId}/installments/{installmentId}",
         "definition": {
           "entityName": "Installment",
-          "schema": {
-            "$ref": "#/backend/entities/Installment"
-          },
+          "schema": { "$ref": "#/backend/entities/Installment" },
           "description": "Stores installments for a specific loan."
         }
       },
@@ -412,9 +278,7 @@
         "path": "/loanProducts/{loanProductId}",
         "definition": {
           "entityName": "LoanProduct",
-          "schema": {
-            "$ref": "#/backend/entities/LoanProduct"
-          },
+          "schema": { "$ref": "#/backend/entities/LoanProduct" },
           "description": "Stores loan product definitions."
         }
       },
@@ -422,10 +286,16 @@
         "path": "/repayments/{repaymentId}",
         "definition": {
           "entityName": "Repayment",
-          "schema": {
-            "$ref": "#/backend/entities/Repayment"
-          },
+          "schema": { "$ref": "#/backend/entities/Repayment" },
           "description": "Stores repayment records."
+        }
+      },
+      {
+        "path": "/registrationPayments/{paymentId}",
+        "definition": {
+            "entityName": "RegistrationPayment",
+            "schema": { "$ref": "#/backend/entities/RegistrationPayment" },
+            "description": "Stores one-time registration fee payment records for borrowers."
         }
       }
     ]

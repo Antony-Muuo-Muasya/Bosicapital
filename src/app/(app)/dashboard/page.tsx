@@ -7,11 +7,10 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import type { Loan, Borrower, Installment } from '@/lib/types';
+import type { Loan, Borrower, Installment, LoanProduct, RegistrationPayment } from '@/lib/types';
 import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
-import { loanProducts } from '@/lib/data';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
@@ -20,6 +19,8 @@ export default function DashboardPage() {
   // Queries
   const loansQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loans') : null, [firestore]);
   const borrowersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'borrowers') : null, [firestore]);
+  const loanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+  const regPaymentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'registrationPayments') : null, [firestore]);
   
   const installmentsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -31,6 +32,8 @@ export default function DashboardPage() {
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
   const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: loanProducts, isLoading: loanProductsLoading } = useCollection<LoanProduct>(loanProductsQuery);
+  const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
 
   const dueInstallmentsWithDetails = useMemo(() => {
     if (!installments || !loans || !borrowers) return [];
@@ -57,7 +60,7 @@ export default function DashboardPage() {
       .slice(0, 10); // Limit to 10 for the dashboard
   }, [installments, loans, borrowers]);
 
-  const isLoading = loansLoading || borrowersLoading || installmentsLoading;
+  const isLoading = loansLoading || borrowersLoading || installmentsLoading || loanProductsLoading || regPaymentsLoading;
 
   const aiInput = useMemo(() => {
     if (isLoading || !installments || !loans || !borrowers) {
@@ -119,7 +122,7 @@ export default function DashboardPage() {
         </Button>
       </PageHeader>
       <div className="p-4 md:p-6 grid gap-6">
-        <OverviewCards loans={loans} installments={installments} borrowers={borrowers} isLoading={isLoading} />
+        <OverviewCards loans={loans} installments={installments} borrowers={borrowers} regPayments={regPayments} isLoading={isLoading} />
         <div className="grid gap-6 xl:grid-cols-5">
           <div className="xl:col-span-3">
             <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
@@ -134,6 +137,7 @@ export default function DashboardPage() {
         onOpenChange={setIsAddLoanOpen}
         borrowers={borrowers || []}
         loanProducts={loanProducts || []}
+        isLoading={isLoading}
        />
     </>
   );

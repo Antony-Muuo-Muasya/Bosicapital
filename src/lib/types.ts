@@ -39,6 +39,7 @@ export type Branch = {
 
 export type Borrower = {
   id: string;
+  organizationId: string;
   fullName: string;
   dateOfBirth: string;
   gender: 'Male' | 'Female' | 'Other';
@@ -50,10 +51,17 @@ export type Borrower = {
   monthlyIncome: number;
   photoUrl: string;
   branchId: string;
+  registrationFeeRequired: boolean;
+  registrationFeeAmount: number;
+  registrationFeePaid: boolean;
+  registrationFeePaidAt: string | null;
+  registrationPaymentId: string | null;
+  userId: string;
 };
 
 export type LoanProduct = {
   id: string;
+  organizationId: string;
   name: string;
   category: string;
   minAmount: number;
@@ -65,6 +73,7 @@ export type LoanProduct = {
 
 export type Loan = {
   id: string;
+  organizationId: string;
   borrowerId: string;
   loanProductId: string;
   principal: number;
@@ -89,10 +98,23 @@ export type Installment = {
 };
 
 export type Repayment = {
-  id: string;
+  id:string;
   loanId: string;
   amount: number;
   paymentDate: string;
   collectedById: string;
   method: 'Cash' | 'Bank Transfer' | 'Mobile Money';
+};
+
+export type RegistrationPayment = {
+    id: string;
+    organizationId: string;
+    borrowerId: string;
+    amount: number;
+    currency: string;
+    paymentMethod: 'Cash' | 'Bank Transfer' | 'Mobile Money';
+    reference: string;
+    collectedBy: string;
+    createdAt: string;
+    status: 'confirmed';
 };

@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -55,7 +55,7 @@ interface AddBorrowerDialogProps {
 
 export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps) {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -75,7 +75,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   });
 
   const onSubmit = (values: BorrowerFormData) => {
-    if (!user || !firestore) {
+    if (!user || !firestore || !userProfile) {
         toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or database not available.' });
         return;
     }
@@ -90,6 +90,12 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
       userId: user.uid,
       photoUrl: `https://picsum.photos/seed/${newBorrowerRef.id}/400/400`,
       branchId: 'branch-1',
+      organizationId: userProfile.organizationId,
+      registrationFeeRequired: true,
+      registrationFeeAmount: 800,
+      registrationFeePaid: false,
+      registrationFeePaidAt: null,
+      registrationPaymentId: null,
     };
 
     setDoc(newBorrowerRef, newBorrowerData, { merge: false })

@@ -13,7 +13,6 @@ service cloud.firestore {
     // Function to get the user's role ID from their user document
     function getUserRoleId() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      // Default to a non-existent role if the user document or roleId doesn't exist.
       if (!('roleId' in userDoc.data)) {
         return 'none';
       }
@@ -22,78 +21,67 @@ service cloud.firestore {
 
     // --- Collection Rules ---
 
-    // Rules for users collection
     match /users/{userId} {
-      // Admins can read all user profiles. Users can read their own.
       allow read: if isAuthenticated() && (getUserRoleId() == 'admin' || isOwner(userId));
-
-      // Only admins can create, update, or delete users.
-      // NOTE: This prevents users from updating their own profile via Firestore directly.
-      // Profile updates from the client will need to be handled carefully.
       allow create, update, delete: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
-    // Rules for roles collection
     match /roles/{roleId} {
-      // All authenticated users can read roles to understand permissions.
       allow read: if isAuthenticated();
-      // Only admins can manage roles.
       allow write: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
-    // Rules for auditLogs collection
     match /auditLogs/{logId} {
-      // Only admins can read audit logs.
       allow read: if isAuthenticated() && getUserRoleId() == 'admin';
-      // Logs are append-only, created by admins during user management.
       allow create: if isAuthenticated() && getUserRoleId() == 'admin';
       allow update, delete: if false;
     }
 
-    // Rules for borrowers collection
     match /borrowers/{borrowerId} {
-      // Admin, Manager, Loan Officer, and Auditor can read.
       allow read: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer', 'auditor'];
-      // Admin, Manager, and Loan Officer can create.
       allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'];
-      // Only Admin and Manager can update/delete.
-      allow update, delete: if isAuthenticated() && getUserRoleId() in ['admin', 'manager'];
+      allow update: if isAuthenticated() && getUserRoleId() in ['admin', 'manager'] &&
+        // Prevent registration fee status from being tampered with.
+        // It can only be changed from false to true, and only if a valid payment record exists.
+        (request.resource.data.registrationFeePaid == resource.data.registrationFeePaid ||
+          (request.resource.data.registrationFeePaid == true && resource.data.registrationFeePaid == false && exists(/databases/$(database)/documents/registrationPayments/$(request.resource.data.registrationPaymentId)))
+        );
+      allow delete: if isAuthenticated() && getUserRoleId() in ['admin', 'manager'];
     }
 
-    // Rules for loans collection and installments subcollection
     match /loans/{loanId} {
-      // All internal roles can read loan data.
       allow read: if isAuthenticated();
-      // Admin, Manager, and Loan Officer can create loans.
-      allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'];
-      // Admin and Manager can approve/update loans (e.g., change status).
+      allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'] &&
+        // Enforce registration fee payment and max loan amount
+        get(/databases/$(database)/documents/borrowers/$(request.resource.data.borrowerId)).data.registrationFeePaid == true &&
+        request.resource.data.principal <= 1000000;
       allow update: if isAuthenticated() && getUserRoleId() in ['admin', 'manager'];
-      // Deletion is disallowed for data integrity.
       allow delete: if false;
 
-      // Rules for installments subcollection
       match /installments/{installmentId} {
         allow read: if isAuthenticated();
-        // Admin, Manager, Loan Officer can update installments (e.g. marking as paid).
         allow write: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'];
       }
     }
 
-    // Rules for loanProducts collection
     match /loanProducts/{productId} {
       allow read: if isAuthenticated();
-      // Only admins can create/update/delete products.
       allow write: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
-    // Rules for repayments collection
     match /repayments/{repaymentId} {
-      // Admin, Manager, Loan Officer can read repayments.
       allow read: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'];
-      // Admin, Manager, Loan Officer can create repayments.
       allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'];
-      // Repayments are records of transactions, so they should be immutable.
       allow update, delete: if false;
+    }
+
+    match /registrationPayments/{paymentId} {
+        allow read: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer', 'auditor'];
+        allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'] &&
+            // Enforce correct fee amount and prevent duplicate payments
+            request.resource.data.amount == 800 &&
+            get(/databases/$(database)/documents/borrowers/$(request.resource.data.borrowerId)).data.registrationFeePaid == false;
+        allow update, delete: if false; // Payments are immutable
     }
   }
 }

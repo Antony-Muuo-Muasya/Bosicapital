@@ -7,14 +7,17 @@ import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebas
 import { collection } from 'firebase/firestore';
 import type { Borrower } from '@/lib/types';
 import { BorrowersDataTable } from '@/components/borrowers/borrowers-data-table';
-import { columns } from '@/components/borrowers/columns';
+import { getBorrowerColumns } from '@/components/borrowers/columns';
 import { AddBorrowerDialog } from '@/components/borrowers/add-borrower-dialog';
-import { useState } from 'react';
+import { PayRegistrationFeeDialog } from '@/components/borrowers/pay-registration-fee-dialog';
+import { useState, useMemo } from 'react';
 
 export default function BorrowersPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedBorrower, setSelectedBorrower] = useState<Borrower | null>(null);
 
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -22,6 +25,13 @@ export default function BorrowersPage() {
   }, [firestore, user]);
 
   const { data: borrowers, isLoading } = useCollection<Borrower>(borrowersQuery);
+
+  const handleRecordPayment = (borrower: Borrower) => {
+    setSelectedBorrower(borrower);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment), []);
 
   return (
     <>
@@ -37,6 +47,13 @@ export default function BorrowersPage() {
         {!isLoading && !borrowers && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">No borrowers found.</div>}
       </div>
       <AddBorrowerDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
+      {selectedBorrower && (
+        <PayRegistrationFeeDialog 
+            open={isPaymentDialogOpen}
+            onOpenChange={setIsPaymentDialogOpen}
+            borrower={selectedBorrower}
+        />
+      )}
     </>
   );
 }

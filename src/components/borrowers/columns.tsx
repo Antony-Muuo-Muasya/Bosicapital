@@ -16,13 +16,14 @@ import { MoreHorizontal } from 'lucide-react';
 import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
+import { Badge } from '../ui/badge';
 
-const BorrowerActions = ({ borrowerId }: { borrowerId: string }) => {
+const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void }) => {
   const firestore = useFirestore();
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this borrower?')) {
-      const borrowerDocRef = doc(firestore, 'borrowers', borrowerId);
+      const borrowerDocRef = doc(firestore, 'borrowers', borrower.id);
       deleteDocumentNonBlocking(borrowerDocRef);
     }
   };
@@ -37,10 +38,15 @@ const BorrowerActions = ({ borrowerId }: { borrowerId: string }) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(borrowerId)}>
+        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(borrower.id)}>
           Copy borrower ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        {!borrower.registrationFeePaid && (
+          <DropdownMenuItem onClick={() => onRecordPayment(borrower)}>
+            Record Payment
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem>Edit Borrower</DropdownMenuItem>
         <DropdownMenuItem onClick={handleDelete} className="text-destructive">
           Delete Borrower
@@ -50,7 +56,7 @@ const BorrowerActions = ({ borrowerId }: { borrowerId: string }) => {
   );
 };
 
-export const columns: ColumnDef<Borrower>[] = [
+export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void): ColumnDef<Borrower>[] => [
   {
     accessorKey: 'fullName',
     header: 'Name',
@@ -75,8 +81,16 @@ export const columns: ColumnDef<Borrower>[] = [
     header: 'Phone',
   },
   {
-    accessorKey: 'address',
-    header: 'Address',
+    accessorKey: 'registrationFeePaid',
+    header: 'Registration',
+    cell: ({ row }) => {
+      const isPaid = row.getValue('registrationFeePaid') as boolean;
+      return (
+        <Badge variant={isPaid ? 'default' : 'destructive'} className={isPaid ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}>
+          {isPaid ? 'Registered' : 'Fee Due'}
+        </Badge>
+      );
+    },
   },
   {
     accessorKey: 'monthlyIncome',
@@ -92,7 +106,7 @@ export const columns: ColumnDef<Borrower>[] = [
     id: 'actions',
     cell: ({ row }) => {
       const borrower = row.original;
-      return <BorrowerActions borrowerId={borrower.id} />;
+      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} />;
     },
   },
 ];

@@ -6,14 +6,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { CircleDollarSign, Landmark, Users, AlertTriangle } from 'lucide-react';
-import type { Loan, Installment, Borrower } from '@/lib/types';
+import { CircleDollarSign, Landmark, Users, AlertTriangle, HandCoins, UserCheck } from 'lucide-react';
+import type { Loan, Installment, Borrower, RegistrationPayment } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
 interface OverviewCardsProps {
   loans: Loan[] | null;
   installments: Installment[] | null;
   borrowers: Borrower[] | null;
+  regPayments: RegistrationPayment[] | null;
   isLoading: boolean;
 }
 
@@ -40,7 +41,7 @@ const StatCard = ({ title, value, icon: Icon, description, className, isLoading 
 );
 
 
-export function OverviewCards({ loans, installments, borrowers, isLoading }: OverviewCardsProps) {
+export function OverviewCards({ loans, installments, borrowers, regPayments, isLoading }: OverviewCardsProps) {
 
   const totalPortfolio = loans
     ? loans.filter(l => l.status === 'Active').reduce((sum, loan) => sum + loan.principal, 0)
@@ -56,6 +57,9 @@ export function OverviewCards({ loans, installments, borrowers, isLoading }: Ove
     ? new Set(installments.filter(i => i.status === 'Overdue').map(i => i.loanId)).size
     : 0;
   
+  const totalRegFees = regPayments ? regPayments.reduce((sum, p) => sum + p.amount, 0) : 0;
+  const registeredBorrowers = borrowers ? borrowers.filter(b => b.registrationFeePaid).length : 0;
+
   const stats = [
     {
       title: 'Total Portfolio',
@@ -64,10 +68,22 @@ export function OverviewCards({ loans, installments, borrowers, isLoading }: Ove
       description: `${activeLoansCount} active loans`,
     },
     {
-      title: 'Total Borrowers',
+      title: 'Active Borrowers',
       value: borrowers?.length ?? 0,
       icon: Users,
       description: 'Across all branches',
+    },
+     {
+      title: 'Registered Borrowers',
+      value: registeredBorrowers,
+      icon: UserCheck,
+      description: `${(borrowers?.length || 0) - registeredBorrowers} pending registration`,
+    },
+    {
+      title: 'Registration Fees',
+      value: formatCurrency(totalRegFees, 'KES'),
+      icon: HandCoins,
+      description: 'Total collected',
     },
     {
       title: 'Total Overdue',
@@ -76,16 +92,10 @@ export function OverviewCards({ loans, installments, borrowers, isLoading }: Ove
       description: `${overdueLoansCount} loans with overdue payments`,
       className: 'text-destructive',
     },
-    {
-      title: 'Branches',
-      value: '3', // Static until branch management is implemented
-      icon: Landmark,
-      description: '1 new branch this quarter',
-    },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       {stats.map((stat) => (
         <StatCard key={stat.title} {...stat} isLoading={isLoading} />
       ))}

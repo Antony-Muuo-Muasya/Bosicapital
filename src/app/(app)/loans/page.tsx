@@ -10,7 +10,6 @@ import { LoansDataTable } from '@/components/loans/loans-data-table';
 import { columns } from '@/components/loans/columns';
 import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
 import { useState, useMemo } from 'react';
-import { loanProducts } from '@/lib/data';
 
 export default function LoansPage() {
   const { user } = useUser();
@@ -27,11 +26,18 @@ export default function LoansPage() {
     return collection(firestore, 'borrowers');
   }, [firestore, user]);
 
+  const loanProductsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'loanProducts');
+  }, [firestore, user]);
+
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
+  const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
+
 
   const loansWithDetails = useMemo(() => {
-    if (!loans || !borrowers) return [];
+    if (!loans || !borrowers || !loanProducts) return [];
     
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
     const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
@@ -43,14 +49,14 @@ export default function LoansPage() {
       loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown Product',
     }));
 
-  }, [loans, borrowers]);
+  }, [loans, borrowers, loanProducts]);
 
-  const isLoading = isLoadingLoans || isLoadingBorrowers;
+  const isLoading = isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
 
   return (
     <>
       <PageHeader title="Loans" description="View and manage all loans across branches.">
-        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isLoadingBorrowers || !borrowers}>
+        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isLoading}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Loan
         </Button>
@@ -65,6 +71,7 @@ export default function LoansPage() {
         onOpenChange={setIsAddDialogOpen}
         borrowers={borrowers || []}
         loanProducts={loanProducts || []}
+        isLoading={isLoading}
        />
     </>
   );
