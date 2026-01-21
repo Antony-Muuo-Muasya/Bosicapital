@@ -28,14 +28,14 @@ export default function AppLayout({
     if (firestore && user && !userProfile && !isLoading) {
         const userDocRef = doc(firestore, 'users', user.uid);
         
-        // Default new users to 'loan_officer'.
-        // In a real app, the first user might be made an admin, or an admin would invite them.
+        // Default new users to 'admin' to facilitate the creation of the first admin account.
+        // In a real app, this would be handled by a more robust user invitation system.
         const newUserProfile: AppUser = {
             id: user.uid,
             organizationId: 'org_1', // Default organization
             fullName: user.displayName || 'New User',
             email: user.email!,
-            roleId: 'loan_officer', // Default role for new sign-ups
+            roleId: 'admin', // Default role for new sign-ups
             branchIds: ['branch-1'], // Default branch
             status: 'active',
             createdAt: new Date().toISOString(),
