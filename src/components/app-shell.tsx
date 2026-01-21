@@ -76,7 +76,12 @@ function SidebarNav() {
   const { userRole } = useUserProfile();
 
   const visibleNavItems = React.useMemo(() => {
-    if (!userRole) return [];
+    // The role-based filtering was causing the menu to disappear if the user's role
+    // wasn't immediately available. To ensure the menu is always present, we are
+    // showing all items and relying on page-level permissions to restrict access.
+    if (!userRole) {
+      return allNavItems;
+    }
     // @ts-ignore
     return allNavItems.filter(item => item.roles.includes(userRole.id));
   }, [userRole]);

@@ -1,6 +1,23 @@
+'use client';
 import { PageHeader } from '@/components/page-header';
+import { useUserProfile } from '@/firebase';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function UsersPage() {
+  const { userRole, isLoading } = useUserProfile();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && userRole?.id !== 'admin') {
+      router.push('/access-denied');
+    }
+  }, [isLoading, userRole, router]);
+
+  if (isLoading || userRole?.id !== 'admin') {
+    return null;
+  }
+  
   return (
     <>
       <PageHeader title="User Management" description="Create, edit, and manage user accounts and roles." />

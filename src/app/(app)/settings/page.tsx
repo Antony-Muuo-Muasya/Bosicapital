@@ -3,16 +3,23 @@ import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUserProfile } from '@/firebase';
 import { LoanProductsManagement } from '@/components/settings/loan-products-management';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 
 export default function SettingsPage() {
-  const { userRole } = useUserProfile();
+  const { userRole, isLoading } = useUserProfile();
+  const router = useRouter();
 
-  // Admins are the only ones who should see this page.
-  // The navigation is already hidden, but this prevents direct access.
-  if (userRole?.id !== 'admin') {
-    // Or redirect to an access denied page
-    return null; 
+  useEffect(() => {
+    if (!isLoading && userRole?.id !== 'admin') {
+      router.push('/access-denied');
+    }
+  }, [isLoading, userRole, router]);
+
+  // Render nothing or a loader while checking permissions
+  if (isLoading || userRole?.id !== 'admin') {
+    return null;
   }
 
   return (
