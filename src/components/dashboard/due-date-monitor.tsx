@@ -7,9 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { generateDueDateRecommendationsAction } from '@/app/actions';
-import { dueDateAiExample } from '@/lib/data';
 import { Lightbulb, AlertTriangle, Loader2 } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
 
 const initialState = {
   recommendations: '',
@@ -43,8 +43,9 @@ const getRiskVariant = (risk: string | null) => {
     }
 }
 
-export function DueDateMonitor() {
+export function DueDateMonitor({ aiInput }: { aiInput: DueDateMonitoringInput }) {
   const [state, formAction] = useFormState(generateDueDateRecommendationsAction, initialState);
+  const formKey = JSON.stringify(aiInput);
 
   return (
     <Card className="h-full flex flex-col">
@@ -53,28 +54,28 @@ export function DueDateMonitor() {
         <CardDescription>Analyze factors to get repayment recommendations.</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow grid gap-4">
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} key={formKey} className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="repaymentHistory">Repayment History</Label>
-            <Textarea id="repaymentHistory" name="repaymentHistory" placeholder="Enter repayment details" rows={3} defaultValue={dueDateAiExample.repaymentHistory} />
+            <Textarea id="repaymentHistory" name="repaymentHistory" placeholder="Enter repayment details" rows={3} defaultValue={aiInput.repaymentHistory} />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="externalEvents">External Events</Label>
-            <Textarea id="externalEvents" name="externalEvents" placeholder="e.g., economic downturns, local events" rows={2} defaultValue={dueDateAiExample.externalEvents} />
+            <Textarea id="externalEvents" name="externalEvents" placeholder="e.g., economic downturns, local events" rows={2} defaultValue={aiInput.externalEvents} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
                 <Label htmlFor="upcomingSchedule">Upcoming</Label>
-                <Textarea id="upcomingSchedule" name="upcomingSchedule" rows={2} defaultValue={dueDateAiExample.upcomingSchedule} />
+                <Textarea id="upcomingSchedule" name="upcomingSchedule" rows={2} defaultValue={aiInput.upcomingSchedule} />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="overdueSchedule">Overdue</Label>
-                <Textarea id="overdueSchedule" name="overdueSchedule" rows={2} defaultValue={dueDateAiExample.overdueSchedule} />
+                <Textarea id="overdueSchedule" name="overdueSchedule" rows={2} defaultValue={aiInput.overdueSchedule} />
             </div>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="currentSchedule">Current Schedule Summary</Label>
-            <Textarea id="currentSchedule" name="currentSchedule" placeholder="e.g., All other loans are current." rows={1} defaultValue={dueDateAiExample.currentSchedule} />
+            <Textarea id="currentSchedule" name="currentSchedule" placeholder="e.g., All other loans are current." rows={1} defaultValue={aiInput.currentSchedule} />
           </div>
           <SubmitButton />
         </form>

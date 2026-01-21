@@ -9,6 +9,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, Timestamp } from 'firebase/firestore';
 import type { Loan, Borrower, Installment } from '@/lib/types';
 import { useMemo } from 'react';
+import { formatCurrency } from '@/lib/utils';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
@@ -55,8 +56,55 @@ export default function DashboardPage() {
       .slice(0, 10); // Limit to 10 for the dashboard
   }, [installments, loans, borrowers]);
 
-
   const isLoading = loansLoading || borrowersLoading || installmentsLoading;
+
+  const aiInput = useMemo(() => {
+    if (isLoading || !installments || !loans || !borrowers) {
+        return {
+            repaymentHistory: 'Loading...',
+            externalEvents: 'Local news reports heavy flooding in the North District...', // Keep this one as example
+            upcomingSchedule: 'Loading...',
+            overdueSchedule: 'Loading...',
+            currentSchedule: 'Loading...',
+        };
+    }
+
+    const loansMap = new Map(loans.map(l => [l.id, l]));
+    const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
+
+    const overdue = installments.filter(i => i.status === 'Overdue');
+    const upcoming = installments.filter(i => i.status === 'Unpaid' || i.status === 'Partial');
+
+    const formatInstallment = (inst: (Installment & {borrowerName?: string})) => {
+        const loan = loansMap.get(inst.loanId);
+        const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
+        const borrowerName = borrower?.fullName || 'Unknown';
+        return `${inst.loanId} (${borrowerName}): Installment ${inst.installmentNumber} for ${formatCurrency(inst.expectedAmount - inst.paidAmount)} due ${new Date(inst.dueDate).toLocaleDateString()}.`;
+    }
+
+    const overdueSchedule = overdue.length > 0 ? overdue.map(formatInstallment).join('\n') : 'No overdue payments.';
+    const upcomingSchedule = upcoming.length > 0 ? upcoming.map(formatInstallment).join('\n') : 'No upcoming payments.';
+    
+    // Simplistic history generation
+    const repaymentHistory = borrowers.slice(0, 2).map(b => {
+        const borrowerLoans = loans.filter(l => l.borrowerId === b.id);
+        const loanIds = borrowerLoans.map(l => l.id).join(', ');
+        if (borrowerLoans.length === 0) return `No loans for ${b.fullName}.`;
+        
+        const recentInstallments = installments.filter(i => loanIds.includes(i.loanId));
+        const history = recentInstallments.length > 0 ? `Recent status for ${b.fullName} on loans ${loanIds}: ${recentInstallments.map(i => `${i.status} on ${new Date(i.dueDate).toLocaleDateString()}`).join(', ')}` : `No recent installments for ${b.fullName}`;
+        return history;
+    }).join('\n');
+
+    return {
+        repaymentHistory: repaymentHistory || 'No significant repayment history to analyze.',
+        externalEvents: 'National economic news indicates a 5% increase in fuel prices, affecting transport and logistics.', // Keeping as example
+        upcomingSchedule,
+        overdueSchedule,
+        currentSchedule: 'All other loans are current.' // simplified
+    }
+
+}, [installments, loans, borrowers, isLoading]);
 
   return (
     <>
@@ -76,7 +124,7 @@ export default function DashboardPage() {
             <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
           </div>
           <div className="xl:col-span-2">
-            <DueDateMonitor />
+            <DueDateMonitor aiInput={aiInput} />
           </div>
         </div>
       </div>

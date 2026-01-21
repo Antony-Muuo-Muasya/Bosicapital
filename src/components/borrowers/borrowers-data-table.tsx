@@ -6,6 +6,8 @@ import {
   getCoreRowModel,
   useReactTable,
   getPaginationRowModel,
+  getFilteredRowModel,
+  ColumnFiltersState,
 } from '@tanstack/react-table';
 
 import {
@@ -17,6 +19,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
+import { useState } from 'react';
+import { Input } from '../ui/input';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -27,15 +31,33 @@ export function BorrowersDataTable<TData, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
+        []
+      )
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
+    state: {
+        columnFilters,
+    }
   });
 
   return (
-    <div>
+    <div className="space-y-4">
+      <div className="flex items-center">
+            <Input
+            placeholder="Filter by name..."
+            value={(table.getColumn("fullName")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+                table.getColumn("fullName")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm"
+            />
+      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>

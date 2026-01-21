@@ -21,6 +21,13 @@ import {
 import { Button } from '../ui/button';
 import { useState } from 'react';
 import { Input } from '../ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -48,7 +55,7 @@ export function LoansDataTable<TData, TValue>({
 
   return (
     <div className='space-y-4'>
-        <div className="flex items-center">
+        <div className="flex items-center gap-4">
             <Input
             placeholder="Filter by borrower name..."
             value={(table.getColumn("borrowerName")?.getFilterValue() as string) ?? ""}
@@ -57,6 +64,25 @@ export function LoansDataTable<TData, TValue>({
             }
             className="max-w-sm"
             />
+            {table.getColumn("status") && (
+            <Select
+                value={(table.getColumn("status")?.getFilterValue() as string) ?? "all"}
+                onValueChange={(value) =>
+                table.getColumn("status")?.setFilterValue(value === "all" ? "" : value)
+                }
+            >
+                <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Pending Approval">Pending Approval</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Rejected">Rejected</SelectItem>
+                </SelectContent>
+            </Select>
+            )}
       </div>
       <div className="rounded-md border">
         <Table>

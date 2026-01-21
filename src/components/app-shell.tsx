@@ -26,6 +26,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth, useUser } from '@/firebase';
+import { ThemeToggle } from './theme-toggle';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
@@ -117,6 +118,7 @@ function Header() {
           <span className="font-normal">Smart Microfinancing</span>
         </h1>
       </div>
+      <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="rounded-full">
@@ -130,7 +132,9 @@ function Header() {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Profile</DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/profile">Profile</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => auth.signOut()}>
