@@ -36,6 +36,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    match /branches/{branchId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+    }
+
     match /borrowers/{borrowerId} {
       allow read: if isAuthenticated();
       // loan_officer or higher can create/update borrowers

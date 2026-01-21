@@ -4,8 +4,8 @@ import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { doc, collection, getDocs, writeBatch } from 'firebase/firestore';
-import type { User as AppUser, Role } from '@/lib/types';
+import { doc, collection, getDocs, writeBatch, query, where, setDoc } from 'firebase/firestore';
+import type { User as AppUser, Role, Branch } from '@/lib/types';
 
 
 export default function AppLayout({
@@ -27,11 +27,7 @@ export default function AppLayout({
 
     // Only proceed if services are available and user is loaded.
     if (firestore && user && !isLoading) {
-        const userDocRef = doc(firestore, 'users', user.uid);
 
-        // --- CRITICAL FIX: Seed roles as soon as possible ---
-        // This must run before user profile logic to ensure the 'admin' role document
-        // exists when the first admin user is created or promoted.
         const seedRoles = async () => {
             const rolesColRef = collection(firestore, 'roles');
             const rolesSnapshot = await getDocs(rolesColRef);
@@ -84,9 +80,30 @@ export default function AppLayout({
             }
         };
 
-        // Run role seeding, then proceed with user profile logic.
-        seedRoles().then(() => {
+        const seedMainBranch = async () => {
+            const branchesColRef = collection(firestore, 'branches');
+            const mainBranchQuery = query(branchesColRef, where('isMain', '==', true));
+            const mainBranchSnapshot = await getDocs(mainBranchQuery);
+        
+            if (mainBranchSnapshot.empty) {
+                const mainBranchRef = doc(firestore, 'branches', 'branch-1');
+                const organizationId = userProfile?.organizationId || 'org_1';
+                const newMainBranch = {
+                    id: 'branch-1',
+                    name: 'Headquarters',
+                    location: 'Main City',
+                    isMain: true,
+                    organizationId,
+                };
+                await setDoc(mainBranchRef, newMainBranch);
+                console.log('Main branch has been seeded to Firestore.');
+            }
+        };
+
+        // Run seeding, then proceed with user profile logic.
+        seedRoles().then(seedMainBranch).then(() => {
             if (!userProfile) {
+                const userDocRef = doc(firestore, 'users', user.uid);
                 // SCENARIO 1: First-time user. Create their profile document.
                 const newUserProfile: AppUser = {
                     id: user.uid,
@@ -99,17 +116,13 @@ export default function AppLayout({
                     createdAt: new Date().toISOString(),
                 };
                 
-                // Use a non-blocking write. The UI will show a loader until the profile is available.
                 setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
             }
         }).catch(console.error);
     }
   }, [user, userProfile, isLoading, router, firestore]);
   
-  // Render blocking logic based on auth and profile state.
-  
   if (isLoading || !user) {
-    // Primary loading state while checking auth.
     return (
       <div className="flex h-screen items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -119,8 +132,6 @@ export default function AppLayout({
   }
 
   if (!userProfile) {
-    // User is authenticated, but their profile document is not yet available.
-    // This state occurs for first-time users while their profile is being created.
     return (
      <div className="flex h-screen items-center justify-center gap-4">
        <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -129,6 +140,5 @@ export default function AppLayout({
    );
   }
 
-  // All checks passed, render the main application shell.
   return <AppShell>{children}</AppShell>;
 }

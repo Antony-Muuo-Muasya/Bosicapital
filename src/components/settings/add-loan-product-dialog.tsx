@@ -41,8 +41,8 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
     defaultValues: {
       name: '',
       category: '',
-      minAmount: 100,
-      maxAmount: 5000,
+      minAmount: 10000,
+      maxAmount: 500000,
       interestRate: 5,
       duration: 12,
       repaymentCycle: 'Monthly',
@@ -50,7 +50,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
   });
 
   const onSubmit = (values: ProductFormData) => {
-    if (!userProfile) return;
+    if (!userProfile || !firestore) return;
     setIsSubmitting(true);
 
     const newProductRef = doc(collection(firestore, 'loanProducts'));
@@ -102,14 +102,14 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="minAmount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Min Amount (USD)</FormLabel>
+                  <FormLabel>Min Amount (KES)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="maxAmount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Max Amount (USD)</FormLabel>
+                  <FormLabel>Max Amount (KES)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

@@ -74,6 +74,19 @@
         },
         "required": ["id", "action", "performedBy", "organizationId", "timestamp"]
     },
+    "Branch": {
+        "title": "Branch",
+        "description": "Represents a physical branch of the organization.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "organizationId": { "type": "string" },
+            "name": { "type": "string" },
+            "location": { "type": "string" },
+            "isMain": { "type": "boolean" }
+        },
+        "required": ["id", "organizationId", "name", "location", "isMain"]
+    },
     "Borrower": {
       "title": "Borrower",
       "description": "Represents a borrower in the microfinancing system.",
@@ -240,6 +253,14 @@
           "entityName": "Role",
           "schema": { "$ref": "#/backend/entities/Role" },
           "description": "Stores role definitions and permissions."
+        }
+      },
+      {
+        "path": "/branches/{branchId}",
+        "definition": {
+          "entityName": "Branch",
+          "schema": { "$ref": "#/backend/entities/Branch" },
+          "description": "Stores organization branch information."
         }
       },
       {

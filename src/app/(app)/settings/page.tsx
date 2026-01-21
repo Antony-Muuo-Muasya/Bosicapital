@@ -2,6 +2,7 @@
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoanProductsManagement } from '@/components/settings/loan-products-management';
+import { BranchManagement } from '@/components/settings/branch-management';
 
 
 export default function SettingsPage() {
@@ -20,9 +21,7 @@ export default function SettingsPage() {
             <LoanProductsManagement />
           </TabsContent>
           <TabsContent value="branches">
-          <div className="border shadow-sm rounded-lg p-8 mt-4 text-center text-muted-foreground">
-              Branch management will be here.
-            </div>
+            <BranchManagement />
           </TabsContent>
           <TabsContent value="users">
           <div className="border shadow-sm rounded-lg p-8 mt-4 text-center text-muted-foreground">

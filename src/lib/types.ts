@@ -33,8 +33,10 @@ export type User = {
 
 export type Branch = {
   id: string;
+  organizationId: string;
   name: string;
   location: string;
+  isMain: boolean;
 };
 
 export type Borrower = {

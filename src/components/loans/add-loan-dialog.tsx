@@ -193,8 +193,8 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 )}/>
                 <FormField control={form.control} name="principal" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Principal Amount (USD)</FormLabel>
-                        <FormControl><Input type="number" placeholder="1000" {...field} disabled={!selectedProductId} /></FormControl>
+                        <FormLabel>Principal Amount (KES)</FormLabel>
+                        <FormControl><Input type="number" placeholder="50000" {...field} disabled={!selectedProductId} /></FormControl>
                         <FormMessage />
                     </FormItem>
                 )}/>

@@ -88,14 +88,14 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="minAmount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Min Amount (USD)</FormLabel>
+                  <FormLabel>Min Amount (KES)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="maxAmount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Max Amount (USD)</FormLabel>
+                  <FormLabel>Max Amount (KES)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
