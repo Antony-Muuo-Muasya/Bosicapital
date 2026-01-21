@@ -38,6 +38,12 @@ service cloud.firestore {
         return branchId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.branchIds;
     }
 
+    // This allows collection group queries on installments for dashboards
+    match /{path=**}/installments/{installmentId} {
+      // Admins and managers can list all installments for analytics.
+      allow read: if isAdmin() || isManager();
+    }
+
     match /users/{userId} {
       // Admins can manage any user. Managers can view users in their branch. Users can read their own data.
       allow read: if isAdmin() || (isManager() && userIsInBranch(resource.data.branchId)) || isMe(userId);

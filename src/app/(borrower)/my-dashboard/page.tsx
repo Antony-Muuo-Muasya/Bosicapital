@@ -43,7 +43,7 @@ export default function MyDashboardPage() {
 
     const installmentsQuery = useMemoFirebase(() => {
         if (!activeLoan) return null;
-        return query(collection(firestore, 'installments'), where('loanId', '==', activeLoan.id));
+        return collection(firestore, 'loans', activeLoan.id, 'installments');
     }, [firestore, activeLoan]);
 
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
