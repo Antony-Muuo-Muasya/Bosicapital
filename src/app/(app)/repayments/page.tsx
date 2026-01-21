@@ -4,9 +4,9 @@ import { useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
-import type { Repayment, Borrower, LoanProduct } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import type { Repayment, Borrower, Loan, LoanProduct } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -21,24 +21,71 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function RepaymentsPage() {
   const firestore = useFirestore();
+  const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
 
-  const repaymentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'repayments') : null, [firestore]);
-  const borrowersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'borrowers') : null, [firestore]);
-  const loansQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loans') : null, [firestore]);
-  const loanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+  // Query for loans visible to the current user
+  const loansQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile || !user) return null;
+    const { roleId, branchIds } = userProfile;
+    if (roleId === 'admin') {
+      return collection(firestore, 'loans');
+    }
+    if (roleId === 'manager' && branchIds?.length > 0) {
+      return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
+    }
+    if (roleId === 'loan_officer') {
+      return query(collection(firestore, 'loans'), where('loanOfficerId', '==', user.uid));
+    }
+    return null;
+  }, [firestore, user, userProfile]);
+  const { data: visibleLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
 
+  // Query for repayments related to the visible loans
+  const repaymentsQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    if (userProfile.roleId === 'admin') {
+      return collection(firestore, 'repayments');
+    }
+    if (isLoadingLoans) return null; // Wait for loans to load
+    if (!visibleLoans || visibleLoans.length === 0) {
+        // No loans, so no repayments to fetch. Query a non-existent path to return empty.
+        return query(collection(firestore, 'repayments'), where('loanId', '==', 'no-loans-found'));
+    }
+
+    const loanIds = visibleLoans.map(l => l.id);
+    if (loanIds.length > 30) {
+        console.warn(`Repayment query limited to 30 loans due to Firestore limitations.`);
+        return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds.slice(0, 30)));
+    }
+    return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds));
+  }, [firestore, userProfile, visibleLoans, isLoadingLoans]);
   const { data: repayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
-  const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<any>(loansQuery);
+
+  // Query for borrowers visible to the current user
+  const borrowersQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    const { roleId, branchIds } = userProfile;
+    if (roleId === 'admin') {
+      return collection(firestore, 'borrowers');
+    }
+    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
+      return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
+    }
+    return null;
+  }, [firestore, userProfile]);
+  const { data: visibleBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
+
+  // All users can see all loan products
+  const loanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
   const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
 
-  const isLoading = isLoadingRepayments || isLoadingBorrowers || isLoadingLoans || isLoadingProducts;
+  const isLoading = isProfileLoading || isLoadingLoans || isLoadingRepayments || isLoadingBorrowers || isLoadingProducts;
 
   const repaymentsWithDetails = useMemo(() => {
-    if (isLoading || !repayments || !borrowers || !loans || !loanProducts) return [];
+    if (isLoading || !repayments || !visibleBorrowers || !visibleLoans || !loanProducts) return [];
 
-    const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
-    const loansMap = new Map(loans.map(l => [l.id, l]));
+    const borrowersMap = new Map(visibleBorrowers.map(b => [b.id, b]));
+    const loansMap = new Map(visibleLoans.map(l => [l.id, l]));
     const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
 
     return repayments.map(repayment => {
@@ -52,7 +99,7 @@ export default function RepaymentsPage() {
         loanProductName: product?.name || 'Unknown Product',
       };
     });
-  }, [repayments, borrowers, loans, loanProducts, isLoading]);
+  }, [repayments, visibleBorrowers, visibleLoans, loanProducts, isLoading]);
 
   const handleExport = () => {
     if (!repaymentsWithDetails) return;
