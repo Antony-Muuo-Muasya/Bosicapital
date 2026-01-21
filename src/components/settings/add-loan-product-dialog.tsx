@@ -38,6 +38,15 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: '',
+      category: '',
+      minAmount: 100,
+      maxAmount: 5000,
+      interestRate: 5,
+      duration: 12,
+      repaymentCycle: 'Monthly',
+    },
   });
 
   const onSubmit = (values: ProductFormData) => {
