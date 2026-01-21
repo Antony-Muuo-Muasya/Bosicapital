@@ -20,9 +20,6 @@ export default function AccessDeniedPage() {
           <p className="text-muted-foreground mb-6">
             If you believe this is an error, please contact your system administrator.
           </p>
-          <Button asChild>
-            <Link href="/dashboard">Return to Dashboard</Link>
-          </Button>
         </CardContent>
       </Card>
     </div>
