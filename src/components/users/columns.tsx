@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking, useUserProfile } from '@/firebase';
+import { useFirestore, updateDocumentNonBlocking, useUserProfile, deleteDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,19 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
       updateDocumentNonBlocking(userDocRef, { status: newStatus })
         .then(() => toast({ title: 'Success', description: 'User status updated.' }))
         .catch(() => toast({ title: 'Error', variant: 'destructive', description: 'Failed to update user status.' }))
+    }
+  };
+  
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete ${user.fullName}? This only deletes their record from the app, not their authentication account.`)) {
+      const userDocRef = doc(firestore, 'users', user.id);
+      deleteDocumentNonBlocking(userDocRef)
+        .then(() => {
+          toast({ title: 'Success', description: 'User deleted successfully.' });
+        })
+        .catch(() => {
+          toast({ title: 'Error', variant: 'destructive', description: 'Failed to delete user.' });
+        });
     }
   };
 
@@ -55,7 +68,7 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
           {user.status === 'active' ? 'Suspend User' : 'Reactivate User'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={isCurrentUser} className="text-destructive">
+        <DropdownMenuItem onClick={handleDelete} disabled={isCurrentUser} className="text-destructive">
           Delete User
         </DropdownMenuItem>
       </DropdownMenuContent>

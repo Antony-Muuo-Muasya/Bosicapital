@@ -54,9 +54,9 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader title="User Management" description="Create, edit, and manage user accounts and roles.">
-        <Button onClick={() => alert('Invite user functionality to be added.')} disabled>
+        <Button onClick={() => alert("To add a new user, have them create an account via the signup page. They will appear here once registered, and you can then manage their role.")}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Invite User
+            Add User
         </Button>
       </PageHeader>
       <div className="p-4 md:p-6">

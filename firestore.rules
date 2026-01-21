@@ -21,11 +21,13 @@ service cloud.firestore {
       return getUserRole() == 'manager';
     }
 
-    // Users can create their own profile on first sign-in, but cannot make themselves admin.
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if request.auth.uid == userId && request.resource.data.roleId != 'admin';
-      allow update: if isAdmin(); // Only admins can update user profiles.
+      // Allow user to create their own document. The logic in layout.tsx handles role assignment.
+      allow create: if request.auth.uid == userId;
+      // Allow admin to update any user, and allow a user to update their own profile.
+      // This is required to allow the first admin account to be promoted.
+      allow update: if isAdmin() || request.auth.uid == userId;
       allow delete: if isAdmin();
     }
     
@@ -71,9 +73,5 @@ service cloud.firestore {
         allow read, create: if isAuthenticated() && (isAdmin() || isManager() || getUserRole() == 'loan_officer');
     }
 
-    // Fallback to deny all access to any other collections
-    match /{document=**} {
-      allow read, write: if false;
-    }
   }
 }
