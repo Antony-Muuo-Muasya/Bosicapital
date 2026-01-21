@@ -10,7 +10,7 @@ import { BorrowersDataTable } from '@/components/borrowers/borrowers-data-table'
 import { getBorrowerColumns } from '@/components/borrowers/columns';
 import { AddBorrowerDialog } from '@/components/borrowers/add-borrower-dialog';
 import { PayRegistrationFeeDialog } from '@/components/borrowers/pay-registration-fee-dialog';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 
 export default function BorrowersPage() {
   const { user } = useUser();
@@ -26,12 +26,12 @@ export default function BorrowersPage() {
 
   const { data: borrowers, isLoading } = useCollection<Borrower>(borrowersQuery);
 
-  const handleRecordPayment = (borrower: Borrower) => {
+  const handleRecordPayment = useCallback((borrower: Borrower) => {
     setSelectedBorrower(borrower);
     setIsPaymentDialogOpen(true);
-  };
+  }, []);
 
-  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment), []);
+  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment), [handleRecordPayment]);
 
   return (
     <>
