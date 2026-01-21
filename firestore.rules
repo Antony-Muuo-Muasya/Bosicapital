@@ -10,8 +10,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Function to get the user's role ID from their user document.
-    // This can be called safely in rules where we aren't reading from the users collection itself.
     function getUserRoleId() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       if (userDoc == null || !('roleId' in userDoc.data)) {
@@ -19,41 +17,49 @@ service cloud.firestore {
       }
       return userDoc.data.roleId;
     }
-    
-    // This function checks the incoming request data to determine role, to avoid recursive get() calls.
+
     function getIncomingUserRole() {
         return request.resource.data.roleId;
+    }
+    
+    function isAdmin() {
+      return getUserRoleId() == 'admin';
+    }
+    
+    function sameOrganization(doc) {
+      // Ensure the user document and organizationId exist before comparing.
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return 'organizationId' in doc.data && 
+             userDoc != null && 
+             'organizationId' in userDoc.data &&
+             doc.data.organizationId == userDoc.data.organizationId;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      // Allow read if the user is reading their own document.
-      // Admin read access would require custom claims to avoid recursive lookups, which is a broader change.
       allow read: if isAuthenticated() && isOwner(userId);
       
-      // Allow create if it's the user creating their own doc, and they are NOT trying to make themselves an admin.
       allow create: if isAuthenticated() && 
                     isOwner(userId) &&
                     getIncomingUserRole() != 'admin';
                     
-      // Only admins can update user documents.
-      allow update: if isAuthenticated() && getUserRoleId() == 'admin';
+      allow update: if isAuthenticated() && isAdmin();
 
-      // Only admins can delete users.
-      allow delete: if isAuthenticated() && getUserRoleId() == 'admin';
+      allow delete: if isAuthenticated() && isAdmin();
     }
 
     match /roles/{roleId} {
-      // This is public to prevent a race condition on new user sign-up.
-      // Role definitions are not sensitive data.
-      allow read: if true;
-      allow write: if isAuthenticated() && getUserRoleId() == 'admin';
+      // Allow authenticated users to READ roles within their organization
+      allow read: if isAuthenticated() && sameOrganization(resource);
+
+      // Only admins can manage roles
+      allow create, update, delete: if isAuthenticated() && isAdmin();
     }
 
     match /auditLogs/{logId} {
-      allow read: if isAuthenticated() && getUserRoleId() == 'admin';
-      allow create: if isAuthenticated(); // Allow any authenticated user to create audit logs
+      allow read: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated();
       allow update, delete: if false;
     }
 
@@ -61,8 +67,6 @@ service cloud.firestore {
       allow read: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer', 'auditor'];
       allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'];
       allow update: if isAuthenticated() && getUserRoleId() in ['admin', 'manager'] &&
-        // Prevent registration fee status from being tampered with.
-        // It can only be changed from false to true, and only if a valid payment record exists.
         (request.resource.data.registrationFeePaid == resource.data.registrationFeePaid ||
           (request.resource.data.registrationFeePaid == true && resource.data.registrationFeePaid == false && exists(/databases/$(database)/documents/registrationPayments/$(request.resource.data.registrationPaymentId)))
         );
@@ -72,7 +76,6 @@ service cloud.firestore {
     match /loans/{loanId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'] &&
-        // Enforce registration fee payment and max loan amount
         get(/databases/$(database)/documents/borrowers/$(request.resource.data.borrowerId)).data.registrationFeePaid == true &&
         request.resource.data.principal <= 1000000;
       allow update: if isAuthenticated() && getUserRoleId() in ['admin', 'manager'];
@@ -86,7 +89,7 @@ service cloud.firestore {
 
     match /loanProducts/{productId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && getUserRoleId() == 'admin';
+      allow write: if isAuthenticated() && isAdmin();
     }
 
     match /repayments/{repaymentId} {
@@ -98,10 +101,9 @@ service cloud.firestore {
     match /registrationPayments/{paymentId} {
         allow read: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer', 'auditor'];
         allow create: if isAuthenticated() && getUserRoleId() in ['admin', 'manager', 'loan_officer'] &&
-            // Enforce correct fee amount and prevent duplicate payments
             request.resource.data.amount == 800 &&
             get(/databases/$(database)/documents/borrowers/$(request.resource.data.borrowerId)).data.registrationFeePaid == false;
-        allow update, delete: if false; // Payments are immutable
+        allow update, delete: if false;
     }
   }
 }
