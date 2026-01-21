@@ -3,8 +3,8 @@
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 import type { Loan, Borrower, LoanProduct } from '@/lib/types';
 import { LoansDataTable } from '@/components/loans/loans-data-table';
 import { columns } from '@/components/loans/columns';
@@ -12,24 +12,48 @@ import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
 import { useState, useMemo } from 'react';
 
 export default function LoansPage() {
-  const { user } = useUser();
+  const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const firestore = useFirestore();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, 'loans');
-  }, [firestore, user]);
+    if (!firestore || !userProfile || !user) return null;
+
+    const { roleId, branchIds } = userProfile;
+
+    if (roleId === 'admin') {
+      return collection(firestore, 'loans');
+    }
+    
+    if (roleId === 'manager' && branchIds?.length > 0) {
+      return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
+    }
+
+    if (roleId === 'loan_officer') {
+        return query(collection(firestore, 'loans'), where('loanOfficerId', '==', user.uid));
+    }
+
+    return null;
+  }, [firestore, user, userProfile]);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, 'borrowers');
-  }, [firestore, user]);
+    if (!firestore || !userProfile) return null;
+    const { roleId, branchIds } = userProfile;
+
+    if (roleId === 'admin') {
+        return collection(firestore, 'borrowers');
+    }
+   
+    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
+        return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
+    }
+    return null;
+  }, [firestore, userProfile]);
 
   const loanProductsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore) return null;
     return collection(firestore, 'loanProducts');
-  }, [firestore, user]);
+  }, [firestore]);
 
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
@@ -51,7 +75,7 @@ export default function LoansPage() {
 
   }, [loans, borrowers, loanProducts]);
 
-  const isLoading = isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
+  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
 
   return (
     <>
