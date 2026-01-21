@@ -1,7 +1,6 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useUserProfile, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { useRouter } from 'next/navigation';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useEffect, useState, useMemo } from 'react';
 import type { User as AppUser, Role } from '@/lib/types';
 import { collection } from 'firebase/firestore';
@@ -20,16 +19,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+
+type UserWithRole = AppUser & { roleName: string };
 
 export default function UsersPage() {
-  const { userRole, isLoading: isProfileLoading } = useUserProfile();
-  const router = useRouter();
-  const { toast } = useToast();
   const firestore = useFirestore();
 
-  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
 
@@ -39,9 +35,9 @@ export default function UsersPage() {
   const { data: users, isLoading: areUsersLoading } = useCollection<AppUser>(usersQuery);
   const { data: roles, isLoading: areRolesLoading } = useCollection<Role>(rolesQuery);
 
-  const isLoading = isProfileLoading || areUsersLoading || areRolesLoading;
+  const isLoading = areUsersLoading || areRolesLoading;
 
-  const usersWithRoles = useMemo(() => {
+  const usersWithRoles: UserWithRole[] = useMemo(() => {
     if (!users || !roles) return [];
     const rolesMap = new Map(roles.map(r => [r.id, r.name]));
     return users.map(user => ({
@@ -50,7 +46,7 @@ export default function UsersPage() {
     }));
   }, [users, roles]);
 
-  const handleEditUser = (user: AppUser) => {
+  const handleEditUser = (user: UserWithRole) => {
     setEditingUser(user);
   };
   
@@ -61,26 +57,6 @@ export default function UsersPage() {
       setSignupUrl(`${window.location.origin}/signup`);
     }
   }, []);
-  
-  useEffect(() => {
-    if (!isProfileLoading && userRole?.id !== 'admin') {
-      toast({
-        variant: 'destructive',
-        title: 'Access Denied',
-        description: "You don't have permission to view the user management page.",
-      });
-      router.replace('/dashboard');
-    }
-  }, [isProfileLoading, userRole, router, toast]);
-
-  if (isProfileLoading || userRole?.id !== 'admin') {
-    return (
-        <div className="flex h-full flex-1 items-center justify-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Verifying permissions...</p>
-        </div>
-    );
-  }
   
   return (
     <>

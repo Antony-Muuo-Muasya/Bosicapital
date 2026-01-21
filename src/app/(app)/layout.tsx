@@ -1,6 +1,6 @@
 'use client';
 import { AppShell } from '@/components/app-shell';
-import { useFirestore, useUserProfile, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -88,14 +88,12 @@ export default function AppLayout({
         seedRoles().then(() => {
             if (!userProfile) {
                 // SCENARIO 1: First-time user. Create their profile document.
-                const roleId = user.email === 'adminadoo@gmail.com' ? 'admin' : 'loan_officer';
-                
                 const newUserProfile: AppUser = {
                     id: user.uid,
                     organizationId: 'org_1', // Default organization
                     fullName: user.displayName || 'New User',
                     email: user.email!,
-                    roleId: roleId,
+                    roleId: 'loan_officer', // All new users are loan officers by default
                     branchIds: ['branch-1'], // Default branch
                     status: 'active',
                     createdAt: new Date().toISOString(),
@@ -103,13 +101,6 @@ export default function AppLayout({
                 
                 // Use a non-blocking write. The UI will show a loader until the profile is available.
                 setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
-
-            } else {
-                // SCENARIO 2: User exists. Check if they are the designated admin and need a role update.
-                if (user.email === 'adminadoo@gmail.com' && userProfile.roleId !== 'admin') {
-                    // Use a non-blocking update. The UI will show a loader until the role is corrected.
-                    updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
-                }
             }
         }).catch(console.error);
     }
@@ -136,18 +127,6 @@ export default function AppLayout({
        <p className="text-muted-foreground">Finalizing setup...</p>
      </div>
    );
-  }
-
-  // If the designated admin user's role is not yet 'admin', show a loader.
-  // This prevents rendering child pages with incorrect permissions during the role update.
-  const isDesignatedAdmin = user.email === 'adminadoo@gmail.com';
-  if (isDesignatedAdmin && userProfile.roleId !== 'admin') {
-    return (
-        <div className="flex h-screen items-center justify-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Updating permissions...</p>
-        </div>
-    );
   }
 
   // All checks passed, render the main application shell.

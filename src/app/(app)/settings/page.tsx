@@ -1,41 +1,10 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useUserProfile } from '@/firebase';
 import { LoanProductsManagement } from '@/components/settings/loan-products-management';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
 
 
 export default function SettingsPage() {
-  const { userRole, isLoading } = useUserProfile();
-  const router = useRouter();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // If loading is done and the user is not an admin, redirect.
-    if (!isLoading && userRole?.id !== 'admin') {
-      toast({
-        variant: 'destructive',
-        title: 'Access Denied',
-        description: "You don't have permission to view the settings page.",
-      });
-      router.replace('/dashboard');
-    }
-  }, [isLoading, userRole, router, toast]);
-
-  // Render a loader while checking permissions
-  if (isLoading || userRole?.id !== 'admin') {
-    return (
-        <div className="flex h-full flex-1 items-center justify-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Verifying permissions...</p>
-        </div>
-    );
-  }
-
   return (
     <>
       <PageHeader title="Settings" description="Configure your organization, branches, and loan products." />
