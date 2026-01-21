@@ -11,12 +11,6 @@ export default function SettingsPage() {
   const { userRole, isLoading } = useUserProfile();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading && userRole?.id !== 'admin') {
-      router.push('/access-denied');
-    }
-  }, [isLoading, userRole, router]);
-
   // Render nothing or a loader while checking permissions
   if (isLoading || userRole?.id !== 'admin') {
     return null;

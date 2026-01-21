@@ -44,12 +44,6 @@ export default function UsersPage() {
 
   const isLoading = isProfileLoading || areUsersLoading || areRolesLoading;
 
-  useEffect(() => {
-    if (!isProfileLoading && userRole?.id !== 'admin') {
-      router.push('/access-denied');
-    }
-  }, [isProfileLoading, userRole, router]);
-
   const usersWithRoles = useMemo(() => {
     if (!users || !roles) return [];
     const rolesMap = new Map(roles.map(r => [r.id, r.name]));
