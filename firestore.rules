@@ -61,10 +61,10 @@ service cloud.firestore {
     }
 
     match /borrowers/{borrowerId} {
-      // Admins and managers can read all borrowers. Loan officers can read borrowers in their branch.
+      // Admins can read all borrowers. Managers & loan officers can read borrowers in their branch.
       // A user can read their own borrower profile.
-      allow read: if isAdmin() || isManager() 
-                  || (isLoanOfficer() && userIsInBranch(resource.data.branchId))
+      allow read: if isAdmin() 
+                  || ((isManager() || isLoanOfficer()) && userIsInBranch(resource.data.branchId))
                   || (isUser() && resource.data.userId == request.auth.uid);
 
       // Loan officers or higher can create/update borrowers.

@@ -3,8 +3,8 @@
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 import type { Borrower } from '@/lib/types';
 import { BorrowersDataTable } from '@/components/borrowers/borrowers-data-table';
 import { getBorrowerColumns } from '@/components/borrowers/columns';
@@ -13,18 +13,31 @@ import { PayRegistrationFeeDialog } from '@/components/borrowers/pay-registratio
 import { useState, useMemo, useCallback } from 'react';
 
 export default function BorrowersPage() {
-  const { user } = useUser();
+  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
   const firestore = useFirestore();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedBorrower, setSelectedBorrower] = useState<Borrower | null>(null);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, 'borrowers');
-  }, [firestore, user]);
+    if (!firestore || !userProfile) return null;
 
-  const { data: borrowers, isLoading } = useCollection<Borrower>(borrowersQuery);
+    const { roleId, branchIds } = userProfile;
+
+    if (roleId === 'admin') {
+      return collection(firestore, 'borrowers');
+    }
+    
+    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
+      return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
+    }
+
+    return null;
+  }, [firestore, userProfile]);
+
+  const { data: borrowers, isLoading: isBorrowersLoading } = useCollection<Borrower>(borrowersQuery);
+  const isLoading = isProfileLoading || isBorrowersLoading;
+
 
   const handleRecordPayment = useCallback((borrower: Borrower) => {
     setSelectedBorrower(borrower);
