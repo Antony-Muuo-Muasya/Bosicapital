@@ -4,23 +4,18 @@ import type { Loan } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
-import { CheckCircle, XCircle, MoreHorizontal } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, writeBatch, collection } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-  } from '@/components/ui/dropdown-menu';
-  import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { add } from 'date-fns';
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
   loanProductName: string;
+  repaymentCycle?: 'Weekly' | 'Monthly';
 };
 
 const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
@@ -28,7 +23,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     const { toast } = useToast();
     const [isUpdating, setIsUpdating] = useState(false);
   
-    const handleUpdateStatus = (status: 'Active' | 'Rejected') => {
+    const handleUpdateStatus = async (status: 'Active' | 'Rejected') => {
       if(isUpdating) return;
 
       const confirmationText = status === 'Active'
@@ -38,14 +33,70 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
       if (confirm(confirmationText)) {
         setIsUpdating(true);
         const loanDocRef = doc(firestore, 'loans', loan.id);
-        updateDocumentNonBlocking(loanDocRef, { status })
-          .then(() => {
-            toast({ title: 'Success', description: `Loan has been ${status.toLowerCase()}.` });
-          })
-          .catch((err: any) => {
-            toast({ variant: 'destructive', title: 'Error', description: err.message });
-          })
-          .finally(() => setIsUpdating(false));
+        
+        if (status === 'Rejected') {
+            updateDocumentNonBlocking(loanDocRef, { status })
+              .then(() => {
+                toast({ title: 'Success', description: `Loan has been rejected.` });
+              })
+              .catch((err: any) => {
+                toast({ variant: 'destructive', title: 'Error', description: err.message });
+              })
+              .finally(() => setIsUpdating(false));
+            return;
+        }
+
+        // Approve loan
+        if (status === 'Active') {
+            if (!loan.repaymentCycle) {
+                toast({ variant: 'destructive', title: 'Error', description: 'Loan product details are missing.' });
+                setIsUpdating(false);
+                return;
+            }
+            try {
+                const batch = writeBatch(firestore);
+                const newIssueDate = new Date().toISOString().split('T')[0];
+
+                // 1. Update loan status and issue date
+                batch.update(loanDocRef, { status: 'Active', issueDate: newIssueDate });
+
+                // 2. Create installments
+                const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
+                let currentDueDate = new Date(newIssueDate);
+
+                for (let i = 1; i <= loan.duration; i++) {
+                    const installmentRef = doc(installmentsColRef);
+                    if (loan.repaymentCycle === 'Monthly') {
+                        currentDueDate = add(currentDueDate, { months: 1 });
+                    } else { // Weekly
+                        currentDueDate = add(currentDueDate, { weeks: 1 });
+                    }
+
+                    const newInstallmentData = {
+                        id: installmentRef.id,
+                        loanId: loan.id,
+                        installmentNumber: i,
+                        dueDate: currentDueDate.toISOString().split('T')[0],
+                        expectedAmount: loan.installmentAmount,
+                        paidAmount: 0,
+                        status: 'Unpaid',
+                    };
+                    batch.set(installmentRef, newInstallmentData);
+                }
+
+                await batch.commit();
+                toast({ title: 'Success', description: 'Loan has been approved and activated.' });
+
+            } catch(err: any) {
+                console.error("Failed to approve loan:", err);
+                toast({ variant: 'destructive', title: 'Error', description: 'Failed to approve loan. Check permissions and data.' });
+            } finally {
+                setIsUpdating(false);
+            }
+        }
+      } else {
+        // User cancelled the action
+        setIsUpdating(false);
       }
     };
   

@@ -22,8 +22,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,7 +34,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { Borrower, LoanProduct } from '@/lib/types';
-import { add } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
@@ -108,69 +107,40 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
     }
     setIsSubmitting(true);
 
-    try {
-        const batch = writeBatch(firestore);
+    const loanRef = doc(collection(firestore, 'loans'));
+    const interest = values.principal * (selectedProduct.interestRate / 100);
+    const totalPayable = values.principal + interest;
+    const installmentAmount = totalPayable / selectedProduct.duration;
 
-        // 1. Create Loan Document
-        const loanRef = doc(collection(firestore, 'loans'));
-        const interest = values.principal * (selectedProduct.interestRate / 100);
-        const totalPayable = values.principal + interest;
-        const installmentAmount = totalPayable / selectedProduct.duration;
-
-        const newLoanData = {
-          id: loanRef.id,
-          organizationId: userProfile.organizationId,
-          borrowerId: values.borrowerId,
-          loanProductId: values.loanProductId,
-          principal: values.principal,
-          interestRate: selectedProduct.interestRate,
-          duration: selectedProduct.duration,
-          totalPayable: totalPayable,
-          installmentAmount: installmentAmount,
-          issueDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-          status: 'Active',
-          loanOfficerId: user.uid,
-          branchId: 'branch-1', // Hardcoded for now
-        };
-        batch.set(loanRef, newLoanData);
-
-        // 2. Create Installment Documents
-        const installmentsColRef = collection(firestore, 'loans', loanRef.id, 'installments');
-        let currentDueDate = new Date();
-
-        for (let i = 1; i <= selectedProduct.duration; i++) {
-            const installmentRef = doc(installmentsColRef);
-
-            if (selectedProduct.repaymentCycle === 'Monthly') {
-                currentDueDate = add(currentDueDate, { months: 1 });
-            } else { // Weekly
-                currentDueDate = add(currentDueDate, { weeks: 1 });
-            }
-
-            const newInstallmentData = {
-                id: installmentRef.id,
-                loanId: loanRef.id,
-                installmentNumber: i,
-                dueDate: currentDueDate.toISOString().split('T')[0],
-                expectedAmount: installmentAmount,
-                paidAmount: 0,
-                status: 'Unpaid',
-            };
-            batch.set(installmentRef, newInstallmentData);
-        }
-        
-        await batch.commit();
-
-        toast({ title: 'Success', description: 'Loan and installments created successfully.' });
+    const newLoanData = {
+      id: loanRef.id,
+      organizationId: userProfile.organizationId,
+      borrowerId: values.borrowerId,
+      loanProductId: values.loanProductId,
+      principal: values.principal,
+      interestRate: selectedProduct.interestRate,
+      duration: selectedProduct.duration,
+      totalPayable: totalPayable,
+      installmentAmount: installmentAmount,
+      issueDate: new Date().toISOString().split('T')[0], // This is the request date
+      status: 'Pending Approval', // Changed from 'Active'
+      loanOfficerId: user.uid,
+      branchId: 'branch-1', // Hardcoded for now
+    };
+    
+    setDocumentNonBlocking(loanRef, newLoanData, { merge: false })
+      .then(() => {
+        toast({ title: 'Success', description: 'Loan submitted for approval.' });
         form.reset();
         onOpenChange(false);
-
-    } catch (error) {
-        console.error("Error creating loan:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to create loan.' });
-    } finally {
-        setIsSubmitting(false);
-    }
+      })
+      .catch((err) => {
+          console.error("Error creating loan:", err);
+          toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit loan for approval.' });
+      })
+      .finally(() => {
+          setIsSubmitting(false);
+      });
   };
 
   return (
@@ -242,7 +212,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" disabled={isSubmitting || !selectedProduct || isLoading || eligibleBorrowers.length === 0}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Create Loan
+                        Submit for Approval
                     </Button>
                 </DialogFooter>
             </form>

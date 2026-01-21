@@ -31,12 +31,16 @@ export default function ApprovalsPage() {
         const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
         const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
     
-        return pendingLoans.map(loan => ({
-          ...loan,
-          borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown Borrower',
-          borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl,
-          loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown Product',
-        }));
+        return pendingLoans.map(loan => {
+            const product = loanProductsMap.get(loan.loanProductId);
+            return {
+                ...loan,
+                borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown Borrower',
+                borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl,
+                loanProductName: product?.name || 'Unknown Product',
+                repaymentCycle: product?.repaymentCycle,
+            };
+        });
     
     }, [pendingLoans, borrowers, loanProducts, isLoading]);
 
