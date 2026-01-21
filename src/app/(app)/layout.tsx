@@ -29,87 +29,89 @@ export default function AppLayout({
     if (firestore && user && !isLoading) {
         const userDocRef = doc(firestore, 'users', user.uid);
 
-        if (!userProfile) {
-            // SCENARIO 1: First-time user. Create their profile document.
-            const roleId = user.email === 'admin@adoo.app' ? 'admin' : 'loan_officer';
-            
-            const newUserProfile: AppUser = {
-                id: user.uid,
-                organizationId: 'org_1', // Default organization
-                fullName: user.displayName || 'New User',
-                email: user.email!,
-                roleId: roleId,
-                branchIds: ['branch-1'], // Default branch
-                status: 'active',
-                createdAt: new Date().toISOString(),
-            };
-            
-            // Use a non-blocking write. The UI will show a loader until the profile is available.
-            setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
+        // --- CRITICAL FIX: Seed roles as soon as possible ---
+        // This must run before user profile logic to ensure the 'admin' role document
+        // exists when the first admin user is created or promoted.
+        const seedRoles = async () => {
+            const rolesColRef = collection(firestore, 'roles');
+            const rolesSnapshot = await getDocs(rolesColRef);
 
-        } else {
-            // SCENARIO 2: User exists. Check if they are the designated admin and need a role update.
-            if (user.email === 'admin@adoo.app' && userProfile.roleId !== 'admin') {
-                // Use a non-blocking update. The UI will show a loader until the role is corrected.
-                updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
+            if (rolesSnapshot.empty) {
+                const batch = writeBatch(firestore);
+                const organizationId = userProfile?.organizationId || 'org_1';
+                const rolesToSeed: Omit<Role, 'organizationId'>[] = [
+                    {
+                      id: 'admin',
+                      name: 'Administrator',
+                      systemRole: true,
+                      permissions: [
+                        'user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 
+                        'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
+                        'repayment.create', 'reports.view'
+                      ],
+                    },
+                    {
+                      id: 'manager',
+                      name: 'Manager',
+                      systemRole: true,
+                      permissions: [
+                        'user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
+                        'repayment.create', 'reports.view'
+                      ],
+                    },
+                    {
+                      id: 'loan_officer',
+                      name: 'Loan Officer',
+                      systemRole: true,
+                      permissions: ['loan.create', 'loan.view', 'repayment.create'],
+                    },
+                    {
+                      id: 'auditor',
+                      name: 'Auditor',
+                      systemRole: true,
+                      permissions: ['loan.view', 'reports.view', 'user.view'],
+                    },
+                ];
+
+                rolesToSeed.forEach(roleData => {
+                    const docRef = doc(firestore, 'roles', roleData.id);
+                    const newRole = { ...roleData, organizationId };
+                    batch.set(docRef, newRole);
+                });
+                
+                await batch.commit();
+                console.log('Default roles have been seeded to Firestore.');
             }
+        };
 
-            // SCENARIO 3: If the current user is an admin, check if system roles need to be seeded.
-            if (userProfile.roleId === 'admin') {
-                const seedRoles = async () => {
-                    const rolesColRef = collection(firestore, 'roles');
-                    const rolesSnapshot = await getDocs(rolesColRef);
-
-                    if (rolesSnapshot.empty) {
-                        const batch = writeBatch(firestore);
-                        const rolesToSeed: Omit<Role, 'organizationId'>[] = [
-                            {
-                              id: 'admin',
-                              name: 'Administrator',
-                              systemRole: true,
-                              permissions: [
-                                'user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 
-                                'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
-                                'repayment.create', 'reports.view'
-                              ],
-                            },
-                            {
-                              id: 'manager',
-                              name: 'Manager',
-                              systemRole: true,
-                              permissions: [
-                                'user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
-                                'repayment.create', 'reports.view'
-                              ],
-                            },
-                            {
-                              id: 'loan_officer',
-                              name: 'Loan Officer',
-                              systemRole: true,
-                              permissions: ['loan.create', 'loan.view', 'repayment.create'],
-                            },
-                            {
-                              id: 'auditor',
-                              name: 'Auditor',
-                              systemRole: true,
-                              permissions: ['loan.view', 'reports.view', 'user.view'],
-                            },
-                        ];
-
-                        rolesToSeed.forEach(roleData => {
-                            const docRef = doc(firestore, 'roles', roleData.id);
-                            const newRole = { ...roleData, organizationId: userProfile.organizationId };
-                            batch.set(docRef, newRole);
-                        });
-                        
-                        await batch.commit();
-                        console.log('Default roles have been seeded to Firestore.');
-                    }
+        // Run role seeding, then proceed with user profile logic.
+        seedRoles().then(() => {
+            if (!userProfile) {
+                // SCENARIO 1: First-time user. Create their profile document.
+                const roleId = user.email === 'admin@adoo.app' ? 'admin' : 'loan_officer';
+                
+                const newUserProfile: AppUser = {
+                    id: user.uid,
+                    organizationId: 'org_1', // Default organization
+                    fullName: user.displayName || 'New User',
+                    email: user.email!,
+                    roleId: roleId,
+                    branchIds: ['branch-1'], // Default branch
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
                 };
+                
+                // Use a non-blocking write. The UI will show a loader until the profile is available.
+                setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
 
-                seedRoles().catch(console.error);
+            } else {
+                // SCENARIO 2: User exists. Check if they are the designated admin and need a role update.
+                if (user.email === 'admin@adoo.app' && userProfile.roleId !== 'admin') {
+                    // Use a non-blocking update. The UI will show a loader until the role is corrected.
+                    updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
+                }
             }
-        }
+        }).catch(console.error);
     }
   }, [user, userProfile, isLoading, router, firestore]);
   
