@@ -1,4 +1,5 @@
 'use client';
+import * as React from 'react';
 import { PageHeader } from '@/components/page-header';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
