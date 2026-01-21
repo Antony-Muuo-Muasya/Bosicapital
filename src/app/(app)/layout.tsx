@@ -28,7 +28,7 @@ export default function AppLayout({
 
         // Scenario 1: First-time login, create the profile
         if (!userProfile) {
-            const roleId = user.email === 'adminadoo@gmail.com' ? 'admin' : 'loan_officer';
+            const roleId = user.email === 'tonniehmuas@gmail.com' ? 'admin' : 'loan_officer';
             
             const newUserProfile: AppUser = {
                 id: user.uid,
@@ -44,7 +44,7 @@ export default function AppLayout({
             setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
         } 
         // Scenario 2: User exists, but is the designated admin and doesn't have the admin role. Update them.
-        else if (user.email === 'adminadoo@gmail.com' && userProfile.roleId !== 'admin') {
+        else if (user.email === 'tonniehmuas@gmail.com' && userProfile.roleId !== 'admin') {
              // Use non-blocking update to change the role
             updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
         }
