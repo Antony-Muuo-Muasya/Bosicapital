@@ -5,11 +5,22 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
 import { CheckCircle, XCircle } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, updateDocumentNonBlocking, useUserProfile, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, writeBatch, collection } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { add } from 'date-fns';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
@@ -21,108 +32,145 @@ type LoanWithDetails = Loan & {
 const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { userRole } = useUserProfile();
+
     const [isUpdating, setIsUpdating] = useState(false);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [actionToConfirm, setActionToConfirm] = useState<'Active' | 'Rejected' | null>(null);
+
+    const canApprove = userRole?.id === 'admin' || userRole?.id === 'manager';
+
+    const handleActionConfirmation = (status: 'Active' | 'Rejected') => {
+        setActionToConfirm(status);
+        setIsAlertOpen(true);
+    };
   
-    const handleUpdateStatus = async (status: 'Active' | 'Rejected') => {
-      if(isUpdating) return;
+    const handleUpdateStatus = async () => {
+      if(isUpdating || !actionToConfirm || !canApprove) return;
 
-      const confirmationText = status === 'Active'
-      ? 'Are you sure you want to approve this loan?'
-      : 'Are you sure you want to reject this loan? This action cannot be undone.';
+      setIsUpdating(true);
+      const loanDocRef = doc(firestore, 'loans', loan.id);
       
-      if (confirm(confirmationText)) {
-        setIsUpdating(true);
-        const loanDocRef = doc(firestore, 'loans', loan.id);
-        
-        if (status === 'Rejected') {
-            updateDocumentNonBlocking(loanDocRef, { status })
-              .then(() => {
-                toast({ title: 'Success', description: `Loan has been rejected.` });
-              })
-              .catch((err: any) => {
-                toast({ variant: 'destructive', title: 'Error', description: err.message });
-              })
-              .finally(() => setIsUpdating(false));
-            return;
-        }
-
-        // Approve loan
-        if (status === 'Active') {
-            if (!loan.repaymentCycle) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Loan product details are missing.' });
+      if (actionToConfirm === 'Rejected') {
+          updateDocumentNonBlocking(loanDocRef, { status: 'Rejected' })
+            .then(() => {
+              toast({ title: 'Success', description: `Loan has been rejected.` });
+            })
+            .catch((err: any) => {
+              // The non-blocking function already emits a detailed error.
+              // We just show a simple toast here.
+              toast({ variant: 'destructive', title: 'Error', description: 'Failed to reject loan.' });
+            })
+            .finally(() => {
                 setIsUpdating(false);
-                return;
-            }
-            try {
-                const batch = writeBatch(firestore);
-                const newIssueDate = new Date().toISOString().split('T')[0];
+                setIsAlertOpen(false);
+                setActionToConfirm(null);
+            });
+          return;
+      }
 
-                // 1. Update loan status and issue date
-                batch.update(loanDocRef, { status: 'Active', issueDate: newIssueDate });
+      if (actionToConfirm === 'Active') {
+          if (!loan.repaymentCycle) {
+              toast({ variant: 'destructive', title: 'Error', description: 'Loan product details are missing.' });
+              setIsUpdating(false);
+              setIsAlertOpen(false);
+              setActionToConfirm(null);
+              return;
+          }
+          try {
+              const batch = writeBatch(firestore);
+              const newIssueDate = new Date().toISOString().split('T')[0];
 
-                // 2. Create installments
-                const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
-                let currentDueDate = new Date(newIssueDate);
+              batch.update(loanDocRef, { status: 'Active', issueDate: newIssueDate });
 
-                for (let i = 1; i <= loan.duration; i++) {
-                    const installmentRef = doc(installmentsColRef);
-                    if (loan.repaymentCycle === 'Monthly') {
-                        currentDueDate = add(currentDueDate, { months: 1 });
-                    } else { // Weekly
-                        currentDueDate = add(currentDueDate, { weeks: 1 });
-                    }
+              const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
+              let currentDueDate = new Date(newIssueDate);
 
-                    const newInstallmentData = {
-                        id: installmentRef.id,
-                        loanId: loan.id,
-                        installmentNumber: i,
-                        dueDate: currentDueDate.toISOString().split('T')[0],
-                        expectedAmount: loan.installmentAmount,
-                        paidAmount: 0,
-                        status: 'Unpaid',
-                    };
-                    batch.set(installmentRef, newInstallmentData);
-                }
+              for (let i = 1; i <= loan.duration; i++) {
+                  const installmentRef = doc(installmentsColRef);
+                  if (loan.repaymentCycle === 'Monthly') {
+                      currentDueDate = add(currentDueDate, { months: 1 });
+                  } else {
+                      currentDueDate = add(currentDueDate, { weeks: 1 });
+                  }
 
-                await batch.commit();
-                toast({ title: 'Success', description: 'Loan has been approved and activated.' });
+                  const newInstallmentData = {
+                      id: installmentRef.id,
+                      loanId: loan.id,
+                      installmentNumber: i,
+                      dueDate: currentDueDate.toISOString().split('T')[0],
+                      expectedAmount: loan.installmentAmount,
+                      paidAmount: 0,
+                      status: 'Unpaid',
+                  };
+                  batch.set(installmentRef, newInstallmentData);
+              }
 
-            } catch(err: any) {
-                console.error("Failed to approve loan:", err);
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to approve loan. Check permissions and data.' });
-            } finally {
-                setIsUpdating(false);
-            }
-        }
-      } else {
-        // User cancelled the action
-        setIsUpdating(false);
+              await batch.commit();
+              toast({ title: 'Success', description: 'Loan has been approved and activated.' });
+
+          } catch(err: any) {
+              console.error("Failed to approve loan:", err);
+              // Emit a contextual error for better debugging in the dev overlay
+              const permissionError = new FirestorePermissionError({
+                  path: loanDocRef.path,
+                  operation: 'write', // 'write' covers batch operations
+                  requestResourceData: { status: 'Active', issueDate: new Date().toISOString().split('T')[0] }
+              });
+              errorEmitter.emit('permission-error', permissionError);
+
+              toast({ variant: 'destructive', title: 'Error', description: 'Failed to approve loan. Check permissions and data.' });
+          } finally {
+              setIsUpdating(false);
+              setIsAlertOpen(false);
+              setActionToConfirm(null);
+          }
       }
     };
   
     return (
-        <div className='flex items-center justify-end gap-2'>
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleUpdateStatus('Active')}
-                disabled={isUpdating}
-                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-            >
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Approve
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleUpdateStatus('Rejected')}
-                disabled={isUpdating}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-                <XCircle className="mr-2 h-4 w-4" />
-                Reject
-            </Button>
-      </div>
+        <>
+            <div className='flex items-center justify-end gap-2'>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleActionConfirmation('Active')}
+                    disabled={isUpdating || !canApprove}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Approve
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleActionConfirmation('Rejected')}
+                    disabled={isUpdating || !canApprove}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Reject
+                </Button>
+            </div>
+             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {actionToConfirm === 'Active'
+                                ? 'This will approve the loan and generate the repayment schedule.'
+                                : 'This will reject the loan application. This action cannot be undone.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setActionToConfirm(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleUpdateStatus} disabled={isUpdating}>
+                            {isUpdating ? 'Processing...' : (actionToConfirm === 'Active' ? 'Yes, approve' : 'Yes, reject')}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
   };
 
