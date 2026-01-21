@@ -28,6 +28,84 @@
         "id",
         "email"
       ]
+    },
+    "Borrower": {
+      "title": "Borrower",
+      "description": "Represents a borrower in the microfinancing system.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique identifier of the borrower."
+        },
+        "fullName": {
+          "type": "string",
+          "description": "The full name of the borrower."
+        },
+        "dateOfBirth": {
+          "type": "string",
+          "format": "date",
+          "description": "The borrower's date of birth."
+        },
+        "gender": {
+          "type": "string",
+          "enum": [
+            "Male",
+            "Female",
+            "Other"
+          ]
+        },
+        "nationalId": {
+          "type": "string",
+          "description": "The national identification number of the borrower."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The borrower's phone number."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The borrower's email address."
+        },
+        "address": {
+          "type": "string",
+          "description": "The borrower's physical address."
+        },
+        "employmentStatus": {
+          "type": "string",
+          "enum": [
+            "Employed",
+            "Self-employed",
+            "Unemployed"
+          ]
+        },
+        "monthlyIncome": {
+          "type": "number",
+          "description": "The borrower's monthly income."
+        },
+        "photoUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the borrower's photo."
+        },
+        "branchId": {
+          "type": "string",
+          "description": "The ID of the branch the borrower belongs to."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who created this borrower."
+        }
+      },
+      "required": [
+        "id",
+        "fullName",
+        "nationalId",
+        "phone",
+        "branchId",
+        "userId"
+      ]
     }
   },
   "auth": {
@@ -49,6 +127,22 @@
             {
               "name": "userId",
               "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/borrowers/{borrowerId}",
+        "definition": {
+          "entityName": "Borrower",
+          "schema": {
+            "$ref": "#/backend/entities/Borrower"
+          },
+          "description": "Stores information about individual borrowers.",
+          "params": [
+            {
+              "name": "borrowerId",
+              "description": "The unique identifier of the borrower."
             }
           ]
         }

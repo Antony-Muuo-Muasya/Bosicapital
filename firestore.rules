@@ -14,5 +14,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
+
+    // Rules for borrowers collection
+    match /borrowers/{borrowerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
   }
 }

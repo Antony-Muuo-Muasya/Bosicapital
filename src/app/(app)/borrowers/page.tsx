@@ -1,21 +1,42 @@
+'use client';
+
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { Borrower } from '@/lib/types';
+import { BorrowersDataTable } from '@/components/borrowers/borrowers-data-table';
+import { columns } from '@/components/borrowers/columns';
+import { AddBorrowerDialog } from '@/components/borrowers/add-borrower-dialog';
+import { useState } from 'react';
 
 export default function BorrowersPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  const borrowersQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'borrowers');
+  }, [firestore, user]);
+
+  const { data: borrowers, isLoading } = useCollection<Borrower>(borrowersQuery);
+
   return (
     <>
       <PageHeader title="Borrowers" description="Manage your list of borrowers.">
-        <Button>
+        <Button onClick={() => setIsAddDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Borrower
         </Button>
       </PageHeader>
       <div className="p-4 md:p-6">
-        <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">
-          Borrower data table will be displayed here.
-        </div>
+        {isLoading && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">Loading borrowers...</div>}
+        {borrowers && <BorrowersDataTable columns={columns} data={borrowers} />}
+        {!isLoading && !borrowers && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">No borrowers found.</div>}
       </div>
+      <AddBorrowerDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
     </>
   );
 }
