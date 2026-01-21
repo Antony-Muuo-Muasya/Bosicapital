@@ -54,6 +54,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const registrationFeeAmount = borrower.registrationFeeAmount ?? 800;
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -79,7 +80,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
             id: paymentRef.id,
             organizationId: userProfile.organizationId,
             borrowerId: borrower.id,
-            amount: borrower.registrationFeeAmount,
+            amount: registrationFeeAmount,
             currency: 'KES',
             paymentMethod: values.paymentMethod,
             reference: values.reference,
@@ -106,7 +107,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
             targetUserId: borrower.id, // Re-using targetUserId for borrower context
             organizationId: userProfile.organizationId,
             timestamp: new Date().toISOString(),
-            details: { amount: borrower.registrationFeeAmount, borrowerName: borrower.fullName }
+            details: { amount: registrationFeeAmount, borrowerName: borrower.fullName }
         };
         batch.set(auditLogRef, auditData);
 
@@ -130,7 +131,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
         <DialogHeader>
           <DialogTitle>Record Registration Fee</DialogTitle>
           <DialogDescription>
-            Record payment for {borrower.fullName}. Amount: {formatCurrency(borrower.registrationFeeAmount, 'KES')}
+            Record payment for {borrower.fullName}. Amount: {formatCurrency(registrationFeeAmount, 'KES')}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
