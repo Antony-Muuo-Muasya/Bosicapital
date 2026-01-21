@@ -20,14 +20,12 @@ import {
   CircleDollarSign,
   FileText,
   Home,
-  Landmark,
-  LineChart,
   LogOut,
   Menu,
   Settings,
   Users,
 } from 'lucide-react';
-import { mainUser } from '@/lib/data';
+import { useAuth, useUser } from '@/firebase';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
@@ -47,7 +45,12 @@ const NavLink = ({
   icon: React.ElementType;
 }) => {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  let isActive = pathname === href;
+  // Special case for dashboard
+  if (href === '/') {
+    isActive = pathname === '/' || pathname === '/dashboard';
+  }
+
 
   return (
     <Link
@@ -74,6 +77,17 @@ function SidebarNav() {
 }
 
 function Header() {
+  const auth = useAuth();
+  const { user } = useUser();
+
+  const displayName = user?.displayName || user?.email;
+  const nameParts = user?.displayName?.split(' ') || [];
+  const fallback =
+    nameParts.length > 1 && nameParts[0] && nameParts[1]
+      ? `${nameParts[0].charAt(0)}${nameParts[1].charAt(0)}`
+      : user?.email?.charAt(0).toUpperCase() || 'U';
+
+
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
       <Sheet>
@@ -86,7 +100,7 @@ function Header() {
         <SheetContent side="left" className="flex flex-col">
           <nav className="grid gap-2 text-lg font-medium">
             <Link
-              href="#"
+              href="/"
               className="flex items-center gap-2 text-lg font-semibold mb-4"
             >
               <AdooLogo className="h-6 w-6 text-primary" />
@@ -107,21 +121,19 @@ function Header() {
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={mainUser.avatarUrl} alt={mainUser.name} />
-              <AvatarFallback>
-                {mainUser.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
+              <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || ''} />
+              <AvatarFallback>{fallback}</AvatarFallback>
             </Avatar>
             <span className="sr-only">Toggle user menu</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{mainUser.name}</DropdownMenuLabel>
+          <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>Profile</DropdownMenuItem>
           <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => auth.signOut()}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Log out</span>
           </DropdownMenuItem>
@@ -132,6 +144,13 @@ function Header() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Redirect /dashboard to /
+  if (pathname === '/dashboard') {
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', '/');
+    }
+  }
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">

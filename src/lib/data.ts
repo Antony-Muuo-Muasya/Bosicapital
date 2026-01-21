@@ -1,13 +1,5 @@
 import type { User, Borrower, Loan, Installment, LoanProduct } from '@/lib/types';
 
-export const mainUser: User = {
-  id: 'user-1',
-  name: 'Alex Doe',
-  email: 'alex.doe@adoo.com',
-  role: 'Branch Manager',
-  avatarUrl: 'https://picsum.photos/seed/user-1/100/100',
-};
-
 export const loanProducts: LoanProduct[] = [
   { id: 'prod-1', name: 'Motorcycle Loan', category: 'Asset Finance', minAmount: 500, maxAmount: 3000, interestRate: 15, duration: 24, repaymentCycle: 'Monthly' },
   { id: 'prod-2', name: 'Small Business Boost', category: 'Business', minAmount: 1000, maxAmount: 10000, interestRate: 12, duration: 36, repaymentCycle: 'Monthly' },
