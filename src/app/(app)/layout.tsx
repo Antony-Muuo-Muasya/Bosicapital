@@ -31,7 +31,7 @@ export default function AppLayout({
 
         if (!userProfile) {
             // SCENARIO 1: First-time user. Create their profile document.
-            const roleId = user.email === 'tonniehmuas@gmail.com' ? 'admin' : 'loan_officer';
+            const roleId = user.email === 'admin@adoo.app' ? 'admin' : 'loan_officer';
             
             const newUserProfile: AppUser = {
                 id: user.uid,
@@ -49,7 +49,7 @@ export default function AppLayout({
 
         } else {
             // SCENARIO 2: User exists. Check if they are the designated admin and need a role update.
-            if (user.email === 'tonniehmuas@gmail.com' && userProfile.roleId !== 'admin') {
+            if (user.email === 'admin@adoo.app' && userProfile.roleId !== 'admin') {
                 // Use a non-blocking update. The UI will show a loader until the role is corrected.
                 updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
             }
@@ -138,7 +138,7 @@ export default function AppLayout({
 
   // If the designated admin user's role is not yet 'admin', show a loader.
   // This prevents rendering child pages with incorrect permissions during the role update.
-  const isDesignatedAdmin = user.email === 'tonniehmuas@gmail.com';
+  const isDesignatedAdmin = user.email === 'admin@adoo.app';
   if (isDesignatedAdmin && userProfile.roleId !== 'admin') {
     return (
         <div className="flex h-screen items-center justify-center gap-4">
