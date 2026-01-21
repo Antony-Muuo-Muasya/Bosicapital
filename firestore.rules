@@ -33,12 +33,12 @@ service cloud.firestore {
     
     match /roles/{roleId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if isAuthenticated();
     }
     
     match /branches/{branchId} {
         allow read: if isAuthenticated();
-        allow write: if isAdmin();
+        allow write: if isAuthenticated();
     }
 
     match /borrowers/{borrowerId} {
