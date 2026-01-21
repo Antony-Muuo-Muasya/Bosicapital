@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -35,18 +35,14 @@ const getStatusVariant = (status: string) => {
     }
   };
 
-const LoanActions = ({ loanId }: { loanId: string }) => {
-  const firestore = useFirestore();
+const LoanActions = ({ loan }: { loan: LoanWithDetails }) => {
+  const { userRole } = useUserProfile();
 
   const handleDelete = () => {
-    // In a real app, deleting a loan should be handled with care,
-    // maybe archiving it instead. For now, deletion is disabled by rules.
-    alert('Loan deletion is disabled for data integrity.');
-    // if (confirm('Are you sure you want to delete this loan? This cannot be undone.')) {
-    //   const loanDocRef = doc(firestore, 'loans', loanId);
-    //   deleteDocumentNonBlocking(loanDocRef);
-    // }
+    alert('For data integrity, loans cannot be deleted. Consider rejecting or archiving instead.');
   };
+
+  const canManage = userRole?.id === 'admin' || userRole?.id === 'manager';
 
   return (
     <DropdownMenu>
@@ -58,15 +54,17 @@ const LoanActions = ({ loanId }: { loanId: string }) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(loanId)}>
+        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(loan.id)}>
           Copy loan ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>View Details</DropdownMenuItem>
-        <DropdownMenuItem>Edit Loan</DropdownMenuItem>
-        <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-          Delete Loan
-        </DropdownMenuItem>
+        {canManage && <DropdownMenuItem>Edit Loan</DropdownMenuItem>}
+        {userRole?.id === 'admin' && (
+             <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                Delete Loan
+             </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -101,7 +99,7 @@ export const columns: ColumnDef<LoanWithDetails>[] = [
     header: () => <div className="text-right">Principal</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue('principal'));
-      return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
+      return <div className="text-right font-medium">{formatCurrency(amount, 'KES')}</div>;
     },
   },
   {
@@ -128,7 +126,7 @@ export const columns: ColumnDef<LoanWithDetails>[] = [
     id: 'actions',
     cell: ({ row }) => {
       const loan = row.original;
-      return <LoanActions loanId={loan.id} />;
+      return <LoanActions loan={loan} />;
     },
   },
 ];

@@ -78,26 +78,18 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
 
 
   useEffect(() => {
-    const principal = form.watch('principal');
-    if (!selectedProduct || !principal) return;
-    
-    if (principal > 1000000) {
+    const principalValue = form.getValues('principal');
+    if (selectedProduct && principalValue > 0) {
+      if (principalValue > selectedProduct.maxAmount || principalValue < selectedProduct.minAmount) {
         form.setError('principal', {
-            type: 'manual',
-            message: 'Principal cannot exceed 1,000,000.',
+          type: 'manual',
+          message: `Amount must be between ${formatCurrency(selectedProduct.minAmount, 'KES')} and ${formatCurrency(selectedProduct.maxAmount, 'KES')}`,
         });
-        return;
+      } else {
+        form.clearErrors('principal');
+      }
     }
-
-    if (principal < selectedProduct.minAmount || principal > selectedProduct.maxAmount) {
-      form.setError('principal', {
-        type: 'manual',
-        message: `Amount must be between ${selectedProduct.minAmount} and ${selectedProduct.maxAmount}`,
-      });
-    } else {
-      form.clearErrors('principal');
-    }
-  }, [form, selectedProduct, form.watch('principal')]);
+  }, [form.watch('principal'), selectedProduct, form]);
 
 
   const onSubmit = async (values: LoanFormData) => {
@@ -123,9 +115,9 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       totalPayable: totalPayable,
       installmentAmount: installmentAmount,
       issueDate: new Date().toISOString().split('T')[0], // This is the request date
-      status: 'Pending Approval', // Changed from 'Active'
+      status: 'Pending Approval',
       loanOfficerId: user.uid,
-      branchId: 'branch-1', // Hardcoded for now
+      branchId: userProfile.branchIds[0] || 'branch-1',
     };
     
     setDocumentNonBlocking(loanRef, newLoanData, { merge: false })
@@ -203,8 +195,8 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                     <div className="text-sm text-muted-foreground space-y-1 rounded-md bg-muted p-3">
                        <p>Interest Rate: <strong>{selectedProduct.interestRate}%</strong></p>
                        <p>Duration: <strong>{selectedProduct.duration} months</strong></p>
-                       <p>Total Payable: <strong>{formatCurrency((form.getValues('principal') || 0) * (1 + selectedProduct.interestRate / 100))}</strong></p>
-                       <p>Monthly Installment: <strong>{formatCurrency(((form.getValues('principal') || 0) * (1 + selectedProduct.interestRate / 100)) / selectedProduct.duration)}</strong></p>
+                       <p>Total Payable: <strong>{formatCurrency(form.getValues('principal') * (1 + selectedProduct.interestRate / 100), 'KES')}</strong></p>
+                       <p>Monthly Installment: <strong>{formatCurrency((form.getValues('principal') * (1 + selectedProduct.interestRate / 100)) / selectedProduct.duration, 'KES')}</strong></p>
                     </div>
                 )}
 

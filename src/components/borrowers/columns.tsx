@@ -45,8 +45,8 @@ const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, on
           Copy borrower ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {!borrower.registrationFeePaid && (
-          <DropdownMenuItem onClick={() => onRecordPayment(borrower)} disabled={userRole?.id === 'auditor'}>
+        {!borrower.registrationFeePaid && userRole?.id !== 'user' && (
+          <DropdownMenuItem onClick={() => onRecordPayment(borrower)}>
             Record Payment
           </DropdownMenuItem>
         )}
@@ -104,7 +104,7 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
     header: () => <div className="text-right">Monthly Income</div>,
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue('monthlyIncome'));
-      const formatted = formatCurrency(amount);
+      const formatted = formatCurrency(amount, 'KES');
 
       return <div className="text-right font-medium">{formatted}</div>;
     },

@@ -57,12 +57,12 @@ export const getLoanProductColumns = (onEdit: (product: LoanProduct) => void): C
   {
     accessorKey: 'minAmount',
     header: 'Min Amount',
-    cell: ({ row }) => formatCurrency(row.original.minAmount),
+    cell: ({ row }) => formatCurrency(row.original.minAmount, 'KES'),
   },
   {
     accessorKey: 'maxAmount',
     header: 'Max Amount',
-    cell: ({ row }) => formatCurrency(row.original.maxAmount),
+    cell: ({ row }) => formatCurrency(row.original.maxAmount, 'KES'),
   },
   {
     accessorKey: 'interestRate',

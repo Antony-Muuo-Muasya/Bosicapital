@@ -16,6 +16,7 @@ interface OverviewCardsProps {
   borrowers: Borrower[] | null;
   regPayments: RegistrationPayment[] | null;
   isLoading: boolean;
+  title?: string;
 }
 
 const StatCard = ({ title, value, icon: Icon, description, className, isLoading }: any) => (
@@ -41,7 +42,7 @@ const StatCard = ({ title, value, icon: Icon, description, className, isLoading 
 );
 
 
-export function OverviewCards({ loans, installments, borrowers, regPayments, isLoading }: OverviewCardsProps) {
+export function OverviewCards({ loans, installments, borrowers, regPayments, isLoading, title = 'Portfolio Overview' }: OverviewCardsProps) {
 
   const totalPortfolio = loans
     ? loans.filter(l => l.status === 'Active').reduce((sum, loan) => sum + loan.principal, 0)
@@ -63,7 +64,7 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
   const stats = [
     {
       title: 'Total Portfolio',
-      value: formatCurrency(totalPortfolio),
+      value: formatCurrency(totalPortfolio, 'KES'),
       icon: CircleDollarSign,
       description: `${activeLoansCount} active loans`,
     },
@@ -87,7 +88,7 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
     },
     {
       title: 'Total Overdue',
-      value: formatCurrency(overdueAmount),
+      value: formatCurrency(overdueAmount, 'KES'),
       icon: AlertTriangle,
       description: `${overdueLoansCount} loans with overdue payments`,
       className: 'text-destructive',

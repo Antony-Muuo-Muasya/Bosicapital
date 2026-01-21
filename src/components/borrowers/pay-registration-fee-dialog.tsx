@@ -97,19 +97,6 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
             registrationFeePaidAt: new Date().toISOString(),
             registrationPaymentId: paymentRef.id,
         });
-        
-        // 3. Create Audit Log
-        const auditLogRef = doc(collection(firestore, 'auditLogs'));
-        const auditData = {
-            id: auditLogRef.id,
-            action: 'REGISTRATION_FEE_PAID',
-            performedBy: user.uid,
-            targetUserId: borrower.id, // Re-using targetUserId for borrower context
-            organizationId: userProfile.organizationId,
-            timestamp: new Date().toISOString(),
-            details: { amount: registrationFeeAmount, borrowerName: borrower.fullName }
-        };
-        batch.set(auditLogRef, auditData);
 
         await batch.commit();
 

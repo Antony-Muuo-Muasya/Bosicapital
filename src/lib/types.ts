@@ -9,10 +9,11 @@ export type Permission =
   | 'loan.approve'
   | 'loan.view'
   | 'repayment.create'
-  | 'reports.view';
+  | 'reports.view'
+  | 'borrower.view.own';
 
 export type Role = {
-  id: 'admin' | 'manager' | 'loan_officer' | 'auditor';
+  id: 'admin' | 'manager' | 'loan_officer' | 'user';
   organizationId: string;
   name: string;
   systemRole: boolean;
@@ -58,7 +59,7 @@ export type Borrower = {
   registrationFeePaid: boolean;
   registrationFeePaidAt: string | null;
   registrationPaymentId: string | null;
-  userId: string;
+  userId: string; // This MUST link to a User with the 'user' role
 };
 
 export type LoanProduct = {

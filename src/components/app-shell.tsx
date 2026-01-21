@@ -35,12 +35,12 @@ import { ThemeToggle } from './theme-toggle';
 
 
 const allNavItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'manager', 'loan_officer', 'auditor'] },
-  { href: '/loans', label: 'Loans', icon: CircleDollarSign, roles: ['admin', 'manager', 'loan_officer', 'auditor'] },
+  { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'manager', 'loan_officer'] },
+  { href: '/loans', label: 'Loans', icon: CircleDollarSign, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['admin', 'manager'] },
-  { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer', 'auditor'] },
+  { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
-  { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager', 'auditor'] },
+  { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager'] },
   { href: '/users', label: 'Users', icon: UserCog, roles: ['admin'] },
   { href: '/branches', label: 'Branches', icon: Building, roles: ['admin'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
@@ -76,10 +76,9 @@ function SidebarNav() {
   const { userRole } = useUserProfile();
 
   const visibleNavItems = React.useMemo(() => {
-    // To ensure the menu is always present, we are showing all items and 
-    // relying on page-level permissions to restrict access.
-    return allNavItems;
-  }, []);
+    if (!userRole) return [];
+    return allNavItems.filter(item => item.roles.includes(userRole.id));
+  }, [userRole]);
 
 
   return (
