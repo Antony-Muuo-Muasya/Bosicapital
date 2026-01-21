@@ -13,7 +13,7 @@ service cloud.firestore {
     // Function to get the user's role ID from their user document
     function getUserRoleId() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      if (!('roleId' in userDoc.data)) {
+       if (userDoc == null || !('roleId' in userDoc.data)) {
         return 'none';
       }
       return userDoc.data.roleId;
@@ -23,7 +23,8 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated() && (getUserRoleId() == 'admin' || isOwner(userId));
-      allow create, update, delete: if isAuthenticated() && getUserRoleId() == 'admin';
+      allow create: if isAuthenticated() && (request.auth.uid == userId || getUserRoleId() == 'admin');
+      allow update, delete: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
     match /roles/{roleId} {
@@ -33,7 +34,7 @@ service cloud.firestore {
 
     match /auditLogs/{logId} {
       allow read: if isAuthenticated() && getUserRoleId() == 'admin';
-      allow create: if isAuthenticated() && getUserRoleId() == 'admin';
+      allow create: if isAuthenticated(); // Allow any authenticated user to create audit logs
       allow update, delete: if false;
     }
 

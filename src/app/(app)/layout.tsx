@@ -1,9 +1,12 @@
 'use client';
 import { AppShell } from '@/components/app-shell';
-import { useUserProfile } from '@/firebase';
+import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { doc } from 'firebase/firestore';
+import type { User as AppUser } from '@/lib/types';
+
 
 export default function AppLayout({
   children,
@@ -12,12 +15,36 @@ export default function AppLayout({
 }) {
   const { user, userProfile, isLoading } = useUserProfile();
   const router = useRouter();
+  const firestore = useFirestore();
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login');
+      return;
     }
-  }, [user, isLoading, router]);
+
+    // If auth is done, we have a user, but we don't have a firestore profile for them.
+    // This means it's their first login and we need to create their document.
+    if (firestore && user && !userProfile && !isLoading) {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        
+        // Default new users to 'loan_officer'.
+        // In a real app, the first user might be made an admin, or an admin would invite them.
+        const newUserProfile: AppUser = {
+            id: user.uid,
+            organizationId: 'org_1', // Default organization
+            fullName: user.displayName || 'New User',
+            email: user.email!,
+            roleId: 'loan_officer', // Default role for new sign-ups
+            branchIds: ['branch-1'], // Default branch
+            status: 'active',
+            createdAt: new Date().toISOString(),
+        };
+        
+        // Use the non-blocking version to create the document
+        setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
+    }
+  }, [user, userProfile, isLoading, router, firestore]);
 
   if (isLoading || !user) {
     return (
