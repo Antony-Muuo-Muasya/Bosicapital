@@ -45,8 +45,10 @@ service cloud.firestore {
     }
 
     match /roles/{roleId} {
-      // Allow authenticated users with a user profile to read role definitions.
-      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      // Allow any authenticated user to read role definitions.
+      // This is safe as roles are configuration, not sensitive user data.
+      // This also resolves a race condition on new user sign-up.
+      allow read: if isAuthenticated();
       allow write: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
