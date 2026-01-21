@@ -9,6 +9,7 @@ import { LogOut, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 const borrowerNavItems = [
     { href: '/my-dashboard', label: 'My Dashboard' },
@@ -23,6 +24,7 @@ export default function BorrowerLayout({
   const { user, userProfile, isLoading } = useUserProfile();
   const auth = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isLoading) return;
@@ -67,7 +69,20 @@ export default function BorrowerLayout({
               <AdooLogo className="h-6 w-6 text-primary" />
               <span className="font-bold sm:inline-block font-headline">Adoo</span>
             </Link>
-            {/* Add nav items here if needed */}
+             <nav className="flex items-center space-x-6 text-sm font-medium">
+              {borrowerNavItems.map((item) => (
+                  <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                          'transition-colors hover:text-primary',
+                          pathname === item.href ? 'text-foreground' : 'text-muted-foreground'
+                      )}
+                  >
+                      {item.label}
+                  </Link>
+              ))}
+            </nav>
           <div className="flex flex-1 items-center justify-end space-x-4">
           <ThemeToggle />
           <DropdownMenu>

@@ -103,8 +103,16 @@ service cloud.firestore {
     }
 
     match /loans/{loanId}/installments/{installmentId} {
-      // Permissions inherit from the parent loan document.
-      allow read, write: if get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId != null;
+      // Permissions to read installments are inherited from the parent loan.
+      // Staff can create/update installments.
+      allow read: if (
+                    let loan = get(/databases/$(database)/documents/loans/$(loanId)).data;
+                    isAdmin() 
+                    || (isManager() && userIsInBranch(loan.branchId))
+                    || (isLoanOfficer() && loan.loanOfficerId == request.auth.uid)
+                    || (isUser() && get(/databases/$(database)/documents/borrowers/$(loan.borrowerId)).data.userId == request.auth.uid)
+                  );
+      allow write: if isManager() || isAdmin() || isLoanOfficer();
     }
 
     match /auditLogs/{logId} {
