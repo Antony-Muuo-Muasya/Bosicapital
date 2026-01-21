@@ -10,25 +10,43 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Function to get the user's role ID from their user document
+    // Function to get the user's role ID from their user document.
+    // This can be called safely in rules where we aren't reading from the users collection itself.
     function getUserRoleId() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-       if (userDoc == null || !('roleId' in userDoc.data)) {
+      if (userDoc == null || !('roleId' in userDoc.data)) {
         return 'none';
       }
       return userDoc.data.roleId;
+    }
+    
+    // This function checks the incoming request data to determine role, to avoid recursive get() calls.
+    function getIncomingUserRole() {
+        return request.resource.data.roleId;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (getUserRoleId() == 'admin' || isOwner(userId));
-      allow create: if isAuthenticated() && (request.auth.uid == userId || getUserRoleId() == 'admin');
-      allow update, delete: if isAuthenticated() && getUserRoleId() == 'admin';
+      // Allow read if the user is reading their own document.
+      // Admin read access would require custom claims to avoid recursive lookups, which is a broader change.
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Allow create if it's the user creating their own doc, and they are NOT trying to make themselves an admin.
+      allow create: if isAuthenticated() && 
+                    isOwner(userId) &&
+                    getIncomingUserRole() != 'admin';
+                    
+      // Only admins can update user documents.
+      allow update: if isAuthenticated() && getUserRoleId() == 'admin';
+
+      // Only admins can delete users.
+      allow delete: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
     match /roles/{roleId} {
-      allow read: if isAuthenticated();
+      // Allow authenticated users with a user profile to read role definitions.
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
       allow write: if isAuthenticated() && getUserRoleId() == 'admin';
     }
 
