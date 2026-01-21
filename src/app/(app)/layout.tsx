@@ -1,6 +1,6 @@
 'use client';
 import { AppShell } from '@/components/app-shell';
-import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUserProfile, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -23,27 +23,31 @@ export default function AppLayout({
       return;
     }
 
-    // If auth is done, we have a user, but we don't have a firestore profile for them.
-    // This means it's their first login and we need to create their document.
-    if (firestore && user && !userProfile && !isLoading) {
+    if (firestore && user && !isLoading) {
         const userDocRef = doc(firestore, 'users', user.uid);
-        
-        // Assign role based on email. Make adminadoo@gmail.com admin, others default to loan_officer
-        const roleId = user.email === 'adminadoo@gmail.com' ? 'admin' : 'loan_officer';
-        
-        const newUserProfile: AppUser = {
-            id: user.uid,
-            organizationId: 'org_1', // Default organization
-            fullName: user.displayName || 'New User',
-            email: user.email!,
-            roleId: roleId,
-            branchIds: ['branch-1'], // Default branch
-            status: 'active',
-            createdAt: new Date().toISOString(),
-        };
-        
-        // Use the non-blocking version to create the document
-        setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
+
+        // Scenario 1: First-time login, create the profile
+        if (!userProfile) {
+            const roleId = user.email === 'adminadoo@gmail.com' ? 'admin' : 'loan_officer';
+            
+            const newUserProfile: AppUser = {
+                id: user.uid,
+                organizationId: 'org_1', // Default organization
+                fullName: user.displayName || 'New User',
+                email: user.email!,
+                roleId: roleId,
+                branchIds: ['branch-1'], // Default branch
+                status: 'active',
+                createdAt: new Date().toISOString(),
+            };
+            
+            setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
+        } 
+        // Scenario 2: User exists, but is the designated admin and doesn't have the admin role. Update them.
+        else if (user.email === 'adminadoo@gmail.com' && userProfile.roleId !== 'admin') {
+             // Use non-blocking update to change the role
+            updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
+        }
     }
   }, [user, userProfile, isLoading, router, firestore]);
 
