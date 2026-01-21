@@ -4,8 +4,8 @@ import { useFirestore, useUserProfile, setDocumentNonBlocking, updateDocumentNon
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { doc } from 'firebase/firestore';
-import type { User as AppUser } from '@/lib/types';
+import { doc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import type { User as AppUser, Role } from '@/lib/types';
 
 
 export default function AppLayout({
@@ -47,6 +47,62 @@ export default function AppLayout({
         else if (user.email === 'tonniehmuas@gmail.com' && userProfile.roleId !== 'admin') {
              // Use non-blocking update to change the role
             updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
+        }
+
+        // Scenario 3: Admin is logged in, check if roles need to be seeded.
+        if (userProfile?.roleId === 'admin') {
+            const seedRoles = async () => {
+                const rolesColRef = collection(firestore, 'roles');
+                const rolesSnapshot = await getDocs(rolesColRef);
+
+                if (rolesSnapshot.empty) {
+                    const batch = writeBatch(firestore);
+                    const rolesToSeed: Omit<Role, 'organizationId'>[] = [
+                        {
+                          id: 'admin',
+                          name: 'Administrator',
+                          systemRole: true,
+                          permissions: [
+                            'user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 
+                            'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
+                            'repayment.create', 'reports.view'
+                          ],
+                        },
+                        {
+                          id: 'manager',
+                          name: 'Manager',
+                          systemRole: true,
+                          permissions: [
+                            'user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
+                            'repayment.create', 'reports.view'
+                          ],
+                        },
+                        {
+                          id: 'loan_officer',
+                          name: 'Loan Officer',
+                          systemRole: true,
+                          permissions: ['loan.create', 'loan.view', 'repayment.create'],
+                        },
+                        {
+                          id: 'auditor',
+                          name: 'Auditor',
+                          systemRole: true,
+                          permissions: ['loan.view', 'reports.view', 'user.view'],
+                        },
+                    ];
+
+                    rolesToSeed.forEach(roleData => {
+                        const docRef = doc(firestore, 'roles', roleData.id);
+                        const newRole = { ...roleData, organizationId: userProfile.organizationId };
+                        batch.set(docRef, newRole);
+                    });
+                    
+                    await batch.commit();
+                    console.log('Default roles have been seeded to Firestore.');
+                }
+            };
+
+            seedRoles().catch(console.error);
         }
     }
   }, [user, userProfile, isLoading, router, firestore]);
