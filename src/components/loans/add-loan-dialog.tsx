@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +63,11 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
 
   const form = useForm<LoanFormData>({
     resolver: zodResolver(loanSchema),
+    defaultValues: {
+      borrowerId: '',
+      loanProductId: '',
+      principal: 0,
+    }
   });
 
   const selectedProductId = form.watch('loanProductId');
