@@ -13,13 +13,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 
 const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void }) => {
   const firestore = useFirestore();
+  const { userRole } = useUserProfile();
+  const canPerformActions = userRole?.id === 'admin' || userRole?.id === 'manager';
+
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this borrower?')) {
@@ -43,12 +46,12 @@ const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, on
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {!borrower.registrationFeePaid && (
-          <DropdownMenuItem onClick={() => onRecordPayment(borrower)}>
+          <DropdownMenuItem onClick={() => onRecordPayment(borrower)} disabled={userRole?.id === 'auditor'}>
             Record Payment
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem>Edit Borrower</DropdownMenuItem>
-        <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+        <DropdownMenuItem disabled={!canPerformActions}>Edit Borrower</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleDelete} className="text-destructive" disabled={!canPerformActions}>
           Delete Borrower
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -91,6 +94,10 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
         </Badge>
       );
     },
+    filterFn: (row, id, value) => {
+        if (value === null) return true;
+        return row.getValue(id) === (value === 'true');
+    }
   },
   {
     accessorKey: 'monthlyIncome',

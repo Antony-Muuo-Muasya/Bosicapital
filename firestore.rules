@@ -1,8 +1,79 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      if (request.auth == null) {
+        return 'public';
+      }
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId;
+    }
+
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+
+    function isManager() {
+      return getUserRole() == 'manager';
+    }
+
+    // Users can create their own profile on first sign-in, but cannot make themselves admin.
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if request.auth.uid == userId && request.resource.data.roleId != 'admin';
+      allow update: if isAdmin(); // Only admins can update user profiles.
+      allow delete: if isAdmin();
+    }
+    
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    match /borrowers/{borrowerId} {
+      allow read: if isAuthenticated();
+      // loan_officer or higher can create/update borrowers
+      allow create, update: if isAuthenticated() && (isAdmin() || isManager() || getUserRole() == 'loan_officer');
+      allow delete: if isAuthenticated() && (isAdmin() || isManager());
+    }
+
+    match /registrationPayments/{paymentId} {
+        allow create: if isAuthenticated() && (isAdmin() || isManager() || getUserRole() == 'loan_officer');
+        allow read: if isAuthenticated();
+    }
+
+    match /loanProducts/{productId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+    }
+
+    match /loans/{loanId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && (isAdmin() || isManager() || getUserRole() == 'loan_officer');
+        // Only manager or admin can approve/reject (update status)
+        allow update: if isAuthenticated() && (isAdmin() || isManager());
+        allow delete: if isAdmin();
+    }
+
+    match /loans/{loanId}/installments/{installmentId} {
+        allow read, write: if isAuthenticated();
+    }
+
+    match /auditLogs/{logId} {
+        allow read, create: if isAdmin();
+    }
+
+    match /repayments/{repaymentId} {
+        allow read, create: if isAuthenticated() && (isAdmin() || isManager() || getUserRole() == 'loan_officer');
+    }
+
+    // Fallback to deny all access to any other collections
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

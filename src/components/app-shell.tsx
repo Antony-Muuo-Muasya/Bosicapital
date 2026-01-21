@@ -73,9 +73,18 @@ const NavLink = ({
 };
 
 function SidebarNav() {
+  const { userRole } = useUserProfile();
+
+  const visibleNavItems = React.useMemo(() => {
+    if (!userRole) return [];
+    // @ts-ignore
+    return allNavItems.filter(item => item.roles.includes(userRole.id));
+  }, [userRole]);
+
+
   return (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-      {allNavItems.map((item) => (
+      {visibleNavItems.map((item) => (
         <NavLink key={item.href} {...item} />
       ))}
     </nav>

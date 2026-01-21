@@ -6,8 +6,6 @@ import {
   getCoreRowModel,
   useReactTable,
   getPaginationRowModel,
-  getFilteredRowModel,
-  ColumnFiltersState,
 } from '@tanstack/react-table';
 
 import {
@@ -19,63 +17,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
-import { useState } from 'react';
-import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
 }
 
-export function BorrowersDataTable<TData, TValue>({
+export function ApprovalsDataTable<TData, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
-        []
-      )
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
-    state: {
-        columnFilters,
-    }
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
-            <Input
-            placeholder="Filter by name..."
-            value={(table.getColumn("fullName")?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-                table.getColumn("fullName")?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm"
-            />
-            {table.getColumn("registrationFeePaid") && (
-                <Select
-                    value={(table.getColumn("registrationFeePaid")?.getFilterValue() as string) ?? "all"}
-                    onValueChange={(value) =>
-                        table.getColumn("registrationFeePaid")?.setFilterValue(value === "all" ? null : value)
-                    }
-                >
-                    <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="true">Registered</SelectItem>
-                        <SelectItem value="false">Fee Due</SelectItem>
-                    </SelectContent>
-                </Select>
-            )}
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -113,7 +73,7 @@ export function BorrowersDataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  No pending approvals found.
                 </TableCell>
               </TableRow>
             )}
