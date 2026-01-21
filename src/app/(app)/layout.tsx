@@ -17,17 +17,20 @@ export default function AppLayout({
   const router = useRouter();
   const firestore = useFirestore();
 
+  // This useEffect handles all one-time setup and correction logic.
   useEffect(() => {
+    // Redirect to login if not authenticated and loading is complete.
     if (!isLoading && !user) {
       router.push('/login');
       return;
     }
 
+    // Only proceed if services are available and user is loaded.
     if (firestore && user && !isLoading) {
         const userDocRef = doc(firestore, 'users', user.uid);
 
-        // Scenario 1: First-time login, create the profile
         if (!userProfile) {
+            // SCENARIO 1: First-time user. Create their profile document.
             const roleId = user.email === 'tonniehmuas@gmail.com' ? 'admin' : 'loan_officer';
             
             const newUserProfile: AppUser = {
@@ -41,73 +44,79 @@ export default function AppLayout({
                 createdAt: new Date().toISOString(),
             };
             
+            // Use a non-blocking write. The UI will show a loader until the profile is available.
             setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
-        } 
-        // Scenario 2: User exists, but is the designated admin and doesn't have the admin role. Update them.
-        else if (user.email === 'tonniehmuas@gmail.com' && userProfile.roleId !== 'admin') {
-             // Use non-blocking update to change the role
-            updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
-        }
 
-        // Scenario 3: Admin is logged in, check if roles need to be seeded.
-        if (userProfile?.roleId === 'admin') {
-            const seedRoles = async () => {
-                const rolesColRef = collection(firestore, 'roles');
-                const rolesSnapshot = await getDocs(rolesColRef);
+        } else {
+            // SCENARIO 2: User exists. Check if they are the designated admin and need a role update.
+            if (user.email === 'tonniehmuas@gmail.com' && userProfile.roleId !== 'admin') {
+                // Use a non-blocking update. The UI will show a loader until the role is corrected.
+                updateDocumentNonBlocking(userDocRef, { roleId: 'admin' });
+            }
 
-                if (rolesSnapshot.empty) {
-                    const batch = writeBatch(firestore);
-                    const rolesToSeed: Omit<Role, 'organizationId'>[] = [
-                        {
-                          id: 'admin',
-                          name: 'Administrator',
-                          systemRole: true,
-                          permissions: [
-                            'user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 
-                            'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
-                            'repayment.create', 'reports.view'
-                          ],
-                        },
-                        {
-                          id: 'manager',
-                          name: 'Manager',
-                          systemRole: true,
-                          permissions: [
-                            'user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
-                            'repayment.create', 'reports.view'
-                          ],
-                        },
-                        {
-                          id: 'loan_officer',
-                          name: 'Loan Officer',
-                          systemRole: true,
-                          permissions: ['loan.create', 'loan.view', 'repayment.create'],
-                        },
-                        {
-                          id: 'auditor',
-                          name: 'Auditor',
-                          systemRole: true,
-                          permissions: ['loan.view', 'reports.view', 'user.view'],
-                        },
-                    ];
+            // SCENARIO 3: If the current user is an admin, check if system roles need to be seeded.
+            if (userProfile.roleId === 'admin') {
+                const seedRoles = async () => {
+                    const rolesColRef = collection(firestore, 'roles');
+                    const rolesSnapshot = await getDocs(rolesColRef);
 
-                    rolesToSeed.forEach(roleData => {
-                        const docRef = doc(firestore, 'roles', roleData.id);
-                        const newRole = { ...roleData, organizationId: userProfile.organizationId };
-                        batch.set(docRef, newRole);
-                    });
-                    
-                    await batch.commit();
-                    console.log('Default roles have been seeded to Firestore.');
-                }
-            };
+                    if (rolesSnapshot.empty) {
+                        const batch = writeBatch(firestore);
+                        const rolesToSeed: Omit<Role, 'organizationId'>[] = [
+                            {
+                              id: 'admin',
+                              name: 'Administrator',
+                              systemRole: true,
+                              permissions: [
+                                'user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 
+                                'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
+                                'repayment.create', 'reports.view'
+                              ],
+                            },
+                            {
+                              id: 'manager',
+                              name: 'Manager',
+                              systemRole: true,
+                              permissions: [
+                                'user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 
+                                'repayment.create', 'reports.view'
+                              ],
+                            },
+                            {
+                              id: 'loan_officer',
+                              name: 'Loan Officer',
+                              systemRole: true,
+                              permissions: ['loan.create', 'loan.view', 'repayment.create'],
+                            },
+                            {
+                              id: 'auditor',
+                              name: 'Auditor',
+                              systemRole: true,
+                              permissions: ['loan.view', 'reports.view', 'user.view'],
+                            },
+                        ];
 
-            seedRoles().catch(console.error);
+                        rolesToSeed.forEach(roleData => {
+                            const docRef = doc(firestore, 'roles', roleData.id);
+                            const newRole = { ...roleData, organizationId: userProfile.organizationId };
+                            batch.set(docRef, newRole);
+                        });
+                        
+                        await batch.commit();
+                        console.log('Default roles have been seeded to Firestore.');
+                    }
+                };
+
+                seedRoles().catch(console.error);
+            }
         }
     }
   }, [user, userProfile, isLoading, router, firestore]);
-
+  
+  // Render blocking logic based on auth and profile state.
+  
   if (isLoading || !user) {
+    // Primary loading state while checking auth.
     return (
       <div className="flex h-screen items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -116,16 +125,29 @@ export default function AppLayout({
     );
   }
 
-  // This can happen if a user is created in Auth but their profile document in Firestore
-  // hasn't been created yet. We wait until the profile is loaded.
   if (!userProfile) {
-     return (
-      <div className="flex h-screen items-center justify-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Finalizing setup...</p>
-      </div>
+    // User is authenticated, but their profile document is not yet available.
+    // This state occurs for first-time users while their profile is being created.
+    return (
+     <div className="flex h-screen items-center justify-center gap-4">
+       <Loader2 className="h-8 w-8 animate-spin text-primary" />
+       <p className="text-muted-foreground">Finalizing setup...</p>
+     </div>
+   );
+  }
+
+  // If the designated admin user's role is not yet 'admin', show a loader.
+  // This prevents rendering child pages with incorrect permissions during the role update.
+  const isDesignatedAdmin = user.email === 'tonniehmuas@gmail.com';
+  if (isDesignatedAdmin && userProfile.roleId !== 'admin') {
+    return (
+        <div className="flex h-screen items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Updating permissions...</p>
+        </div>
     );
   }
 
+  // All checks passed, render the main application shell.
   return <AppShell>{children}</AppShell>;
 }
