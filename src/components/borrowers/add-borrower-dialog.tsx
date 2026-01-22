@@ -64,9 +64,12 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   const [usersLoading, setUsersLoading] = useState(true);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if(!firestore) return null;
-    return collection(firestore, 'borrowers');
-  },[firestore]);
+    if (!firestore || !staffProfile) return null;
+    const { organizationId } = staffProfile;
+    // Query all borrowers for the organization to find unlinked users.
+    // The security rule will enforce this organization boundary.
+    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
+  }, [firestore, staffProfile]);
 
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
 
@@ -82,7 +85,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
         const borrowerUserIds = new Set(borrowers?.map(b => b.userId) || []);
   
         if (staffProfile.roleId === 'admin') {
-          const q = query(collection(firestore, 'users'), where('roleId', '==', 'user'));
+          const q = query(collection(firestore, 'users'), where('roleId', '==', 'user'), where('organizationId', '==', staffProfile.organizationId));
           const querySnapshot = await getDocs(q);
           querySnapshot.forEach(doc => {
             usersData.push({ id: doc.id, ...doc.data() } as AppUser);
@@ -95,7 +98,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             const q = query(
               collection(firestore, 'users'), 
               where('roleId', '==', 'user'), 
-              where('branchIds', 'array-contains', branchId)
+              where('branchIds', 'array-contains', branchId),
+              where('organizationId', '==', staffProfile.organizationId)
             );
             const querySnapshot = await getDocs(q);
             querySnapshot.forEach(doc => {

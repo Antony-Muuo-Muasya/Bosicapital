@@ -22,14 +22,15 @@ export default function BorrowersPage() {
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
 
-    const { roleId, branchIds } = userProfile;
+    const { roleId, branchIds, organizationId } = userProfile;
+    const borrowersCol = collection(firestore, 'borrowers');
 
     if (roleId === 'admin') {
-      return collection(firestore, 'borrowers');
+      return query(borrowersCol, where('organizationId', '==', organizationId));
     }
     
     if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
-      return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
+      return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
 
     return null;

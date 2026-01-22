@@ -21,7 +21,6 @@ export function LoanOfficerDashboard() {
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
 
   // Queries for all data - will be used to get all products/borrowers for loan creation
-  const allBorrowersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'borrowers') : null, [firestore]);
   const allLoanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
   
   // Queries filtered by loan officer
@@ -31,19 +30,17 @@ export function LoanOfficerDashboard() {
   }, [firestore, user]);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    // This is tricky. A borrower is not directly assigned to a loan officer.
+    if (!firestore || !user || !userProfile?.branchIds?.length) return null;
+    // A borrower is not directly assigned to a loan officer.
     // We will show all borrowers in the officer's branch.
-    if (!userProfile?.branchIds?.length) return null;
-    return query(collection(firestore, 'borrowers'), where('branchId', 'in', userProfile.branchIds));
+    return query(collection(firestore, 'borrowers'), where('organizationId', '==', userProfile.organizationId), where('branchId', 'in', userProfile.branchIds));
   }, [firestore, user, userProfile]);
 
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: allBorrowers, isLoading: allBorrowersLoading } = useCollection<Borrower>(allBorrowersQuery);
   const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || allBorrowersLoading || allLoanProductsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading;
 
   return (
     <>
@@ -77,7 +74,7 @@ export function LoanOfficerDashboard() {
       <AddLoanDialog 
         open={isAddLoanOpen} 
         onOpenChange={setIsAddLoanOpen}
-        borrowers={allBorrowers || []}
+        borrowers={borrowers || []}
         loanProducts={allLoanProducts || []}
         isLoading={isLoading}
        />

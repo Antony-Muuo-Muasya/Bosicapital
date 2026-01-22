@@ -10,59 +10,56 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
     
-    function getUserRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.roleId;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isRole(userId, role) {
-      return getUserRole(userId) == role;
+    function getUserRole() {
+      return getUserData().roleId;
+    }
+
+    function isRole(role) {
+      return getUserRole() == role;
     }
 
     function isAdmin() {
-      return isRole(request.auth.uid, 'admin');
+      return isRole('admin');
     }
 
     function isManager() {
-      return isRole(request.auth.uid, 'manager');
+      return isRole('manager');
     }
 
     function isLoanOfficer() {
-      return isRole(request.auth.uid, 'loan_officer');
+      return isRole('loan_officer');
     }
     
     function isUser() {
-        return isRole(request.auth.uid, 'user');
+        return isRole('user');
     }
 
     function userIsInBranch(branchId) {
-        return branchId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.branchIds;
+        return branchId in getUserData().branchIds;
     }
 
-    // This allows collection group queries on installments for dashboards
     match /{path=**}/installments/{installmentId} {
-      // Admins and managers can list all installments for analytics.
       allow read: if isAdmin() || isManager();
     }
 
     match /users/{userId} {
-      // Admins can manage any user. Managers/Officers can get any user. Users can read their own data.
       allow get: if isAdmin() || isManager() || isLoanOfficer() || isMe(userId);
-      // Admins can list all users. Managers/Officers can list users with role 'user' from their own branch.
-      allow list: if isAdmin() || 
-                  ((isManager() || isLoanOfficer()) 
-                    && request.query.where.roleId == 'user'
-                    && request.query.where.branchIds['array-contains'] in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.branchIds);
-      // Allow user to create their own document.
+      allow list: if isAdmin()
+                  || ((isManager() || isLoanOfficer()) 
+                      && request.query.where.organizationId == getUserData().organizationId
+                      && request.query.where.roleId == 'user'
+                      && request.query.where.branchIds['array-contains'] in getUserData().branchIds);
       allow create: if isMe(userId);
-      // Allow admin to update any user, and a user to update their own profile.
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();
     }
     
     match /roles/{roleId} {
-      // All authenticated users can read roles to understand permissions.
       allow read: if isAuthenticated();
-      // Only admins can create/update roles.
       allow write: if isAdmin();
     }
     
@@ -72,15 +69,14 @@ service cloud.firestore {
     }
 
     match /borrowers/{borrowerId} {
-      // Admins can read all borrowers. Managers & loan officers can read borrowers in their branch.
-      // A user can read their own borrower profile.
-      allow read: if isAdmin() 
+      allow get: if isAdmin() 
                   || ((isManager() || isLoanOfficer()) && userIsInBranch(resource.data.branchId))
                   || (isUser() && resource.data.userId == request.auth.uid);
+      
+      allow list: if (isAdmin() || isManager() || isLoanOfficer())
+                   && request.query.where.organizationId == getUserData().organizationId;
 
-      // Loan officers or higher can create/update borrowers.
       allow create, update: if isLoanOfficer() || isManager() || isAdmin();
-      // Only managers and admins can delete borrowers.
       allow delete: if isManager() || isAdmin();
     }
 
@@ -95,21 +91,17 @@ service cloud.firestore {
     }
 
     match /loans/{loanId} {
-      // Admins can read all. Managers their branch. Loan officers their assigned loans. Users their own loans.
       allow read: if isAdmin() 
                   || (isManager() && userIsInBranch(resource.data.branchId))
                   || (isLoanOfficer() && resource.data.loanOfficerId == request.auth.uid)
                   || (isUser() && get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid);
 
       allow create: if isLoanOfficer() || isManager() || isAdmin();
-      // Only manager or admin can approve/reject (update status)
       allow update: if isManager() || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /loans/{loanId}/installments/{installmentId} {
-      // Permissions to read installments are inherited from the parent loan.
-      // Staff can create/update installments.
       allow read: if (
                     let loan = get(/databases/$(database)/documents/loans/$(loanId)).data;
                     isAdmin() 

@@ -15,31 +15,32 @@ export function ManagerDashboard() {
   const router = useRouter();
 
   const branchIds = userProfile?.branchIds || [];
+  const organizationId = userProfile?.organizationId;
 
   // Queries filtered by manager's branch(es)
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
-    return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
-  }, [firestore, branchIds]);
+    if (!firestore || !organizationId || branchIds.length === 0) return null;
+    return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
+  }, [firestore, organizationId, branchIds]);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
-    return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
-  }, [firestore, branchIds]);
+    if (!firestore || !organizationId || branchIds.length === 0) return null;
+    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
+  }, [firestore, organizationId, branchIds]);
 
   const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
+    if (!firestore || !organizationId) return null;
     // Firestore doesn't support 'in' queries on different fields in the same query as other filters.
     // So we fetch all installments and filter client-side.
     // For a larger app, this should be denormalized (add branchId to installments).
     return collection(firestore, 'installments');
-  }, [firestore]);
+  }, [firestore, organizationId]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
+    if (!firestore || !organizationId) return null;
      // This is also inefficient. Would be better to have branchId on payments.
-    return collection(firestore, 'registrationPayments');
-  }, [firestore]);
+    return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId]);
 
   // Data fetching
   const { data: allLoans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
