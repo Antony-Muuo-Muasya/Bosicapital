@@ -26,15 +26,17 @@ export default function RepaymentsPage() {
   // Query for loans visible to the current user
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile || !user) return null;
-    const { roleId, branchIds } = userProfile;
+    const { roleId, branchIds, organizationId } = userProfile;
+    const loansCol = collection(firestore, 'loans');
+
     if (roleId === 'admin') {
-      return collection(firestore, 'loans');
+      return query(loansCol, where('organizationId', '==', organizationId));
     }
     if (roleId === 'manager' && branchIds?.length > 0) {
-      return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
+      return query(loansCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
     if (roleId === 'loan_officer') {
-      return query(collection(firestore, 'loans'), where('loanOfficerId', '==', user.uid));
+      return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', user.uid));
     }
     return null;
   }, [firestore, user, userProfile]);
@@ -43,8 +45,9 @@ export default function RepaymentsPage() {
   // Query for repayments related to the visible loans
   const repaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
-    if (userProfile.roleId === 'admin') {
-      return collection(firestore, 'repayments');
+    if (userProfile.roleId === 'admin' && userProfile.organizationId) {
+        // This is inefficient. For a larger app, repayments should have an organizationId.
+        // We are fetching all and will filter client-side if needed, but the list of loanIds below is better.
     }
     if (isLoadingLoans) return null; // Wait for loans to load
     if (!visibleLoans || visibleLoans.length === 0) {
@@ -64,12 +67,14 @@ export default function RepaymentsPage() {
   // Query for borrowers visible to the current user
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
-    const { roleId, branchIds } = userProfile;
+    const { roleId, branchIds, organizationId } = userProfile;
+    const borrowersCol = collection(firestore, 'borrowers');
+
     if (roleId === 'admin') {
-      return collection(firestore, 'borrowers');
+      return query(borrowersCol, where('organizationId', '==', organizationId));
     }
     if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
-      return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
+      return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
     return null;
   }, [firestore, userProfile]);
