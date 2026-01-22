@@ -1,94 +1,193 @@
 'use client';
-import * as React from 'react';
-import { PageHeader } from '@/components/page-header';
-import { OverviewCards } from '@/components/dashboard/overview-cards';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Loan, Borrower, Installment, RegistrationPayment } from '@/lib/types';
-import { Button } from '../ui/button';
-import { BarChart, ShieldCheck } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const GaugePlaceholder = ({ label }: { label: string }) => (
+    <Card className="flex flex-col items-center justify-center p-6 text-center shadow-sm rounded-xl">
+        <div className="relative h-[75px] w-[150px] overflow-hidden">
+            <div className="absolute top-0 h-[150px] w-[150px] rounded-full border-[20px] border-muted" style={{ clipPath: 'inset(50% 0 0 0)' }}></div>
+            <div className="absolute top-0 h-[150px] w-[150px] rounded-full border-[20px] border-primary transition-transform duration-500" 
+                 style={{ clipPath: 'inset(50% 0 0 0)', transform: 'rotate(0deg)' }}>
+            </div>
+            <div className="absolute bottom-0 w-full text-center">
+                <span className="text-2xl font-bold">--%</span>
+            </div>
+        </div>
+        <p className="mt-4 text-sm font-medium">{label}</p>
+    </Card>
+);
 
 export function ManagerDashboard() {
-  const firestore = useFirestore();
-  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const router = useRouter();
-
-  const branchIds = userProfile?.branchIds || [];
-  const organizationId = userProfile?.organizationId;
-
-  // Queries filtered by manager's branch(es)
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId || branchIds.length === 0) return null;
-    return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-  }, [firestore, organizationId, branchIds]);
-
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId || branchIds.length === 0) return null;
-    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-  }, [firestore, organizationId, branchIds]);
-
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    // Firestore doesn't support 'in' queries on different fields in the same query as other filters.
-    // So we fetch all installments and filter client-side.
-    // For a larger app, this should be denormalized (add branchId to installments).
-    return collection(firestore, 'installments');
-  }, [firestore, organizationId]);
-
-  const regPaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-     // This is also inefficient. Would be better to have branchId on payments.
-    return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
-
-  // Data fetching
-  const { data: allLoans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: allInstallments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
-  const { data: allRegPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
-
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading;
-
-  const { loans, installments, regPayments } = React.useMemo(() => {
-    if (isLoading) return { loans: null, installments: null, regPayments: null };
-    const loanIdsInBranch = new Set(allLoans?.map(l => l.id));
-    const borrowerIdsInBranch = new Set(borrowers?.map(b => b.id));
-
-    const filteredInstallments = allInstallments?.filter(i => loanIdsInBranch.has(i.loanId)) || null;
-    const filteredPayments = allRegPayments?.filter(p => borrowerIdsInBranch.has(p.borrowerId)) || null;
-
-    return { loans: allLoans, installments: filteredInstallments, regPayments: filteredPayments };
-  }, [allLoans, borrowers, allInstallments, allRegPayments, isLoading]);
-
-
   return (
-    <>
-      <PageHeader
-        title="Manager Dashboard"
-        description={`Summary of activities for your branch(es).`}
-      >
-        <div className='flex gap-2'>
-             <Button variant="outline" onClick={() => router.push('/reports')}>
-                <BarChart className="mr-2 h-4 w-4" />
-                View Branch Reports
-            </Button>
+    <div className="min-h-screen">
+      <main className="p-4 md:p-6 space-y-8">
+        {/* Filter Row */}
+        <div className="flex flex-col md:flex-row gap-4">
+          <Select>
+            <SelectTrigger className="w-full md:w-[200px] bg-card shadow-sm rounded-lg">
+              <SelectValue placeholder="Select Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="branch1">Branch 1</SelectItem>
+              <SelectItem value="branch2">Branch 2</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select>
+            <SelectTrigger className="w-full md:w-[200px] bg-card shadow-sm rounded-lg">
+              <SelectValue placeholder="Select RO" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ro1">RO 1</SelectItem>
+              <SelectItem value="ro2">RO 2</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </PageHeader>
-      <div className="p-4 md:p-6 grid gap-6">
-        <OverviewCards
-          loans={loans}
-          installments={installments}
-          borrowers={borrowers}
-          regPayments={regPayments}
-          isLoading={isLoading}
-          title="Branch Overview"
-        />
-        {/* We can add more manager-specific components here */}
-         <div className="border shadow-sm rounded-lg p-8 mt-4 text-center text-muted-foreground">
-          Additional manager-specific widgets can be built here.
+
+        {/* SECTION 1: Summary Cards Grid */}
+        <section>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <Card className="rounded-xl shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-muted-foreground">Outstanding Loan Balance</CardTitle>
+                <CardDescription>Sub-label placeholder</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-10"></div>
+                <p className="text-xs text-muted-foreground text-right">Placeholder</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-muted-foreground">Performing Loan Balance</CardTitle>
+                <CardDescription>Sub-label placeholder</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-10"></div>
+                <p className="text-xs text-muted-foreground text-right">Placeholder</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-xl shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-muted-foreground">Total Customers</CardTitle>
+                <CardDescription>Sub-label placeholder</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-10"></div>
+                <p className="text-xs text-muted-foreground text-right">YTD</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* SECTION 2: Customers Overview */}
+        <section>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="rounded-xl shadow-sm">
+                    <CardHeader><CardTitle className="text-base">Active Customers</CardTitle></CardHeader>
+                    <CardContent><div className="h-24 bg-muted rounded-md"></div></CardContent>
+                </Card>
+                 <Card className="rounded-xl shadow-sm">
+                    <CardHeader><CardTitle className="text-base">Inactive Customers</CardTitle></CardHeader>
+                    <CardContent><div className="h-24 bg-muted rounded-md"></div></CardContent>
+                </Card>
+                 <Card className="rounded-xl shadow-sm">
+                    <CardHeader><CardTitle className="text-base">Recruitments</CardTitle></CardHeader>
+                    <CardContent><div className="h-24 bg-muted rounded-md"></div></CardContent>
+                </Card>
+            </div>
+             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <GaugePlaceholder label="Leads Conversion This Month" />
+                <GaugePlaceholder label="Leads Conversion This Year" />
+            </div>
+        </section>
+
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* SECTION 3: Loans Overview */}
+            <section className="lg:col-span-1">
+                 <Card className="h-full rounded-xl shadow-sm">
+                    <CardHeader>
+                        <CardTitle>Loans Overview</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Disbursed Loans</span>
+                            <span className="font-semibold text-foreground">--</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Loans Due Today</span>
+                            <span className="font-semibold text-foreground">--</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Month-to-Date Arrears</span>
+                            <span className="font-semibold text-foreground">--</span>
+                        </div>
+                         <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Outstanding Total Loan Arrears</span>
+                            <span className="font-semibold text-foreground">--</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </section>
+
+             {/* SECTION 4: Collections Overview */}
+            <section className="lg:col-span-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <Card className="rounded-xl shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-medium">Today’s Collection Rate</CardTitle>
+                            <CardDescription>Sub-label placeholder</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Progress value={0} className="h-2 rounded-full" />
+                        </CardContent>
+                    </Card>
+                    <Card className="rounded-xl shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-medium">Monthly Collection Rate</CardTitle>
+                            <CardDescription>Sub-label placeholder</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Progress value={0} className="h-2 rounded-full" />
+                        </CardContent>
+                    </Card>
+                     <Card className="rounded-xl shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-medium">Tomorrow’s Prepayment Rate</CardTitle>
+                            <CardDescription>Sub-label placeholder</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Progress value={0} className="h-2 rounded-full" />
+                        </CardContent>
+                    </Card>
+                     <Card className="rounded-xl shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-medium">PAR</CardTitle>
+                            <CardDescription>Sub-label placeholder</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Progress value={0} className="h-2 rounded-full" />
+                        </CardContent>
+                    </Card>
+                </div>
+            </section>
         </div>
-      </div>
-    </>
+
+        {/* SECTION 5: Pending Actions */}
+        <section>
+          <Card className="rounded-xl shadow-sm">
+            <CardHeader>
+              <CardTitle>Pending Customer Approvals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">Placeholder area</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      </main>
+    </div>
   );
 }

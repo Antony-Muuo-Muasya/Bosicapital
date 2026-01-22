@@ -28,7 +28,10 @@ import {
   Building,
   FileKey,
   BarChart,
-  UserCog
+  UserCog,
+  Search,
+  RefreshCw,
+  Bell,
 } from 'lucide-react';
 import { useAuth, useUserProfile } from '@/firebase';
 import { ThemeToggle } from './theme-toggle';
@@ -103,7 +106,7 @@ function Header() {
 
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
       <Sheet>
         <SheetTrigger asChild>
           <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -125,10 +128,20 @@ function Header() {
         </SheetContent>
       </Sheet>
       <div className="w-full flex-1">
-        <h1 className="font-headline text-xl text-foreground">
-          <span className="font-normal">Smart Microfinancing</span>
-        </h1>
+        {/* Empty div for spacing. Logo is in the sidebar for desktop. */}
       </div>
+      <Button variant="ghost" size="icon">
+        <Search className="h-5 w-5" />
+        <span className="sr-only">Search</span>
+      </Button>
+      <Button variant="ghost" size="icon">
+        <RefreshCw className="h-5 w-5" />
+        <span className="sr-only">Refresh</span>
+      </Button>
+      <Button variant="ghost" size="icon">
+        <Bell className="h-5 w-5" />
+        <span className="sr-only">Notifications</span>
+      </Button>
       <ThemeToggle />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -176,7 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <div className="flex flex-col">
         <Header />
-        <main className="flex flex-1 flex-col gap-4 bg-background">
+        <main className="flex flex-1 flex-col gap-4 bg-background overflow-y-auto">
           {children}
         </main>
       </div>
