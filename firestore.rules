@@ -62,9 +62,6 @@ service cloud.firestore {
         isAuthenticated() && 
         resource.data.organizationId == getUserData().organizationId
       );
-      allow list: if isAuthenticated() && 
-                   'organizationId' in request.query.where &&
-                   request.query.where.organizationId == getUserData().organizationId;
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();
