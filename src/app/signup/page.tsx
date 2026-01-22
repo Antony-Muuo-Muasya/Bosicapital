@@ -59,7 +59,7 @@ export default function SignupPage() {
           fullName: values.fullName,
           email: values.email,
           roleId: 'user', // All new signups default to the 'user' role. An admin can change this later.
-          branchIds: ['branch-1'],
+          branchIds: [], // New users are unassigned from any branch by default.
           status: 'active',
           createdAt: new Date().toISOString(),
       };

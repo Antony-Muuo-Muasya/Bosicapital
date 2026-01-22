@@ -2,7 +2,7 @@
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useEffect, useState, useMemo } from 'react';
-import type { User as AppUser, Role } from '@/lib/types';
+import type { User as AppUser, Role, Branch } from '@/lib/types';
 import { collection } from 'firebase/firestore';
 import { UsersDataTable } from '@/components/users/users-data-table';
 import { getUserColumns } from '@/components/users/columns';
@@ -31,11 +31,16 @@ export default function UsersPage() {
 
   const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
   const rolesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
+  const branchesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'branches') : null, [firestore]);
+
 
   const { data: users, isLoading: areUsersLoading } = useCollection<AppUser>(usersQuery);
   const { data: roles, isLoading: areRolesLoading } = useCollection<Role>(rolesQuery);
+  const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
 
-  const isLoading = areUsersLoading || areRolesLoading;
+
+  const isLoading = areUsersLoading || areRolesLoading || areBranchesLoading;
+
 
   const usersWithRoles: UserWithRole[] = useMemo(() => {
     if (!users || !roles) return [];
@@ -70,10 +75,11 @@ export default function UsersPage() {
         {isLoading && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">Loading users...</div>}
         {!isLoading && <UsersDataTable columns={columns} data={usersWithRoles} />}
       </div>
-      {editingUser && roles && (
+      {editingUser && roles && branches && (
         <EditUserDialog
             user={editingUser}
             roles={roles}
+            branches={branches}
             open={!!editingUser}
             onOpenChange={(open) => !open && setEditingUser(null)}
         />
