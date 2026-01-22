@@ -97,10 +97,16 @@ service cloud.firestore {
     }
 
     match /loans/{loanId} {
-      allow read: if isAdmin() 
+      allow get: if isAdmin() 
                   || (isManager() && userIsInBranch(resource.data.branchId))
                   || (isLoanOfficer() && resource.data.loanOfficerId == request.auth.uid)
                   || (isUser() && get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid);
+      
+      allow list: if request.query.where.organizationId == getUserData().organizationId && (
+                    isAdmin() 
+                    || (isManager() && 'branchId' in request.query.where && request.query.where.branchId.toSet().hasOnly(getUserData().branchIds))
+                    || (isLoanOfficer() && 'loanOfficerId' in request.query.where && request.query.where.loanOfficerId == request.auth.uid)
+                  );
 
       allow create: if isLoanOfficer() || isManager() || isAdmin();
       allow update: if isManager() || isAdmin();
