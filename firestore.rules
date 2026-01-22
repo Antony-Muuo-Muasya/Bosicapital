@@ -101,7 +101,8 @@ service cloud.firestore {
 
     match /registrationPayments/{paymentId} {
       allow create: if isLoanOfficer() || isManager() || isAdmin();
-      allow read: if isAuthenticated();
+      allow get: if isAuthenticated(); // Allow any authenticated user to GET a specific document
+      allow list: if request.query.where.organizationId == getUserData().organizationId && (isAdmin() || isManager() || isLoanOfficer());
     }
 
     match /loanProducts/{productId} {
