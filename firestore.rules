@@ -80,13 +80,8 @@ service cloud.firestore {
       allow list: if request.query.where.organizationId == getUserData().organizationId &&
                    (
                      isAdmin() ||
-                     (
-                       (isManager() || isLoanOfficer()) &&
-                       'branchId' in request.query.where &&
-                       request.query.where.branchId is list &&
-                       request.query.where.branchId.size() <= 30 &&
-                       request.query.where.branchId.forall(b, userIsAllowedBranch(b))
-                     ) ||
+                     isManager() ||
+                     isLoanOfficer() ||
                      (
                        isUser() &&
                        'userId' in request.query.where &&
@@ -116,12 +111,7 @@ service cloud.firestore {
       
       allow list: if request.query.where.organizationId == getUserData().organizationId && (
                     isAdmin() 
-                    || (isManager() && 
-                        'branchId' in request.query.where &&
-                        request.query.where.branchId is list &&
-                        request.query.where.branchId.size() <= 30 &&
-                        request.query.where.branchId.forall(b, userIsAllowedBranch(b))
-                    )
+                    || isManager()
                     || (isLoanOfficer() && 'loanOfficerId' in request.query.where && request.query.where.loanOfficerId == request.auth.uid)
                   );
 
