@@ -31,7 +31,7 @@ export default function UsersPage() {
   const [signupUrl, setSignupUrl] = useState('');
 
   const usersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
+    if (!firestore || !userProfile || userProfile.roleId !== 'admin') return null;
     return query(collection(firestore, 'users'), where('organizationId', '==', userProfile.organizationId));
   }, [firestore, userProfile]);
 
