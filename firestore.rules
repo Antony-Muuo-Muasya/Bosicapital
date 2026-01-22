@@ -60,10 +60,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isMe(userId) || (
         isAuthenticated() && 
-        resource.data.organizationId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId
+        resource.data.organizationId == getUserData().organizationId
       );
       allow list: if isAuthenticated() && 
-                   request.query.where.organizationId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId;
+                   'organizationId' in request.query.where &&
+                   request.query.where.organizationId == getUserData().organizationId;
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();
@@ -84,7 +85,8 @@ service cloud.firestore {
                   || ((isManager() || isLoanOfficer()) && userIsInBranch(resource.data.branchId))
                   || (isUser() && resource.data.userId == request.auth.uid);
       
-      allow list: if request.query.where.organizationId == getUserData().organizationId &&
+      allow list: if 'organizationId' in request.query.where && 
+                   request.query.where.organizationId == getUserData().organizationId &&
                    (
                      isAdmin() ||
                      ((isManager() || isLoanOfficer()) && userIsQueryingOwnBranches('branchId')) ||
@@ -102,7 +104,9 @@ service cloud.firestore {
     match /registrationPayments/{paymentId} {
       allow create: if isLoanOfficer() || isManager() || isAdmin();
       allow get: if isAuthenticated(); // Allow any authenticated user to GET a specific document
-      allow list: if request.query.where.organizationId == getUserData().organizationId && (isAdmin() || isManager() || isLoanOfficer());
+      allow list: if 'organizationId' in request.query.where &&
+                   request.query.where.organizationId == getUserData().organizationId && 
+                   (isAdmin() || isManager() || isLoanOfficer());
     }
 
     match /loanProducts/{productId} {
@@ -116,7 +120,8 @@ service cloud.firestore {
                   || (isLoanOfficer() && resource.data.loanOfficerId == request.auth.uid)
                   || (isUser() && get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid);
       
-      allow list: if request.query.where.organizationId == getUserData().organizationId && (
+      allow list: if 'organizationId' in request.query.where &&
+                   request.query.where.organizationId == getUserData().organizationId && (
                     isAdmin() 
                     || (isManager() && userIsQueryingOwnBranches('branchId'))
                     || (isLoanOfficer() && 'loanOfficerId' in request.query.where && request.query.where.loanOfficerId == request.auth.uid)
