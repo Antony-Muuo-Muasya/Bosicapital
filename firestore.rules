@@ -73,8 +73,14 @@ service cloud.firestore {
                   || ((isManager() || isLoanOfficer()) && userIsInBranch(resource.data.branchId))
                   || (isUser() && resource.data.userId == request.auth.uid);
       
-      allow list: if (isAdmin() || isManager() || isLoanOfficer())
-                   && request.query.where.organizationId == getUserData().organizationId;
+      allow list: if request.query.where.organizationId == getUserData().organizationId &&
+                   (isAdmin() ||
+                     (
+                       (isManager() || isLoanOfficer()) &&
+                       'branchId' in request.query.where &&
+                       request.query.where.branchId.toSet().hasOnly(getUserData().branchIds)
+                     )
+                   );
 
       allow create, update: if isLoanOfficer() || isManager() || isAdmin();
       allow delete: if isManager() || isAdmin();
