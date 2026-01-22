@@ -62,7 +62,6 @@ service cloud.firestore {
        allow list: if request.query.where.organizationId == getUserData().organizationId &&
                    (isAdmin()
                   || ((isManager() || isLoanOfficer()) 
-                      && 'roleId' in request.query.where && request.query.where.roleId == 'user'
                       && userIsQueryingOwnBranches('branchIds')));
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
@@ -124,7 +123,7 @@ service cloud.firestore {
                   );
 
       allow create: if isLoanOfficer() || isManager() || isAdmin();
-      allow update: if isManager() || isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -136,7 +135,7 @@ service cloud.firestore {
                     || (isLoanOfficer() && loan.loanOfficerId == request.auth.uid)
                     || (isUser() && get(/databases/$(database)/documents/borrowers/$(loan.borrowerId)).data.userId == request.auth.uid)
                   );
-      allow write: if isManager() || isAdmin() || isLoanOfficer();
+      allow write: if isAdmin() || isLoanOfficer();
     }
 
     match /auditLogs/{logId} {

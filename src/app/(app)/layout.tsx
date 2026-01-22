@@ -13,7 +13,7 @@ const routePermissions = {
     '/settings': ['admin'],
     '/branches': ['admin'],
     '/loan-products': ['admin'], // Assuming this will be a page
-    '/approvals': ['admin', 'manager'],
+    '/approvals': ['admin'],
     '/reports': ['admin', 'manager'],
 };
 

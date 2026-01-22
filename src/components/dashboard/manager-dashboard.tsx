@@ -69,10 +69,6 @@ export function ManagerDashboard() {
         description={`Summary of activities for your branch(es).`}
       >
         <div className='flex gap-2'>
-            <Button onClick={() => router.push('/approvals')}>
-                <ShieldCheck className="mr-2 h-4 w-4" />
-                Approve Loans
-            </Button>
              <Button variant="outline" onClick={() => router.push('/reports')}>
                 <BarChart className="mr-2 h-4 w-4" />
                 View Branch Reports
