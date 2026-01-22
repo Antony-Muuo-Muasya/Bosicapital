@@ -82,7 +82,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
 
   useEffect(() => {
-    if (!firestore || !staffProfile || borrowersLoading) {
+    if (!firestore || !staffProfile || borrowersLoading || !['admin', 'manager', 'loan_officer'].includes(staffProfile.roleId)) {
+      setUsersLoading(false);
       return;
     }
   

@@ -45,7 +45,7 @@ export function ManagerDashboard() {
 
 
   const loanOfficersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile || !userProfile.branchIds || userProfile.branchIds.length === 0) return null;
+    if (!firestore || !userProfile || userProfile.roleId !== 'manager' || !userProfile.branchIds || userProfile.branchIds.length === 0) return null;
     return query(
         collection(firestore, 'users'), 
         where('organizationId', '==', userProfile.organizationId),
