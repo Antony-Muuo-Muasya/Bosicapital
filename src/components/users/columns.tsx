@@ -17,7 +17,7 @@ import { useFirestore, updateDocumentNonBlocking, useUserProfile, deleteDocument
 import { doc } from 'firebase/firestore';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
-
+import type { Row } from '@tanstack/react-table';
 
 type UserWithRole = AppUser & { roleName: string };
 
@@ -76,25 +76,42 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
   );
 };
 
+const UserNameCell = ({ row }: { row: Row<UserWithRole> }) => {
+    const user = row.original;
+    return (
+    <div className="flex items-center gap-3">
+        <Avatar className="hidden h-9 w-9 sm:flex">
+        <AvatarImage src={user.avatarUrl} alt={user.fullName} />
+        <AvatarFallback>{user.fullName.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div className="grid gap-0.5">
+        <span className="font-medium">{user.fullName}</span>
+        <span className="text-xs text-muted-foreground">{user.email}</span>
+        </div>
+    </div>
+    );
+};
+
+const StatusCell = ({ row }: { row: Row<UserWithRole> }) => {
+    const status = row.getValue('status') as string;
+    return (
+    <Badge variant={status === 'active' ? 'default' : 'secondary'} className={`capitalize ${status === 'active' ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}`}>
+        {status}
+    </Badge>
+    );
+};
+
+const CreatedAtCell = ({ row }: { row: Row<UserWithRole> }) => {
+    const date = row.getValue('createdAt') as string;
+    return new Date(date).toLocaleDateString();
+};
+
+
 export const getUserColumns = (onEdit: (user: UserWithRole) => void): ColumnDef<UserWithRole>[] => [
   {
     accessorKey: 'fullName',
     header: 'Name',
-    cell: ({ row }) => {
-      const user = row.original;
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="hidden h-9 w-9 sm:flex">
-            <AvatarImage src={user.avatarUrl} alt={user.fullName} />
-            <AvatarFallback>{user.fullName.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="grid gap-0.5">
-            <span className="font-medium">{user.fullName}</span>
-            <span className="text-xs text-muted-foreground">{user.email}</span>
-          </div>
-        </div>
-      );
-    },
+    cell: UserNameCell,
     filterFn: (row, id, value) => {
         const name = row.original.fullName.toLowerCase();
         const email = row.original.email.toLowerCase();
@@ -109,22 +126,12 @@ export const getUserColumns = (onEdit: (user: UserWithRole) => void): ColumnDef<
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ row }) => {
-      const status = row.getValue('status') as string;
-      return (
-        <Badge variant={status === 'active' ? 'default' : 'secondary'} className={`capitalize ${status === 'active' ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}`}>
-          {status}
-        </Badge>
-      );
-    },
+    cell: StatusCell,
   },
   {
     accessorKey: 'createdAt',
     header: 'Date Added',
-    cell: ({ row }) => {
-        const date = row.getValue('createdAt') as string;
-        return new Date(date).toLocaleDateString();
-    }
+    cell: CreatedAtCell,
   },
   {
     id: 'actions',
