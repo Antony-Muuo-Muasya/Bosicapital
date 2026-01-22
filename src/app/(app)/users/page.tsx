@@ -1,9 +1,9 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { UsersDataTable } from '@/components/users/users-data-table';
 import { getUserColumns } from '@/components/users/columns';
 import { Button } from '@/components/ui/button';
@@ -24,12 +24,17 @@ type UserWithRole = AppUser & { roleName: string };
 
 export default function UsersPage() {
   const firestore = useFirestore();
+  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
 
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
 
-  const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+  const usersQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    return query(collection(firestore, 'users'), where('organizationId', '==', userProfile.organizationId));
+  }, [firestore, userProfile]);
+
   const rolesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
   const branchesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'branches') : null, [firestore]);
 
@@ -39,7 +44,7 @@ export default function UsersPage() {
   const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
 
 
-  const isLoading = areUsersLoading || areRolesLoading || areBranchesLoading;
+  const isLoading = isProfileLoading || areUsersLoading || areRolesLoading || areBranchesLoading;
 
 
   const usersWithRoles: UserWithRole[] = useMemo(() => {
