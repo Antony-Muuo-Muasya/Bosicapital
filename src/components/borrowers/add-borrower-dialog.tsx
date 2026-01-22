@@ -65,10 +65,18 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !staffProfile) return null;
-    const { organizationId } = staffProfile;
-    // Query all borrowers for the organization to find unlinked users.
-    // The security rule will enforce this organization boundary.
-    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
+    const { organizationId, roleId, branchIds } = staffProfile;
+    const borrowersCol = collection(firestore, 'borrowers');
+
+    if (roleId === 'admin') {
+      return query(borrowersCol, where('organizationId', '==', organizationId));
+    }
+    
+    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
+      return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
+    }
+
+    return null;
   }, [firestore, staffProfile]);
 
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);

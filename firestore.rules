@@ -41,6 +41,10 @@ service cloud.firestore {
     function userIsInBranch(branchId) {
         return branchId in getUserData().branchIds;
     }
+    
+    function userIsAllowedBranch(branchId) {
+      return branchId in getUserData().branchIds;
+    }
 
     match /{path=**}/installments/{installmentId} {
       allow read: if isAdmin() || isManager();
@@ -48,11 +52,11 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isAdmin() || isManager() || isLoanOfficer() || isMe(userId);
-      allow list: if isAdmin()
+       allow list: if request.query.where.organizationId == getUserData().organizationId &&
+                   (isAdmin()
                   || ((isManager() || isLoanOfficer()) 
-                      && request.query.where.organizationId == getUserData().organizationId
-                      && request.query.where.roleId == 'user'
-                      && request.query.where.branchIds['array-contains'] in getUserData().branchIds);
+                      && 'roleId' in request.query.where && request.query.where.roleId == 'user'
+                      && 'branchIds' in request.query.where && userIsAllowedBranch(request.query.where.branchIds['array-contains'])));
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();
@@ -74,11 +78,19 @@ service cloud.firestore {
                   || (isUser() && resource.data.userId == request.auth.uid);
       
       allow list: if request.query.where.organizationId == getUserData().organizationId &&
-                   (isAdmin() ||
+                   (
+                     isAdmin() ||
                      (
                        (isManager() || isLoanOfficer()) &&
                        'branchId' in request.query.where &&
-                       request.query.where.branchId.toSet().hasOnly(getUserData().branchIds)
+                       request.query.where.branchId is list &&
+                       request.query.where.branchId.size() <= 30 &&
+                       request.query.where.branchId.forall(b, userIsAllowedBranch(b))
+                     ) ||
+                     (
+                       isUser() &&
+                       'userId' in request.query.where &&
+                       request.query.where.userId == request.auth.uid
                      )
                    );
 
@@ -104,7 +116,12 @@ service cloud.firestore {
       
       allow list: if request.query.where.organizationId == getUserData().organizationId && (
                     isAdmin() 
-                    || (isManager() && 'branchId' in request.query.where && request.query.where.branchId.toSet().hasOnly(getUserData().branchIds))
+                    || (isManager() && 
+                        'branchId' in request.query.where &&
+                        request.query.where.branchId is list &&
+                        request.query.where.branchId.size() <= 30 &&
+                        request.query.where.branchId.forall(b, userIsAllowedBranch(b))
+                    )
                     || (isLoanOfficer() && 'loanOfficerId' in request.query.where && request.query.where.loanOfficerId == request.auth.uid)
                   );
 
