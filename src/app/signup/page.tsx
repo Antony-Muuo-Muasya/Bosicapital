@@ -82,7 +82,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!isUserLoading && user) {
-      router.push('/dashboard');
+      router.push('/');
     }
   }, [user, isUserLoading, router]);
 
@@ -138,7 +138,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} autoComplete="new-password" />
+                      <Input type="password" autoComplete="new-password" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
