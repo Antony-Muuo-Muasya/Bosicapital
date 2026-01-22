@@ -120,6 +120,7 @@ service cloud.firestore {
                     isAdmin() 
                     || (isManager() && userIsQueryingOwnBranches('branchId'))
                     || (isLoanOfficer() && 'loanOfficerId' in request.query.where && request.query.where.loanOfficerId == request.auth.uid)
+                    || (isUser() && 'borrowerId' in request.query.where && get(/databases/$(database)/documents/borrowers/$(request.query.where.borrowerId)).data.userId == request.auth.uid)
                   );
 
       allow create: if isLoanOfficer() || isManager() || isAdmin();

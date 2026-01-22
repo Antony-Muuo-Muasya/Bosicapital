@@ -40,7 +40,11 @@ export default function MyDashboardPage() {
 
     const loansQuery = useMemoFirebase(() => {
         if (!borrower) return null;
-        return query(collection(firestore, 'loans'), where('borrowerId', '==', borrower.id), where('status', '==', 'Active'));
+        return query(collection(firestore, 'loans'), 
+            where('organizationId', '==', borrower.organizationId),
+            where('borrowerId', '==', borrower.id), 
+            where('status', '==', 'Active')
+        );
     }, [firestore, borrower]);
     const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
     const activeLoan = useMemo(() => loans?.[0], [loans]);

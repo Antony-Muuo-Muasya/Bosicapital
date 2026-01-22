@@ -35,7 +35,10 @@ export default function MyLoansPage() {
 
     const loansQuery = useMemoFirebase(() => {
         if (!borrower) return null;
-        return query(collection(firestore, 'loans'), where('borrowerId', '==', borrower.id));
+        return query(collection(firestore, 'loans'), 
+            where('organizationId', '==', borrower.organizationId),
+            where('borrowerId', '==', borrower.id)
+        );
     }, [firestore, borrower]);
 
     const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
