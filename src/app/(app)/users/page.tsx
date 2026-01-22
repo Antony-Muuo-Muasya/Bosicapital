@@ -1,7 +1,7 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
 import { collection } from 'firebase/firestore';
 import { UsersDataTable } from '@/components/users/users-data-table';
@@ -51,11 +51,11 @@ export default function UsersPage() {
     }));
   }, [users, roles]);
 
-  const handleEditUser = (user: UserWithRole) => {
+  const handleEditUser = useCallback((user: UserWithRole) => {
     setEditingUser(user);
-  };
+  }, []);
   
-  const columns = useMemo(() => getUserColumns(handleEditUser), []);
+  const columns = useMemo(() => getUserColumns(handleEditUser), [handleEditUser]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
