@@ -58,8 +58,12 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isAdmin() || isManager() || isLoanOfficer() || isMe(userId);
-       allow list: if isAuthenticated() && request.query.where.organizationId == getUserData().organizationId;
+      allow get: if isMe(userId) || (
+        isAuthenticated() && 
+        resource.data.organizationId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId
+      );
+      allow list: if isAuthenticated() && 
+                   request.query.where.organizationId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId;
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();
