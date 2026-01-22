@@ -6,7 +6,7 @@ import type { Borrower, Loan, Installment, User as LoanOfficer } from '@/lib/typ
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, TrendingUp, Trophy, Lightbulb, User, Phone, Mail } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -24,7 +24,11 @@ const financialTips = [
 export default function MyDashboardPage() {
     const firestore = useFirestore();
     const { user, userProfile } = useUserProfile();
-    const [randomTip] = useState(() => financialTips[Math.floor(Math.random() * financialTips.length)]);
+    const [randomTip, setRandomTip] = useState<string | undefined>();
+
+    useEffect(() => {
+        setRandomTip(financialTips[Math.floor(Math.random() * financialTips.length)]);
+    }, []);
 
     const borrowerQuery = useMemoFirebase(() => {
         if (!user) return null;
@@ -205,7 +209,7 @@ export default function MyDashboardPage() {
                                 <CardTitle className="text-base flex items-center gap-2"><Lightbulb className="text-blue-500" /> Financial Tip</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-muted-foreground">{randomTip}</p>
+                                <p className="text-sm text-muted-foreground">{randomTip || 'Loading tip...'}</p>
                             </CardContent>
                         </Card>
                     </div>
