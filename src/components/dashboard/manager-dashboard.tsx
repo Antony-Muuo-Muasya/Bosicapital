@@ -2,6 +2,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useMemo } from 'react';
+import { useUserProfile, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import type { Branch, User as LoanOfficer } from '@/lib/types';
+import { Skeleton } from "../ui/skeleton";
+
 
 const GaugePlaceholder = ({ label }: { label: string }) => (
     <Card className="flex flex-col items-center justify-center p-6 text-center shadow-sm rounded-xl">
@@ -19,29 +25,82 @@ const GaugePlaceholder = ({ label }: { label: string }) => (
 );
 
 export function ManagerDashboard() {
+  const firestore = useFirestore();
+  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
+
+  const [selectedBranch, setSelectedBranch] = useState<string>('all');
+  const [selectedOfficer, setSelectedOfficer] = useState<string>('all');
+  
+  const allBranchesQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    return query(collection(firestore, 'branches'), where('organizationId', '==', userProfile.organizationId));
+  }, [firestore, userProfile]);
+
+  const { data: allBranches, isLoading: areBranchesLoading } = useCollection<Branch>(allBranchesQuery);
+
+  const managerBranches = useMemo(() => {
+    if (!allBranches || !userProfile?.branchIds) return [];
+    return allBranches.filter(branch => userProfile.branchIds.includes(branch.id));
+  }, [allBranches, userProfile]);
+
+
+  const loanOfficersQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile || !userProfile.branchIds || userProfile.branchIds.length === 0) return null;
+    return query(
+        collection(firestore, 'users'), 
+        where('organizationId', '==', userProfile.organizationId),
+        where('roleId', '==', 'loan_officer'),
+        where('branchIds', 'array-contains-any', userProfile.branchIds)
+    );
+  }, [firestore, userProfile]);
+
+  const { data: loanOfficers, isLoading: areOfficersLoading } = useCollection<LoanOfficer>(loanOfficersQuery);
+  
+  const filteredLoanOfficers = useMemo(() => {
+    if (!loanOfficers) return [];
+    if (selectedBranch === 'all') return loanOfficers;
+    return loanOfficers.filter(officer => officer.branchIds.includes(selectedBranch));
+  }, [loanOfficers, selectedBranch]);
+
+
+  const isLoading = isProfileLoading || areBranchesLoading || areOfficersLoading;
+
   return (
     <div className="min-h-screen">
       <main className="p-4 md:p-6 space-y-8">
         {/* Filter Row */}
         <div className="flex flex-col md:flex-row gap-4">
-          <Select>
-            <SelectTrigger className="w-full md:w-[200px] bg-card shadow-sm rounded-lg">
-              <SelectValue placeholder="Select Branch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="branch1">Branch 1</SelectItem>
-              <SelectItem value="branch2">Branch 2</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select>
-            <SelectTrigger className="w-full md:w-[200px] bg-card shadow-sm rounded-lg">
-              <SelectValue placeholder="Select RO" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ro1">RO 1</SelectItem>
-              <SelectItem value="ro2">RO 2</SelectItem>
-            </SelectContent>
-          </Select>
+          {isLoading ? (
+            <>
+              <Skeleton className="h-10 w-full md:w-[200px]" />
+              <Skeleton className="h-10 w-full md:w-[200px]" />
+            </>
+          ) : (
+            <>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="w-full md:w-[200px] bg-card shadow-sm rounded-lg">
+                  <SelectValue placeholder="Select Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {managerBranches?.map(branch => (
+                    <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedOfficer} onValueChange={setSelectedOfficer}>
+                <SelectTrigger className="w-full md:w-[200px] bg-card shadow-sm rounded-lg">
+                  <SelectValue placeholder="Select RO" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ROs</SelectItem>
+                  {filteredLoanOfficers.map(officer => (
+                      <SelectItem key={officer.id} value={officer.id}>{officer.fullName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
 
         {/* SECTION 1: Summary Cards Grid */}
@@ -147,7 +206,7 @@ export function ManagerDashboard() {
                         <CardHeader>
                             <CardTitle className="text-sm font-medium">Monthly Collection Rate</CardTitle>
                             <CardDescription>Sub-label placeholder</CardDescription>
-                        </CardHeader>
+                        </Header>
                         <CardContent>
                             <Progress value={0} className="h-2 rounded-full" />
                         </CardContent>
