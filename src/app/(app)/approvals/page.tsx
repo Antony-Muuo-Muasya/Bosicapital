@@ -1,6 +1,6 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { Loan, Borrower, LoanProduct } from '@/lib/types';
 import { useMemo } from 'react';
@@ -10,20 +10,33 @@ import { ApprovalsDataTable } from '@/components/approvals/approvals-data-table'
 
 export default function ApprovalsPage() {
     const firestore = useFirestore();
+    const { userProfile } = useUserProfile();
+    const organizationId = userProfile?.organizationId;
 
     const pendingLoansQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'loans'), where('status', '==', 'Pending Approval'));
-    }, [firestore]);
+        if (!firestore || !organizationId) return null;
+        return query(
+            collection(firestore, 'loans'), 
+            where('organizationId', '==', organizationId),
+            where('status', '==', 'Pending Approval')
+        );
+    }, [firestore, organizationId]);
 
-    const borrowersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'borrowers') : null, [firestore]);
-    const loanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+    const borrowersQuery = useMemoFirebase(() => {
+        if (!firestore || !organizationId) return null;
+        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
+    }, [firestore, organizationId]);
+    
+    const loanProductsQuery = useMemoFirebase(() => {
+        if (!firestore || !organizationId) return null;
+        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
+    }, [firestore, organizationId]);
 
     const { data: pendingLoans, isLoading: isLoadingLoans } = useCollection<Loan>(pendingLoansQuery);
     const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
     const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
     
-    const isLoading = isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
+    const isLoading = isLoadingLoans || isLoadingBorrowers || isLoadingProducts || !userProfile;
 
     const loansWithDetails = useMemo(() => {
         if (isLoading || !pendingLoans || !borrowers || !loanProducts) return [];
