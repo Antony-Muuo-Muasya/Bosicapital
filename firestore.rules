@@ -46,6 +46,13 @@ service cloud.firestore {
       return branchId in getUserData().branchIds;
     }
 
+    function userIsQueryingOwnBranches(queryKey) {
+      // For 'in' queries, check that all requested branch IDs are in the user's allowed branches.
+      return queryKey in request.query.where &&
+             request.query.where[queryKey] is list &&
+             getUserData().branchIds.hasAll(request.query.where[queryKey]);
+    }
+
     match /{path=**}/installments/{installmentId} {
       allow read: if isAdmin() || isManager();
     }
@@ -80,8 +87,7 @@ service cloud.firestore {
       allow list: if request.query.where.organizationId == getUserData().organizationId &&
                    (
                      isAdmin() ||
-                     isManager() ||
-                     isLoanOfficer() ||
+                     ((isManager() || isLoanOfficer()) && userIsQueryingOwnBranches('branchId')) ||
                      (
                        isUser() &&
                        'userId' in request.query.where &&
@@ -111,7 +117,7 @@ service cloud.firestore {
       
       allow list: if request.query.where.organizationId == getUserData().organizationId && (
                     isAdmin() 
-                    || isManager()
+                    || (isManager() && userIsQueryingOwnBranches('branchId'))
                     || (isLoanOfficer() && 'loanOfficerId' in request.query.where && request.query.where.loanOfficerId == request.auth.uid)
                   );
 
