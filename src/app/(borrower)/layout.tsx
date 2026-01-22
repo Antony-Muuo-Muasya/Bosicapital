@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useAuth, useUserProfile } from '@/firebase';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 const borrowerNavItems = [
     { href: '/my-dashboard', label: 'My Dashboard' },
     { href: '/my-loans', label: 'My Loans' },
+    { href: '/help', label: 'Help Center' },
 ];
 
 export default function BorrowerLayout({
@@ -99,6 +100,10 @@ export default function BorrowerLayout({
             <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link href="/profile">Profile</Link></DropdownMenuItem>
+             <DropdownMenuItem asChild><Link href="/help">
+                <LifeBuoy className="mr-2 h-4 w-4" />
+                <span>Help Center</span>
+             </Link></DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => auth.signOut()}>
                 <LogOut className="mr-2 h-4 w-4" />
@@ -109,7 +114,7 @@ export default function BorrowerLayout({
           </div>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 bg-muted/20">{children}</main>
     </div>
   );
 }

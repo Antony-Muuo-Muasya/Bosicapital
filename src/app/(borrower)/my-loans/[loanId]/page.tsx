@@ -4,12 +4,13 @@ import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase
 import { doc, collection } from "firebase/firestore";
 import type { Loan, LoanProduct, Installment } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileDown, Circle, CheckCircle, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 
 
 const getLoanStatusVariant = (status: string) => {
@@ -22,13 +23,13 @@ const getLoanStatusVariant = (status: string) => {
     }
 };
 
-const getInstallmentStatusVariant = (status: string) => {
+const getInstallmentStatusConfig = (status: string) => {
     switch (status) {
-        case 'Paid': return 'default';
-        case 'Unpaid': return 'secondary';
-        case 'Partial': return 'secondary';
-        case 'Overdue': return 'destructive';
-        default: return 'outline';
+        case 'Paid': return { variant: 'default', icon: CheckCircle, className: 'bg-green-500/10 text-green-700 border-green-500/20' };
+        case 'Unpaid': return { variant: 'secondary', icon: Circle, className: '' };
+        case 'Partial': return { variant: 'secondary', icon: Circle, className: '' };
+        case 'Overdue': return { variant: 'destructive', icon: AlertCircle, className: '' };
+        default: return { variant: 'outline', icon: Circle, className: '' };
     }
 };
 
@@ -43,9 +44,9 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
     
     const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
 
-    // This is a client-side guard. Security rules are the primary enforcement.
     useEffect(() => {
         if (loanError) {
+            console.error("Permission denied to fetch loan:", loanError.message);
             router.replace('/access-denied');
         }
     }, [loanError, router]);
@@ -59,16 +60,60 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
 
     const installmentsQuery = useMemoFirebase(() => {
         if (!firestore || !loan) return null;
-        // Only fetch installments for active or completed loans
-        if (loan.status === 'Active' || loan.status === 'Completed') {
+        if (loan.status === 'Active' || loan.status === 'Completed' || loan.status === 'Pending Approval') {
             return collection(firestore, 'loans', loan.id, 'installments');
         }
         return null;
     }, [firestore, loan]);
 
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
+    
+    const sortedInstallments = useMemo(() => {
+        return installments?.sort((a,b) => a.installmentNumber - b.installmentNumber) || [];
+    }, [installments]);
+    
+    const { totalPaid, totalOutstanding } = useMemo(() => {
+        if (!installments || !loan) return { totalPaid: 0, totalOutstanding: 0 };
+        const paid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
+        return {
+            totalPaid: paid,
+            totalOutstanding: loan.totalPayable - paid
+        }
+    }, [installments, loan]);
 
     const isLoading = isLoadingLoan || isLoadingProduct || isLoadingInstallments;
+
+    const handleDownload = () => {
+        if (!sortedInstallments || !loan || !product) return;
+
+        const headers = ['Installment #', 'Due Date', 'Amount Due', 'Amount Paid', 'Status'];
+        const rows = sortedInstallments.map(inst => [
+            inst.installmentNumber,
+            new Date(inst.dueDate).toLocaleDateString(),
+            inst.expectedAmount,
+            inst.paidAmount,
+            inst.status
+        ].join(','));
+
+        const csvContent = [
+            `Loan Statement for ${product.name}`,
+            `Loan ID: ${loan.id}`,
+            `Date: ${new Date().toLocaleDateString()}`,
+            '',
+            headers.join(','),
+            ...rows
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `loan_statement_${loan.id.substring(0,6)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     if (isLoading) {
         return (
@@ -91,39 +136,41 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
         )
     }
 
-    const sortedInstallments = installments?.sort((a,b) => a.installmentNumber - b.installmentNumber) || [];
-
     return (
         <div className="container max-w-5xl py-8">
-            <PageHeader title={product.name} description={`Details for loan #${loan.id.substring(0, 8)}`} />
+             <PageHeader title={product.name} description={`Details for loan #${loan.id.substring(0, 8)}`}>
+                <Button variant="outline" onClick={handleDownload} disabled={sortedInstallments.length === 0}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download Statement
+                </Button>
+            </PageHeader>
 
-            <Card className="mt-6">
-                <CardHeader>
-                    <CardTitle>Loan Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                        <p className="text-muted-foreground">Principal</p>
-                        <p className="font-medium">{formatCurrency(loan.principal, 'KES')}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted-foreground">Total Payable</p>
-                        <p className="font-medium">{formatCurrency(loan.totalPayable, 'KES')}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted-foreground">Installment</p>
-                        <p className="font-medium">{formatCurrency(loan.installmentAmount, 'KES')} / {product.repaymentCycle}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted-foreground">Status</p>
-                        <p className="font-medium"><Badge variant={getLoanStatusVariant(loan.status)}>{loan.status}</Badge></p>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Principal Amount</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-semibold">{formatCurrency(loan.principal, 'KES')}</p></CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Payable</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-semibold">{formatCurrency(loan.totalPayable, 'KES')}</p></CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Amount Paid</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-semibold text-green-600">{formatCurrency(totalPaid, 'KES')}</p></CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Amount Outstanding</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-semibold text-destructive">{formatCurrency(totalOutstanding, 'KES')}</p></CardContent>
+                </Card>
+            </div>
 
             <Card className="mt-8">
                 <CardHeader>
                     <CardTitle>Repayment Schedule</CardTitle>
+                    <CardDescription>
+                        Installments are {formatCurrency(loan.installmentAmount, 'KES')} per {product.repaymentCycle}.
+                         <Badge variant={getLoanStatusVariant(loan.status)} className="ml-2">{loan.status}</Badge>
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -137,21 +184,27 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedInstallments.map(inst => (
-                                <TableRow key={inst.id}>
+                            {sortedInstallments.map(inst => {
+                                const statusConfig = getInstallmentStatusConfig(inst.status);
+                                const Icon = statusConfig.icon;
+                                return (
+                                <TableRow key={inst.id} className={inst.status === 'Paid' ? 'bg-green-500/5' : ''}>
                                     <TableCell>{inst.installmentNumber}</TableCell>
                                     <TableCell>{new Date(inst.dueDate).toLocaleDateString()}</TableCell>
                                     <TableCell>{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
                                     <TableCell>{formatCurrency(inst.paidAmount, 'KES')}</TableCell>
                                     <TableCell className="text-right">
-                                        <Badge variant={getInstallmentStatusVariant(inst.status)}>{inst.status}</Badge>
+                                        <Badge variant={statusConfig.variant} className={cn('gap-1.5', statusConfig.className)}>
+                                            <Icon className="h-3 w-3" />
+                                            {inst.status}
+                                        </Badge>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                             {!isLoading && sortedInstallments.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
-                                        {loan.status === 'Active' || loan.status === 'Completed' ? 'No installments found for this loan.' : `Repayment schedule will be generated upon loan approval.`}
+                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                        {loan.status === 'Pending Approval' ? `Repayment schedule will be generated upon loan approval.` : 'No installments found for this loan.'}
                                     </TableCell>
                                 </TableRow>
                             )}

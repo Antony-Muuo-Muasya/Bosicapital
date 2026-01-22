@@ -9,14 +9,15 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-const getStatusVariant = (status: string) => {
+const getStatusVariant = (status: string): {variant: "default" | "secondary" | "outline" | "destructive", className: string} => {
     switch (status) {
-        case 'Pending Approval': return 'secondary';
-        case 'Active': return 'default';
-        case 'Completed': return 'outline';
-        case 'Rejected': return 'destructive';
-        default: return 'outline';
+        case 'Pending Approval': return { variant: 'secondary', className: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20' };
+        case 'Active': return { variant: 'default', className: 'bg-blue-500/10 text-blue-700 border-blue-500/20' };
+        case 'Completed': return { variant: 'outline', className: 'bg-green-500/10 text-green-700 border-green-500/20' };
+        case 'Rejected': return { variant: 'destructive', className: '' };
+        default: return { variant: 'outline', className: '' };
     }
 };
 
@@ -74,29 +75,34 @@ export default function MyLoansPage() {
             )}
 
             <div className="grid gap-6 md:grid-cols-2 mt-6">
-                {loansWithDetails.map(loan => (
-                    <Link href={`/my-loans/${loan.id}`} key={loan.id} className="focus:outline-none focus:ring-2 focus:ring-ring rounded-lg">
-                        <Card className="hover:bg-muted/50 transition-colors h-full">
+                {loansWithDetails.map(loan => {
+                    const statusConfig = getStatusVariant(loan.status);
+                    return (
+                    <Link href={`/my-loans/${loan.id}`} key={loan.id} className="focus:outline-none focus:ring-2 focus:ring-ring rounded-lg group">
+                        <Card className="hover:border-primary transition-all h-full flex flex-col">
                             <CardHeader>
                                 <div className="flex justify-between items-start">
                                     <CardTitle>{loan.loanProductName}</CardTitle>
-                                    <Badge variant={getStatusVariant(loan.status)}>{loan.status}</Badge>
+                                    <Badge variant={statusConfig.variant} className={statusConfig.className}>{loan.status}</Badge>
                                 </div>
                                 <CardDescription>Issued on: {new Date(loan.issueDate).toLocaleDateString()}</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                            <CardContent className="grid grid-cols-2 gap-4 text-sm flex-grow">
                                 <div>
                                     <p className="text-muted-foreground">Principal</p>
-                                    <p className="font-medium">{formatCurrency(loan.principal, 'KES')}</p>
+                                    <p className="font-semibold text-lg">{formatCurrency(loan.principal, 'KES')}</p>
                                 </div>
                                 <div>
                                     <p className="text-muted-foreground">Total Payable</p>
-                                    <p className="font-medium">{formatCurrency(loan.totalPayable, 'KES')}</p>
+                                    <p className="font-semibold text-lg">{formatCurrency(loan.totalPayable, 'KES')}</p>
                                 </div>
                             </CardContent>
+                             <div className="p-6 pt-0 text-right text-xs text-primary group-hover:underline">
+                                View Details &rarr;
+                             </div>
                         </Card>
                     </Link>
-                ))}
+                )})}
             </div>
         </div>
     )
