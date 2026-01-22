@@ -206,7 +206,7 @@ export function ManagerDashboard() {
                         <CardHeader>
                             <CardTitle className="text-sm font-medium">Monthly Collection Rate</CardTitle>
                             <CardDescription>Sub-label placeholder</CardDescription>
-                        </Header>
+                        </CardHeader>
                         <CardContent>
                             <Progress value={0} className="h-2 rounded-full" />
                         </CardContent>
