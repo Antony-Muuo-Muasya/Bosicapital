@@ -59,10 +59,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isAdmin() || isManager() || isLoanOfficer() || isMe(userId);
-       allow list: if request.query.where.organizationId == getUserData().organizationId &&
-                   (isAdmin()
-                  || ((isManager() || isLoanOfficer()) 
-                      && userIsQueryingOwnBranches('branchIds')));
+       allow list: if isAuthenticated() && request.query.where.organizationId == getUserData().organizationId;
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();
