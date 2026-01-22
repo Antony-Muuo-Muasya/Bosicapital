@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, query, where, getDocs } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,7 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
   } from "@/components/ui/select";
-import type { User as AppUser } from '@/lib/types';
+import type { User as AppUser, Borrower } from '@/lib/types';
 
 
 const borrowerSchema = z.object({
@@ -60,26 +60,69 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const usersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    // Find users with the 'user' role who are not yet linked to a borrower profile.
-    // This requires knowing which users are already borrowers. We will filter client-side.
-    return query(collection(firestore, 'users'), where('roleId', '==', 'user'));
-  }, [firestore]);
+  const [unlinkedUsers, setUnlinkedUsers] = useState<AppUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   const borrowersQuery = useMemoFirebase(() => {
     if(!firestore) return null;
     return collection(firestore, 'borrowers');
   },[firestore]);
 
-  const { data: users, isLoading: usersLoading } = useCollection<AppUser>(usersQuery);
-  const { data: borrowers, isLoading: borrowersLoading } = useCollection(borrowersQuery);
+  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
 
-  const unlinkedUsers = useMemo(() => {
-    if (!users || !borrowers) return [];
-    const borrowerUserIds = new Set(borrowers.map(b => b.userId));
-    return users.filter(u => !borrowerUserIds.has(u.id));
-  }, [users, borrowers]);
+  useEffect(() => {
+    if (!firestore || !staffProfile || borrowersLoading) {
+      return;
+    }
+  
+    const fetchUnlinkedUsers = async () => {
+      setUsersLoading(true);
+      try {
+        let usersData: AppUser[] = [];
+        const borrowerUserIds = new Set(borrowers?.map(b => b.userId) || []);
+  
+        if (staffProfile.roleId === 'admin') {
+          const q = query(collection(firestore, 'users'), where('roleId', '==', 'user'));
+          const querySnapshot = await getDocs(q);
+          querySnapshot.forEach(doc => {
+            usersData.push({ id: doc.id, ...doc.data() } as AppUser);
+          });
+        } else if ((staffProfile.roleId === 'manager' || staffProfile.roleId === 'loan_officer') && staffProfile.branchIds?.length > 0) {
+          const userMap = new Map<string, AppUser>();
+          // A non-admin user might be in multiple branches. We must query each branch and merge.
+          // Firestore 'in' queries have a limit of 30, so this is safer.
+          for (const branchId of staffProfile.branchIds) {
+            const q = query(
+              collection(firestore, 'users'), 
+              where('roleId', '==', 'user'), 
+              where('branchIds', 'array-contains', branchId)
+            );
+            const querySnapshot = await getDocs(q);
+            querySnapshot.forEach(doc => {
+              if (!userMap.has(doc.id)) {
+                userMap.set(doc.id, { id: doc.id, ...doc.data() } as AppUser);
+              }
+            });
+          }
+          usersData = Array.from(userMap.values());
+        }
+  
+        const filteredUsers = usersData.filter(u => !borrowerUserIds.has(u.id));
+        setUnlinkedUsers(filteredUsers);
+      } catch (error) {
+        console.error("Error fetching unlinked users: ", error);
+        toast({
+          variant: "destructive",
+          title: "Could not fetch users",
+          description: "You may not have the required permissions. Please contact an administrator."
+        });
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+  
+    fetchUnlinkedUsers();
+  }, [firestore, staffProfile, borrowers, borrowersLoading, toast]);
 
 
   const form = useForm<BorrowerFormData>({
@@ -97,7 +140,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   });
 
   const selectedUserId = form.watch('userId');
-  const selectedUser = useMemo(() => users?.find(u => u.id === selectedUserId), [users, selectedUserId]);
+  const selectedUser = useMemo(() => unlinkedUsers.find(u => u.id === selectedUserId), [unlinkedUsers, selectedUserId]);
 
   const onSubmit = (values: BorrowerFormData) => {
     if (!staffProfile || !firestore || !selectedUser) {
@@ -146,6 +189,11 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   };
 
   const isLoading = usersLoading || borrowersLoading;
+  
+  // Reset form when dialog opens/closes or user list changes
+  useEffect(() => {
+      form.reset();
+  }, [open, unlinkedUsers, form]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,7 +209,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                 <FormField control={form.control} name="userId" render={({ field }) => (
                     <FormItem>
                         <FormLabel>User to Link</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
                             <FormControl>
                                 <SelectTrigger><SelectValue placeholder="Select a user account..." /></SelectTrigger>
                             </FormControl>

@@ -45,8 +45,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Admins can manage any user. Managers can view users in their branch. Users can read their own data.
-      allow read: if isAdmin() || (isManager() && userIsInBranch(resource.data.branchId)) || isMe(userId);
+      // Admins can manage any user. Managers/Officers can get any user. Users can read their own data.
+      allow get: if isAdmin() || isManager() || isLoanOfficer() || isMe(userId);
+      // Admins can list all users. Managers/Officers can list users with role 'user' from their own branch.
+      allow list: if isAdmin() || 
+                  ((isManager() || isLoanOfficer()) 
+                    && request.query.where.roleId == 'user'
+                    && request.query.where.branchIds['array-contains'] in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.branchIds);
       // Allow user to create their own document.
       allow create: if isMe(userId);
       // Allow admin to update any user, and a user to update their own profile.
