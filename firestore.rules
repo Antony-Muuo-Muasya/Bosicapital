@@ -47,7 +47,7 @@ service cloud.firestore {
     }
 
     function userIsQueryingOwnBranches(queryKey) {
-      // For 'in' queries, check that all requested branch IDs are in the user's allowed branches.
+      // For 'in' and 'array-contains-any' queries, check that all requested branch IDs are in the user's allowed branches.
       return queryKey in request.query.where &&
              request.query.where[queryKey] is list &&
              getUserData().branchIds.hasAll(request.query.where[queryKey]);
@@ -63,7 +63,7 @@ service cloud.firestore {
                    (isAdmin()
                   || ((isManager() || isLoanOfficer()) 
                       && 'roleId' in request.query.where && request.query.where.roleId == 'user'
-                      && 'branchIds' in request.query.where && userIsAllowedBranch(request.query.where.branchIds['array-contains'])));
+                      && userIsQueryingOwnBranches('branchIds')));
       allow create: if isMe(userId);
       allow update: if isAdmin() || isMe(userId);
       allow delete: if isAdmin();

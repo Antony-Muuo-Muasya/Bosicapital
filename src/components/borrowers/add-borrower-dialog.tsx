@@ -99,24 +99,16 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             usersData.push({ id: doc.id, ...doc.data() } as AppUser);
           });
         } else if ((staffProfile.roleId === 'manager' || staffProfile.roleId === 'loan_officer') && staffProfile.branchIds?.length > 0) {
-          const userMap = new Map<string, AppUser>();
-          // A non-admin user might be in multiple branches. We must query each branch and merge.
-          // Firestore 'in' queries have a limit of 30, so this is safer.
-          for (const branchId of staffProfile.branchIds) {
             const q = query(
               collection(firestore, 'users'), 
               where('roleId', '==', 'user'), 
-              where('branchIds', 'array-contains', branchId),
+              where('branchIds', 'array-contains-any', staffProfile.branchIds),
               where('organizationId', '==', staffProfile.organizationId)
             );
             const querySnapshot = await getDocs(q);
             querySnapshot.forEach(doc => {
-              if (!userMap.has(doc.id)) {
-                userMap.set(doc.id, { id: doc.id, ...doc.data() } as AppUser);
-              }
+                usersData.push({ id: doc.id, ...doc.data() } as AppUser);
             });
-          }
-          usersData = Array.from(userMap.values());
         }
   
         const filteredUsers = usersData.filter(u => !borrowerUserIds.has(u.id));
