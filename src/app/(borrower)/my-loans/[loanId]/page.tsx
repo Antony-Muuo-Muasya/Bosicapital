@@ -9,8 +9,9 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, use } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 
 const getLoanStatusVariant = (status: string) => {
@@ -34,13 +35,15 @@ const getInstallmentStatusConfig = (status: string) => {
 };
 
 export default function MyLoanDetailPage({ params }: { params: { loanId: string } }) {
+    const resolvedParams = use(params);
+    const loanId = resolvedParams.loanId;
     const firestore = useFirestore();
     const router = useRouter();
 
     const loanRef = useMemoFirebase(() => {
         if (!firestore) return null;
-        return doc(firestore, 'loans', params.loanId);
-    }, [firestore, params.loanId]);
+        return doc(firestore, 'loans', loanId);
+    }, [firestore, loanId]);
     
     const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
 
