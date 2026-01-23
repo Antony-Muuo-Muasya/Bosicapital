@@ -115,9 +115,9 @@ service cloud.firestore {
       allow write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
     }
     
-    // Staff can read products. Admins can write.
+    // Any authenticated user can read loan products. Admins can write.
     match /loanProducts/{loanProductId} {
-      allow read: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
+      allow read: if isSignedIn();
       allow write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
     }
     
