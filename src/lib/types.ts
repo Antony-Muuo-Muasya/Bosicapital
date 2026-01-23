@@ -30,6 +30,9 @@ export type User = {
   status: 'active' | 'suspended';
   createdAt: string; // ISO string
   avatarUrl?: string;
+  phone?: string;
+  address?: string;
+  marketingOptIn?: boolean;
 };
 
 export type Branch = {

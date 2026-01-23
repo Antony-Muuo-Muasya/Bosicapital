@@ -40,6 +40,23 @@
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the user was created."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's profile picture."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The user's phone number."
+        },
+        "address": {
+          "type": "string",
+          "description": "The user's physical address."
+        },
+        "marketingOptIn": {
+          "type": "boolean",
+          "description": "Whether the user has opted in to marketing communications."
         }
       },
       "required": ["id", "email", "fullName", "roleId", "status", "organizationId", "createdAt"]
