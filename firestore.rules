@@ -4,51 +4,67 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isStaff(userId) {
-        // This function should only be used in WRITE rules.
-        // Using get() in a read/list rule can cause performance issues or timeouts.
-        let role = get(/databases/$(database)/documents/users/$(userId)).data.roleId;
-        return role in ['admin', 'manager', 'loan_officer'];
+    // --- Helper Functions for WRITE rules ---
+    // These functions get user data and should ONLY be used in 'allow write' rules.
+    // Using 'get' or 'exists' in 'read' or 'list' rules for queries can cause them to fail.
+    function getUserRoleForWrite() {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      // Check for document existence before trying to access its data.
+      if (exists(userDocPath)) {
+        return get(userDocPath).data.roleId;
+      }
+      // Default to the least privileged role if the profile doesn't exist yet.
+      return 'user';
     }
 
-    // Default to read-only for authenticated users
+    // --- Global Read/List Rule ---
+    // This rule allows any authenticated user to read or list documents from any collection.
+    // This is the key fix for the "Missing or insufficient permissions" error on dashboard queries.
+    // The application's client-side code is responsible for querying only the data the user should see.
     match /{document=**} {
       allow read: if request.auth != null;
-      allow write: if false; // Deny writes by default
     }
 
-    // Allow users to update their own profile
+
+    // --- Specific WRITE Rules ---
+
+    // A user can update their own profile.
     match /users/{userId} {
       allow write: if request.auth.uid == userId;
     }
     
-    // Allow staff to write to business collections
+    // Only admins can create, update, or delete branches and loan products.
     match /branches/{branchId} {
-        allow write: if isStaff(request.auth.uid);
+        allow write: if getUserRoleForWrite() == 'admin';
+    }
+    match /loanProducts/{productId} {
+      allow write: if getUserRoleForWrite() == 'admin';
     }
     
+    // Staff members can write to borrower, payment, and loan records.
     match /borrowers/{borrowerId} {
-      allow write: if isStaff(request.auth.uid);
+      allow write: if getUserRoleForWrite() in ['admin', 'manager', 'loan_officer'];
     }
-
-    match /loanProducts/{productId} {
-      allow write: if isStaff(request.auth.uid);
+    match /repayments/{repaymentId} {
+      allow write: if getUserRoleForWrite() in ['admin', 'manager', 'loan_officer'];
     }
-
+    match /registrationPayments/{paymentId} {
+      allow write: if getUserRoleForWrite() in ['admin', 'manager', 'loan_officer'];
+    }
+    
+    // Staff can manage loans and their installments.
+    // Note: 'write' covers create, update, and delete.
     match /loans/{loanId} {
-      allow write: if isStaff(request.auth.uid);
+      allow write: if getUserRoleForWrite() in ['admin', 'manager', 'loan_officer'];
 
        match /installments/{installmentId} {
-        allow write: if isStaff(request.auth.uid);
+        allow write: if getUserRoleForWrite() in ['admin', 'manager', 'loan_officer'];
       }
     }
-
-    match /repayments/{repaymentId} {
-      allow write: if isStaff(request.auth.uid);
-    }
     
-    match /registrationPayments/{paymentId} {
-        allow write: if isStaff(request.auth.uid);
+    // Fallback: Deny all other writes by default.
+     match /{document=**} {
+      allow write: if false;
     }
   }
 }
