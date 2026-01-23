@@ -61,10 +61,5 @@ service cloud.firestore {
         allow write: if getUserRoleForWrite() in ['admin', 'manager', 'loan_officer'];
       }
     }
-    
-    // Fallback: Deny all other writes by default.
-     match /{document=**} {
-      allow write: if false;
-    }
   }
 }
