@@ -39,13 +39,13 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      name: '',
-      category: '',
-      minAmount: 10000,
-      maxAmount: 500000,
-      interestRate: 5,
-      duration: 12,
-      repaymentCycle: 'Monthly',
+      name: 'Weekly Kickstart Loan',
+      category: 'Short-term',
+      minAmount: 5000,
+      maxAmount: 5000,
+      interestRate: 0,
+      duration: 1,
+      repaymentCycle: 'Weekly',
     },
   });
 

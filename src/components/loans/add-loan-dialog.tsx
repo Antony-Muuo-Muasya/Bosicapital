@@ -102,7 +102,11 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
     const loanRef = doc(collection(firestore, 'loans'));
     const interest = values.principal * (selectedProduct.interestRate / 100);
     const totalPayable = values.principal + interest;
-    const installmentAmount = totalPayable / selectedProduct.duration;
+    
+    const numberOfInstallments = selectedProduct.repaymentCycle === 'Weekly' 
+        ? selectedProduct.duration * 4 // Assuming 4 weeks per month
+        : selectedProduct.duration;
+    const installmentAmount = totalPayable / numberOfInstallments;
 
     const newLoanData = {
       id: loanRef.id,
@@ -194,9 +198,20 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 {selectedProduct && form.getValues('principal') > 0 && !form.formState.errors.principal && (
                     <div className="text-sm text-muted-foreground space-y-1 rounded-md bg-muted p-3">
                        <p>Interest Rate: <strong>{selectedProduct.interestRate}%</strong></p>
-                       <p>Duration: <strong>{selectedProduct.duration} months</strong></p>
+                       <p>Duration: <strong>{selectedProduct.duration} {selectedProduct.duration > 1 ? 'months' : 'month'}</strong></p>
                        <p>Total Payable: <strong>{formatCurrency(form.getValues('principal') * (1 + selectedProduct.interestRate / 100), 'KES')}</strong></p>
-                       <p>Monthly Installment: <strong>{formatCurrency((form.getValues('principal') * (1 + selectedProduct.interestRate / 100)) / selectedProduct.duration, 'KES')}</strong></p>
+                       {(() => {
+                            const principal = form.getValues('principal');
+                            const totalPayable = principal * (1 + selectedProduct.interestRate / 100);
+                            const numInstallments = selectedProduct.repaymentCycle === 'Weekly' ? selectedProduct.duration * 4 : selectedProduct.duration;
+                            const installmentAmount = totalPayable / numInstallments;
+                            
+                            return (
+                                <p>
+                                    {selectedProduct.repaymentCycle} Installment: <strong>{formatCurrency(installmentAmount, 'KES')}</strong>
+                                </p>
+                            )
+                       })()}
                     </div>
                 )}
 
