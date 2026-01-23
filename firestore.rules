@@ -97,7 +97,8 @@ service cloud.firestore {
         (exists(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)) && 
          isOwner(get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId))
       );
-      allow list, create: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
       allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
       allow delete: if false; // For data integrity
     }
