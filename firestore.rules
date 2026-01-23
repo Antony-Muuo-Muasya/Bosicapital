@@ -3,14 +3,54 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // This rule allows any authenticated user to read and write to any document
-    // in the database. This will resolve the "Missing or insufficient permissions"
-    // errors you were encountering.
-    // For production applications, it is highly recommended to implement more
-    // granular security rules to protect your data.
+
+    function isStaff(userId) {
+        // This function should only be used in WRITE rules.
+        // Using get() in a read/list rule can cause performance issues or timeouts.
+        let role = get(/databases/$(database)/documents/users/$(userId)).data.roleId;
+        return role in ['admin', 'manager', 'loan_officer'];
+    }
+
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      // By default, allow all authenticated users to read and list.
+      // This is a broad but simple rule that will fix the LIST permission errors on dashboards.
+      // Write permissions are handled by more specific rules below.
+      allow read: if request.auth != null;
+      
+      // By default, deny all writes. Specific collections will override this.
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow write: if request.auth.uid == userId || isStaff(request.auth.uid);
+    }
+    
+    match /branches/{branchId} {
+        allow write: if isStaff(request.auth.uid);
+    }
+    
+    match /borrowers/{borrowerId} {
+      allow write: if isStaff(request.auth.uid);
+    }
+
+    match /loanProducts/{productId} {
+      allow write: if isStaff(request.auth.uid);
+    }
+
+    match /loans/{loanId} {
+      allow write: if isStaff(request.auth.uid);
+
+       match /installments/{installmentId} {
+        allow write: if isStaff(request.auth.uid);
+      }
+    }
+
+    match /repayments/{repaymentId} {
+      allow write: if isStaff(request.auth.uid);
+    }
+    
+    match /registrationPayments/{paymentId} {
+        allow write: if isStaff(request.auth.uid);
     }
   }
 }

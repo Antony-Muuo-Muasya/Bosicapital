@@ -86,9 +86,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
               const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
               let currentDueDate = new Date(newIssueDate);
 
-              const numberOfInstallments = loan.repaymentCycle === 'Weekly'
-                ? loan.duration * 4 // Assuming duration is in months
-                : loan.duration;
+              const numberOfInstallments = loan.duration;
 
               for (let i = 1; i <= numberOfInstallments; i++) {
                   const installmentRef = doc(installmentsColRef);
@@ -101,6 +99,8 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
                   const newInstallmentData = {
                       id: installmentRef.id,
                       loanId: loan.id,
+                      organizationId: loan.organizationId,
+                      branchId: loan.branchId,
                       installmentNumber: i,
                       dueDate: currentDueDate.toISOString().split('T')[0],
                       expectedAmount: loan.installmentAmount,

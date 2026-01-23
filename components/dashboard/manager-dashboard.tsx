@@ -30,7 +30,11 @@ export function ManagerDashboard() {
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore || branchIds.length === 0) return null;
       // This uses a collection group query and requires a composite index.
-      return query(collectionGroup(firestore, 'installments'));
+      return query(
+        collectionGroup(firestore, 'installments'), 
+        where('branchId', 'in', branchIds), 
+        where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
+      );
   }, [firestore, branchIds]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
@@ -51,7 +55,6 @@ export function ManagerDashboard() {
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
 
     return installments
-      .filter(i => ['Unpaid', 'Partial', 'Overdue'].includes(i.status))
       .map(inst => {
         const loan = loans?.find(l => l.id === inst.loanId);
         const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
@@ -105,5 +108,3 @@ export function ManagerDashboard() {
     </>
   );
 }
-
-    
