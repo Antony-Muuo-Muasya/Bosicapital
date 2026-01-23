@@ -95,7 +95,7 @@ export default function MyDashboardPage() {
 
         return {
             nextDueDate: nextInstallment ? new Date(nextInstallment.dueDate).toLocaleDateString() : 'N/A',
-            nextInstallmentAmount: nextInstallment ? nextInstallment.expectedAmount - nextInstallment.paidAmount : 0,
+            nextInstallmentAmount: nextInstallment ? nextInstallment.expectedAmount : 0,
             totalPaid: totalPaid,
             totalOutstanding: activeLoan.totalPayable - totalPaid,
             progress: progress,
