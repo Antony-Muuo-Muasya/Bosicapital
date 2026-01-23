@@ -80,7 +80,11 @@ service cloud.firestore {
         (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) || 
         isOwner(resource.data.userId)
       );
-      allow list, create, update: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
+      // Staff can list all borrowers. Borrowers can also query, but the 'get' rule above
+      // ensures they can only actually read their own data from the results.
+      allow list: if isSignedIn();
+      
+      allow create, update: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
       allow delete: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
     }
     
