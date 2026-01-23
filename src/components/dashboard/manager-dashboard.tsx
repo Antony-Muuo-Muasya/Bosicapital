@@ -29,11 +29,11 @@ export function ManagerDashboard() {
 
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore || branchIds.length === 0) return null;
-      // This collection group query is simplified to only filter by branch to avoid needing a composite index.
-      // The status filtering is now handled on the client-side.
+      // This uses a collection group query and requires a composite index.
       return query(
         collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds)
+        where('branchId', 'in', branchIds), 
+        where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
       );
   }, [firestore, branchIds]);
 
@@ -45,20 +45,13 @@ export function ManagerDashboard() {
 
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: allInstallments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
-
-  // Client-side filtering for installment statuses
-  const installments = useMemo(() => {
-    if (!allInstallments) return null;
-    const relevantStatuses = ['Overdue', 'Unpaid', 'Partial'];
-    return allInstallments.filter(inst => relevantStatuses.includes(inst.status));
-  }, [allInstallments]);
 
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading;
 
   const dueInstallmentsWithDetails = useMemo(() => {
-    if (!installments || !borrowers || !loans) return [];
+    if (!installments || !borrowers) return [];
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
 
     return installments
