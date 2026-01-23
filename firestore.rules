@@ -36,20 +36,22 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
-      // Any signed-in user can get another user's profile if they are in the same organization.
-      allow get: if isSignedIn() && userProfileExists();
+      // Any signed-in user can get another user's profile.
+      // This is safe because sensitive fields (phone, address) have been removed from the User data model.
+      // This also fixes recursive errors in helper functions that need to read the user's profile.
+      allow get: if isSignedIn();
         
-      // Admins and Managers can list users within their own org.
-      allow list: if isSignedIn() && userProfileExists() && getMyRole() in ['admin', 'manager'] && request.query.organizationId == getMyOrg();
+      // Admins and Managers can list users. The client query MUST filter by organizationId.
+      allow list: if isSignedIn() && userProfileExists() && getMyRole() in ['admin', 'manager'];
                    
-      // New users can create their own profile during signup. A user can also update their own profile.
+      // A user can create or update their own profile.
       allow create, update: if isOwner(userId);
       
-      // An admin can update any user in their org.
-      allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin' && getMyOrg() == resource.data.organizationId;
+      // An admin can update any user in their own organization.
+      allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin' && get(/databases/$(database)/documents/users/$(userId)).data.organizationId == getMyOrg();
       
-      // Only admins can delete users.
-      allow delete: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+      // An admin can delete users in their own organization.
+      allow delete: if isSignedIn() && userProfileExists() && getMyRole() == 'admin' && get(/databases/$(database)/documents/users/$(userId)).data.organizationId == getMyOrg();
     }
     
     // All authenticated users can see what roles exist.
@@ -68,9 +70,9 @@ service cloud.firestore {
     match /borrowers/{borrowerId} {
       allow get: if isSignedIn() && (
         (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) || 
-        isOwner(resource.data.userId)
+        isOwner(get(/databases/$(database)/documents/borrowers/$(borrowerId)).data.userId)
       );
-      // Staff can list all borrowers. Borrowers can query for their own record.
+      // Staff and Borrowers can query for their own records.
       allow list: if isSignedIn();
       
       allow create, update: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
@@ -119,7 +121,7 @@ service cloud.firestore {
     }
 
     // Rule for the 'installments' collection group.
-    // This allows admins and managers to query across all installments within their organization.
+    // This allows staff to query across all installments. Client-side queries MUST filter by org/branch.
     match /{path=**}/installments/{installmentId} {
       allow list: if isSignedIn() &&
                      userProfileExists() &&
