@@ -99,6 +99,8 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
                   const newInstallmentData = {
                       id: installmentRef.id,
                       loanId: loan.id,
+                      organizationId: loan.organizationId,
+                      branchId: loan.branchId,
                       installmentNumber: i,
                       dueDate: currentDueDate.toISOString().split('T')[0],
                       expectedAmount: loan.installmentAmount,
