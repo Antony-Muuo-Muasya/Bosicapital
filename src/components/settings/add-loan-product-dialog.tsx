@@ -43,7 +43,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
       category: 'Short-term',
       minAmount: 5000,
       maxAmount: 5000,
-      interestRate: 0,
+      interestRate: 25,
       duration: 1,
       repaymentCycle: 'Weekly',
     },
