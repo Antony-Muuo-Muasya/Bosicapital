@@ -88,7 +88,7 @@ export default function MyDashboardPage() {
 
         const nextInstallment = sortedUpcoming[0];
         const totalPaid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
-        const progress = activeLoan.totalPayable > 0 ? (totalPaid / activeLoan.totalPayable) * 100 : 0;
+        const progress = activeLoan.principal > 0 ? (totalPaid / activeLoan.principal) * 100 : 0;
 
         const totalPaymentsMade = installments.filter(i => i.status === 'Paid').length;
         const isPromptPayer = !installments.some(i => i.status === 'Overdue');

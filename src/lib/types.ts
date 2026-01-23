@@ -94,8 +94,6 @@ export type Loan = {
 export type Installment = {
   id: string;
   loanId: string;
-  organizationId: string;
-  branchId: string;
   installmentNumber: number;
   dueDate: string;
   expectedAmount: number;
