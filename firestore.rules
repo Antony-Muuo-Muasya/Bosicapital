@@ -11,20 +11,18 @@ service cloud.firestore {
         return role in ['admin', 'manager', 'loan_officer'];
     }
 
+    // Default to read-only for authenticated users
     match /{document=**} {
-      // By default, allow all authenticated users to read and list.
-      // This is a broad but simple rule that will fix the LIST permission errors on dashboards.
-      // Write permissions are handled by more specific rules below.
       allow read: if request.auth != null;
-      
-      // By default, deny all writes. Specific collections will override this.
-      allow write: if false;
+      allow write: if false; // Deny writes by default
     }
 
+    // Allow users to update their own profile
     match /users/{userId} {
-      allow write: if request.auth.uid == userId || isStaff(request.auth.uid);
+      allow write: if request.auth.uid == userId;
     }
     
+    // Allow staff to write to business collections
     match /branches/{branchId} {
         allow write: if isStaff(request.auth.uid);
     }

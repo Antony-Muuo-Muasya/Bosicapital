@@ -2,7 +2,7 @@
 import { PageHeader } from '@/components/page-header';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment } from '@/lib/types';
 import { Button } from '../ui/button';
 import { PlusCircle, BarChart, UserPlus } from 'lucide-react';
@@ -29,13 +29,6 @@ export function AdminDashboard() {
     return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId]);
 
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    // Use a collection group query to get all installments for the organization.
-    // This requires a Firestore index.
-    return query(collectionGroup(firestore, 'installments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
-
   const regPaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !organizationId) return null;
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
@@ -44,10 +37,9 @@ export function AdminDashboard() {
   // Data fetching
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || regPaymentsLoading;
 
   return (
     <>
@@ -73,7 +65,7 @@ export function AdminDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <OverviewCards
           loans={loans}
-          installments={installments}
+          installments={null}
           borrowers={borrowers}
           regPayments={regPayments}
           isLoading={isLoading}
@@ -87,5 +79,3 @@ export function AdminDashboard() {
     </>
   );
 }
-
-    
