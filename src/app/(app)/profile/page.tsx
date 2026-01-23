@@ -3,7 +3,7 @@
 import { useAuth, useFirestore, useUserProfile, updateDocumentNonBlocking, useCollection, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import type { Branch } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 
 const profileSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
@@ -270,12 +271,13 @@ export default function ProfilePage() {
                 <CardContent>
                    <div className="flex items-center justify-between space-x-2 rounded-md border p-4">
                         <div className="space-y-0.5">
-                            <FormLabel>Marketing Emails</FormLabel>
-                            <FormDescription>
+                            <Label htmlFor="marketing-emails">Marketing Emails</Label>
+                            <p className="text-sm text-muted-foreground">
                                 Receive emails about new products and features.
-                            </FormDescription>
+                            </p>
                         </div>
                         <Switch
+                            id="marketing-emails"
                             checked={userProfile?.marketingOptIn}
                             onCheckedChange={handleMarketingToggle}
                         />
