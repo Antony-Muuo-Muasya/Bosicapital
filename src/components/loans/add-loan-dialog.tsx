@@ -103,9 +103,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
     const interest = values.principal * (selectedProduct.interestRate / 100);
     const totalPayable = values.principal + interest;
     
-    const numberOfInstallments = selectedProduct.repaymentCycle === 'Weekly' 
-        ? selectedProduct.duration * 4 // Assuming 4 weeks per month
-        : selectedProduct.duration;
+    const numberOfInstallments = selectedProduct.duration;
     const installmentAmount = totalPayable / numberOfInstallments;
 
     const newLoanData = {
@@ -198,12 +196,12 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 {selectedProduct && form.getValues('principal') > 0 && !form.formState.errors.principal && (
                     <div className="text-sm text-muted-foreground space-y-1 rounded-md bg-muted p-3">
                        <p>Interest Rate: <strong>{selectedProduct.interestRate}%</strong></p>
-                       <p>Duration: <strong>{selectedProduct.duration} {selectedProduct.duration > 1 ? 'months' : 'month'}</strong></p>
+                       <p>Duration: <strong>{selectedProduct.duration} {selectedProduct.duration > 1 ? `${selectedProduct.repaymentCycle.toLowerCase().slice(0,-2)}s` : selectedProduct.repaymentCycle.toLowerCase().slice(0,-2)}</strong></p>
                        <p>Total Payable: <strong>{formatCurrency(form.getValues('principal') * (1 + selectedProduct.interestRate / 100), 'KES')}</strong></p>
                        {(() => {
                             const principal = form.getValues('principal');
                             const totalPayable = principal * (1 + selectedProduct.interestRate / 100);
-                            const numInstallments = selectedProduct.repaymentCycle === 'Weekly' ? selectedProduct.duration * 4 : selectedProduct.duration;
+                            const numInstallments = selectedProduct.duration;
                             const installmentAmount = totalPayable / numInstallments;
                             
                             return (

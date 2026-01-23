@@ -73,7 +73,7 @@ export type LoanProduct = {
   minAmount: number;
   maxAmount: number;
   interestRate: number;
-  duration: number; // in months
+  duration: number; // in intervals (e.g., months or weeks, depending on repaymentCycle)
   repaymentCycle: 'Weekly' | 'Monthly';
 };
 
@@ -86,7 +86,7 @@ export type Loan = {
   interestRate: number;
   totalPayable: number;
   installmentAmount: number;
-  duration: number; // in months
+  duration: number; // Corresponds to LoanProduct's duration intervals
   issueDate: string;
   status: 'Draft' | 'Pending Approval' | 'Approved' | 'Active' | 'Completed' | 'Rejected';
   loanOfficerId: string;

@@ -20,7 +20,7 @@ const productSchema = z.object({
   minAmount: z.coerce.number().positive('Must be a positive number.'),
   maxAmount: z.coerce.number().positive('Must be a positive number.'),
   interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
-  duration: z.coerce.number().int().positive('Duration must be a positive number of months.'),
+  duration: z.coerce.number().int().positive('Duration must be a positive integer.'),
   repaymentCycle: z.enum(['Weekly', 'Monthly']),
 });
 
@@ -41,6 +41,8 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
     resolver: zodResolver(productSchema),
     defaultValues: product,
   });
+
+  const repaymentCycle = form.watch('repaymentCycle');
 
   const onSubmit = (values: ProductFormData) => {
     setIsSubmitting(true);
@@ -111,7 +113,7 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
               )} />
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (Months)</FormLabel>
+                  <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

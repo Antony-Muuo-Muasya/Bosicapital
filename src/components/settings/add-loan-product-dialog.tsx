@@ -19,7 +19,7 @@ const productSchema = z.object({
   minAmount: z.coerce.number().positive('Must be a positive number.'),
   maxAmount: z.coerce.number().positive('Must be a positive number.'),
   interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
-  duration: z.coerce.number().int().positive('Duration must be a positive number of months.'),
+  duration: z.coerce.number().int().positive('Duration must be a positive integer.'),
   repaymentCycle: z.enum(['Weekly', 'Monthly']),
 });
 
@@ -44,10 +44,12 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
       minAmount: 5000,
       maxAmount: 5000,
       interestRate: 25,
-      duration: 1,
+      duration: 4,
       repaymentCycle: 'Weekly',
     },
   });
+
+  const repaymentCycle = form.watch('repaymentCycle');
 
   const onSubmit = (values: ProductFormData) => {
     if (!userProfile || !firestore) return;
@@ -125,7 +127,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
               )} />
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (Months)</FormLabel>
+                  <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
