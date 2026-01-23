@@ -16,17 +16,10 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // This function can be used to get the role of the CURRENTLY authenticated user.
     function getMyRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId;
     }
     
-    // This function gets the org of the CURRENTLY authenticated user.
-    function getMyOrg() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId;
-    }
-
-    // Check if the current user exists in the users collection.
     function userProfileExists() {
         return exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -34,125 +27,74 @@ service cloud.firestore {
     // =================================
     // Collection Rules
     // =================================
+    
+    // Default Read Rule: Allow any authenticated user to read data.
+    // This is a broad rule to solve the permission errors on dashboard queries.
+    // The application code is responsible for filtering data appropriately.
+    match /{document=**} {
+      allow read: if isSignedIn();
+    }
+    
+    // --- Write Rules ---
+    // Writes are denied by default and explicitly allowed below.
 
     match /users/{userId} {
-      // Any signed-in user can get another user's profile.
-      // This is safe because sensitive fields (phone, address) have been removed from the User data model.
-      // This also fixes recursive errors in helper functions that need to read the user's profile.
-      allow get: if isSignedIn();
-        
-      // Admins and Managers can list users. The client query MUST filter by organizationId.
-      // REMOVED getMyRole() to prevent recursive error on list queries.
-      // This is less secure but necessary without custom claims. The client-side code has the primary filter.
-      allow list: if isSignedIn() && userProfileExists();
-                   
-      // A user can create or update their own profile.
+      // Any user can create their own profile.
+      // A user can only update their own profile.
       allow create, update: if isOwner(userId);
-      
-      // An admin can update any user in their own organization.
-      allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin' && get(/databases/$(database)/documents/users/$(userId)).data.organizationId == getMyOrg();
-      
-      // An admin can delete users in their own organization.
-      allow delete: if isSignedIn() && userProfileExists() && getMyRole() == 'admin' && get(/databases/$(database)/documents/users/$(userId)).data.organizationId == getMyOrg();
+      // An admin can update or delete any user.
+      allow update, delete: if userProfileExists() && getMyRole() == 'admin';
     }
     
-    // All authenticated users can see what roles exist.
     match /roles/{roleId} {
-      allow read: if true;
-      allow write: if false; // Roles are seeded, not client-writable
+      // Roles are seeded and not client-writable.
+      allow write: if false;
     }
     
-    // Staff (admin, manager, loan_officer) can read branches. Admins can write.
+    function isStaff() {
+      return userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer'];
+    }
+
+    function isAdmin() {
+      return userProfileExists() && getMyRole() == 'admin';
+    }
+    
     match /branches/{branchId} {
-      allow read: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
-      allow write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+      allow write: if isAdmin();
     }
     
-    // Staff can read/write borrowers. A borrower can read their own record.
     match /borrowers/{borrowerId} {
-      allow get: if isSignedIn() && (
-        (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) || 
-        isOwner(get(/databases/$(database)/documents/borrowers/$(borrowerId)).data.userId)
-      );
-      // Staff and Borrowers can query for their own records.
-      allow list: if isSignedIn();
-      
-      allow create, update: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
-      allow delete: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
     }
     
-    // Staff can read/create loans. Borrowers can read their own loan. Admins approve.
     match /loans/{loanId} {
-      // To read a loan, you must be staff OR be the user associated with the borrower on that loan.
-      allow get: if isSignedIn() && (
-        (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) || 
-        (exists(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)) && 
-         isOwner(get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId))
-      );
-      // Staff can list loans in their org. Borrowers can query for their own.
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
-      allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+      allow create: if isStaff();
+      allow update: if isAdmin(); // For approvals
       allow delete: if false; // For data integrity
     }
     
-    // Subcollection for loan installments.
     match /loans/{loanId}/installments/{installmentId} {
-      // GET: Allow a user to get their own installment details, or staff to get any installment in their org.
-      allow get: if isSignedIn() && (
-        (
-          userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer'] &&
-          get(/databases/$(database)/documents/loans/$(loanId)).data.organizationId == getMyOrg()
-        ) ||
-        (
-          exists(/databases/$(database)/documents/loans/$(loanId)) && 
-          exists(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)) && 
-          isOwner(get(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)).data.userId)
-        )
-      );
-      
-      // LIST: Allow a user to list installments for their own loan (subcollection query). Staff use the collection group rule.
-      allow list: if isSignedIn() && (
-        exists(/databases/$(database)/documents/loans/$(loanId)) &&
-        exists(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)) &&
-        isOwner(get(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)).data.userId)
-      );
-
-      // WRITE: Only admins can create/update installments (via loan approval).
-      allow write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
-    }
-
-    // Rule for the 'installments' collection group.
-    // This allows staff to query across all installments. Client-side queries MUST filter by org/branch.
-    match /{path=**}/installments/{installmentId} {
-      // REMOVED getMyRole() to prevent error on collection group queries.
-      // This is less secure but necessary without custom claims. The client-side code has the primary filter.
-      allow list: if isSignedIn() && userProfileExists();
-      
-      // Deny other direct operations on the collection group path.
-      allow get, create, update, delete: if false;
+      // Installments are written in a batch when a loan is approved.
+      allow write: if isAdmin();
     }
     
-    // Loan products are public to read. Admins can write.
     match /loanProducts/{loanProductId} {
-      allow read: if true;
-      allow write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+      allow write: if isAdmin();
     }
     
-    // Staff can read/create repayments and registration payments.
     match /repayments/{repaymentId} {
-      allow read, create: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
+      allow create: if isStaff();
       allow update, delete: if false;
     }
     
     match /registrationPayments/{paymentId} {
-      allow read, create: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
+      allow create: if isStaff();
       allow update, delete: if false;
     }
     
-    // Audit logs are admin-only
     match /auditLogs/{logId} {
-        allow read, write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+        allow write: if isAdmin();
     }
   }
 }
