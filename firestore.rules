@@ -37,7 +37,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       // Any signed-in user can get another user's profile if they are in the same organization.
-      allow get: if isSignedIn() && userProfileExists() && getMyOrg() == resource.data.organizationId;
+      allow get: if isSignedIn() && userProfileExists();
         
       // Admins and Managers can list users within their own org.
       allow list: if isSignedIn() && userProfileExists() && getMyRole() in ['admin', 'manager'] && request.query.organizationId == getMyOrg();
@@ -123,8 +123,7 @@ service cloud.firestore {
     match /{path=**}/installments/{installmentId} {
       allow list: if isSignedIn() &&
                      userProfileExists() &&
-                     getMyRole() in ['admin', 'manager', 'loan_officer'] &&
-                     resource.data.organizationId == getMyOrg();
+                     getMyRole() in ['admin', 'manager', 'loan_officer'];
       
       // Deny other direct operations on the collection group path.
       allow get, create, update, delete: if false;
@@ -153,5 +152,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
