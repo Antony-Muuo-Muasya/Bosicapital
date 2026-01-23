@@ -2,12 +2,13 @@
 import { PageHeader } from '@/components/page-header';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment } from '@/lib/types';
 import { DueLoansTable } from './due-loans-table';
 import { useMemo } from 'react';
 import { DueDateMonitor } from './due-date-monitor';
 import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
+import { formatCurrency } from '@/lib/utils';
 
 export function ManagerDashboard() {
   const firestore = useFirestore();
@@ -28,8 +29,12 @@ export function ManagerDashboard() {
 
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore || branchIds.length === 0) return null;
-      // This requires a composite index on branchId and status.
-      return query(collection(firestore, 'installments'), where('branchId', 'in', branchIds), where('status', 'in', ['Overdue', 'Unpaid', 'Partial']));
+      // This uses a collection group query and requires a composite index.
+      return query(
+        collectionGroup(firestore, 'installments'), 
+        where('branchId', 'in', branchIds), 
+        where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
+      );
   }, [firestore, branchIds]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
@@ -104,3 +109,5 @@ export function ManagerDashboard() {
     </>
   );
 }
+
+    

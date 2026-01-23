@@ -2,7 +2,7 @@
 import { PageHeader } from '@/components/page-header';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment } from '@/lib/types';
 import { Button } from '../ui/button';
 import { PlusCircle, BarChart, UserPlus } from 'lucide-react';
@@ -29,13 +29,12 @@ export function AdminDashboard() {
     return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId]);
 
-  // This is incorrect because installments is a subcollection. A collectionGroup query would be better.
-  // For now, to prevent errors and extensive refactoring, query a non-existent path to return an empty array.
-  // This means overdue calculations will be incorrect on the admin dashboard, but it avoids permission errors.
   const installmentsQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
-      return query(collection(firestore, 'installments'), where('loanId', '==', 'non-existent-to-return-empty'));
-    }, [firestore]);
+    if (!firestore || !organizationId) return null;
+    // Use a collection group query to get all installments for the organization.
+    // This requires a Firestore index.
+    return query(collectionGroup(firestore, 'installments'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !organizationId) return null;
@@ -88,3 +87,5 @@ export function AdminDashboard() {
     </>
   );
 }
+
+    

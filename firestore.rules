@@ -27,7 +27,6 @@ service cloud.firestore {
     }
 
     // Check if the current user exists in the users collection.
-    // This is a prerequisite for getting their role or org.
     function userProfileExists() {
         return exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -37,26 +36,17 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
-      // A user can get their own profile.
-      // Or, any signed-in user can get another user's profile if they are in the same organization.
-      // This is safe because the get() on the requester's own profile is allowed by the isOwner() check.
-      allow get: if isSignedIn() && (
-        isOwner(userId) || 
-        (userProfileExists() && getMyOrg() == resource.data.organizationId)
-      );
-
-      // Admins and Managers can list users within their own org. This requires a query with organizationId.
-      allow list: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager']) && 
-                   request.query.organizationId == getMyOrg();
+      // Any signed-in user can get another user's profile if they are in the same organization.
+      allow get: if isSignedIn() && userProfileExists() && getMyOrg() == resource.data.organizationId;
+        
+      // Admins and Managers can list users within their own org.
+      allow list: if isSignedIn() && userProfileExists() && getMyRole() in ['admin', 'manager'] && request.query.organizationId == getMyOrg();
                    
-      // New users can create their own profile during signup.
-      allow create: if isOwner(userId);
-
-      // A user can update their own profile. An admin can update any user in their org.
-      allow update: if isSignedIn() && (
-        isOwner(userId) ||
-        (userProfileExists() && getMyRole() == 'admin' && getMyOrg() == resource.data.organizationId)
-      );
+      // New users can create their own profile during signup. A user can also update their own profile.
+      allow create, update: if isOwner(userId);
+      
+      // An admin can update any user in their org.
+      allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin' && getMyOrg() == resource.data.organizationId;
       
       // Only admins can delete users.
       allow delete: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
@@ -80,8 +70,7 @@ service cloud.firestore {
         (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) || 
         isOwner(resource.data.userId)
       );
-      // Staff can list all borrowers. Borrowers can also query, but the 'get' rule above
-      // ensures they can only actually read their own data from the results.
+      // Staff can list all borrowers. Borrowers can query for their own record.
       allow list: if isSignedIn();
       
       allow create, update: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
@@ -91,12 +80,12 @@ service cloud.firestore {
     // Staff can read/create loans. Borrowers can read their own loan. Admins approve.
     match /loans/{loanId} {
       // To read a loan, you must be staff OR be the user associated with the borrower on that loan.
-      // This requires two 'get's, which is allowed.
       allow get: if isSignedIn() && (
         (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) || 
         (exists(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)) && 
          isOwner(get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId))
       );
+      // Staff can list loans in their org. Borrowers can query for their own.
       allow list: if isSignedIn();
       allow create: if isSignedIn() && userProfileExists() && (getMyRole() in ['admin', 'manager', 'loan_officer']);
       allow update: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
@@ -105,14 +94,40 @@ service cloud.firestore {
     
     // Subcollection for loan installments.
     match /loans/{loanId}/installments/{installmentId} {
-      // Similar logic to reading a loan.
-      allow read: if isSignedIn() && (
-        (userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer']) ||
-        (exists(/databases/$(database)/documents/loans/$(loanId)) && 
-         exists(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)) && 
-         isOwner(get(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)).data.userId))
+      // GET: Allow a user to get their own installment details, or staff to get any installment in their org.
+      allow get: if isSignedIn() && (
+        (
+          userProfileExists() && getMyRole() in ['admin', 'manager', 'loan_officer'] &&
+          get(/databases/$(database)/documents/loans/$(loanId)).data.organizationId == getMyOrg()
+        ) ||
+        (
+          exists(/databases/$(database)/documents/loans/$(loanId)) && 
+          exists(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)) && 
+          isOwner(get(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)).data.userId)
+        )
       );
+      
+      // LIST: Allow a user to list installments for their own loan (subcollection query). Staff use the collection group rule.
+      allow list: if isSignedIn() && (
+        exists(/databases/$(database)/documents/loans/$(loanId)) &&
+        exists(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)) &&
+        isOwner(get(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)).data.userId)
+      );
+
+      // WRITE: Only admins can create/update installments (via loan approval).
       allow write: if isSignedIn() && userProfileExists() && getMyRole() == 'admin';
+    }
+
+    // Rule for the 'installments' collection group.
+    // This allows admins and managers to query across all installments within their organization.
+    match /{path=**}/installments/{installmentId} {
+      allow list: if isSignedIn() &&
+                     userProfileExists() &&
+                     getMyRole() in ['admin', 'manager', 'loan_officer'] &&
+                     resource.data.organizationId == getMyOrg();
+      
+      // Deny other direct operations on the collection group path.
+      allow get, create, update, delete: if false;
     }
     
     // Loan products are public to read. Admins can write.
@@ -138,3 +153,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
