@@ -20,7 +20,9 @@ export function RecentActivity({ loans, borrowers, isLoading }: RecentActivityPr
     const recentActivities = useMemo(() => {
         if (!loans || !borrowers) return [];
 
-        const recentLoans = loans.slice(0, 3).map(loan => ({
+        const sortedLoans = [...loans].sort((a,b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+
+        const recentLoans = sortedLoans.slice(0, 3).map(loan => ({
             type: 'Loan',
             id: loan.id,
             date: new Date(loan.issueDate),

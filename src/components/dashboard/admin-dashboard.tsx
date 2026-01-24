@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react';
 import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role } from '@/lib/types';
 import { OverviewCards } from './overview-cards';
 import { PortfolioStatusChart } from './admin/portfolio-status-chart';
@@ -28,7 +28,8 @@ export function AdminDashboard() {
   // Data queries
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !organizationId) return null;
-    return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId), orderBy('issueDate', 'desc'));
+    // Removed orderBy to prevent query from requiring a composite index
+    return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId]);
 
   const borrowersQuery = useMemoFirebase(() => {
