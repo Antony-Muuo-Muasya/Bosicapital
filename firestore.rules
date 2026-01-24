@@ -10,9 +10,15 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId;
     }
 
+    // --- Collection Group Read Rule ---
+    // Explicitly allow reads on the 'installments' collection group for any authenticated user.
+    // This is required for the collection group queries used in the dashboards.
+    match /{path=**}/installments/{installmentId} {
+      allow read: if request.auth != null;
+    }
+
     // --- Global Read Rule ---
     // This allows any authenticated user to read/list any document.
-    // This will resolve the "Missing or insufficient permissions" error on list queries.
     match /{document=**} {
       allow read: if request.auth != null;
     }
