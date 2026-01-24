@@ -4,7 +4,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/
 import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, LoanProduct, Repayment } from '@/lib/types';
 import { Button } from '../ui/button';
-import { HandCoins, PlusCircle, UserPlus } from 'lucide-react';
+import { HandCoins, PlusCircle, UserPlus, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
@@ -14,9 +14,8 @@ import { Landmark, Users, Scale, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PerformanceTracker } from './loan-officer/PerformanceTracker';
 import { LoanPipeline } from './loan-officer/LoanPipeline';
-import { ActionCenter } from './loan-officer/ActionCenter';
 import { RecentActivity } from './loan-officer/RecentActivity';
-import { CreateIndexCard } from './loan-officer/CreateIndexCard';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 
 export function LoanOfficerDashboard() {
@@ -62,17 +61,6 @@ export function LoanOfficerDashboard() {
     return query(collection(firestore, 'repayments'), where('collectedById', '==', user.uid));
   }, [firestore, user]);
   const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
-
-
-  // 5. Get all installments for the officer's loans (may require index)
-  const loanIds = useMemo(() => loans?.map(l => l.id) || [], [loans]);
-  
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || loanIds.length === 0) return null;
-    // NOTE: This query requires a composite index on the 'installments' collection group.
-    return query(collectionGroup(firestore, 'installments'), where('loanId', 'in', loanIds));
-  }, [firestore, loanIds]);
-  const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
 
   // Overall loading state
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading || repaymentsLoading;
@@ -142,11 +130,20 @@ export function LoanOfficerDashboard() {
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
             <PerformanceTracker loans={loans} borrowers={borrowers} isLoading={isLoading} />
-            {installmentsError ? (
-                <CreateIndexCard />
-            ) : (
-                <ActionCenter installments={installments} loans={loans} borrowers={borrowers} isLoading={installmentsLoading || borrowersLoading} />
-            )}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Action Center</CardTitle>
+                    <CardDescription>A prioritized list of borrowers who require your attention.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center text-center h-full min-h-[150px]">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Info className="h-8 w-8" />
+                        <p className="text-sm max-w-xs">
+                            The Action Center is disabled because it requires a database index. Please ask your administrator to create the required index in Firestore.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
           </div>
           <div className="space-y-6">
               <LoanPipeline loans={loans} isLoading={isLoading} />
