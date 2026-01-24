@@ -58,6 +58,7 @@ export function ManagerDashboard() {
 
     const disbursedLoans = activeLoans.length;
 
+    // NOTE: The following metrics are not implemented due to query complexity and the need for database indexes.
     const loansDueToday = 0;
     const monthToDateArrears = 0;
     const outstandingTotalLoanArrears = 0;
