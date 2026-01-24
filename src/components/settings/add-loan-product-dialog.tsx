@@ -39,17 +39,15 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      name: 'Weekly Kickstart Loan',
-      category: 'Short-term',
-      minAmount: 5000,
-      maxAmount: 5000,
-      interestRate: 25,
-      duration: 4,
-      repaymentCycle: 'Weekly',
+      name: '',
+      category: '',
+      minAmount: 0,
+      maxAmount: 0,
+      interestRate: 0,
+      duration: 0,
+      repaymentCycle: 'Monthly',
     },
   });
-
-  const repaymentCycle = form.watch('repaymentCycle');
 
   const onSubmit = (values: ProductFormData) => {
     if (!userProfile || !firestore) return;
@@ -127,7 +125,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
               )} />
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>
+                  <FormLabel>Duration (Months)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
