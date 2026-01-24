@@ -30,10 +30,10 @@ export function ManagerDashboard() {
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore || branchIds.length === 0) return null;
       // This uses a collection group query and requires a composite index.
+      // This query can be expensive and may be denied by security rules if not scoped properly.
       return query(
         collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds), 
-        where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
+        where('branchId', 'in', branchIds)
       );
   }, [firestore, branchIds]);
 
@@ -50,11 +50,19 @@ export function ManagerDashboard() {
 
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading;
 
+  const dueInstallments = useMemo(() => {
+    if (!installments) return [];
+    return installments
+        .filter(i => i.status === 'Overdue' || i.status === 'Unpaid' || i.status === 'Partial')
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [installments]);
+
+
   const dueInstallmentsWithDetails = useMemo(() => {
-    if (!installments || !borrowers) return [];
+    if (!dueInstallments || !borrowers || !loans) return [];
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
 
-    return installments
+    return dueInstallments
       .map(inst => {
         const loan = loans?.find(l => l.id === inst.loanId);
         const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
@@ -63,9 +71,8 @@ export function ManagerDashboard() {
           borrowerName: borrower?.fullName || 'Unknown Borrower',
           borrowerPhotoUrl: borrower?.photoUrl || `https://picsum.photos/seed/${inst.id}/400/400`,
         };
-      })
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [installments, borrowers, loans]);
+      });
+  }, [dueInstallments, borrowers, loans]);
 
   const aiInput = useMemo((): DueDateMonitoringInput => {
     const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');

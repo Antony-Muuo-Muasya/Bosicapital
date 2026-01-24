@@ -24,7 +24,7 @@ service cloud.firestore {
     }
 
     // --- Specific Write Rules ---
-    // These rules are evaluated only on write operations (create, update, delete).
+    // These are evaluated only on write operations (create, update, delete).
     
     match /users/{userId} {
       // A user can only write to their own document.

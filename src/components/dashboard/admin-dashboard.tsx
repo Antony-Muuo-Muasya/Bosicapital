@@ -1,15 +1,13 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { Button } from '../ui/button';
 import { PlusCircle, UserPlus } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
 
 export function AdminDashboard() {
   const router = useRouter();
-  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
 
   return (
