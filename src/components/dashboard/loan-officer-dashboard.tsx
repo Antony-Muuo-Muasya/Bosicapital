@@ -2,9 +2,9 @@
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where, documentId } from 'firebase/firestore';
-import type { Loan, Borrower, Installment, LoanProduct, Repayment } from '@/lib/types';
+import type { Loan, Borrower, LoanProduct, Repayment } from '@/lib/types';
 import { Button } from '../ui/button';
-import { HandCoins, PlusCircle, UserPlus, Info } from 'lucide-react';
+import { HandCoins, PlusCircle, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
@@ -17,7 +17,6 @@ import { LoanPipeline } from './loan-officer/LoanPipeline';
 import { RecentActivity } from './loan-officer/RecentActivity';
 import { subMonths, format } from 'date-fns';
 import { DualTrendChart } from './loan-officer/DualTrendChart';
-import { PortfolioMixChart } from './loan-officer/PortfolioMixChart';
 import { LifetimeStats } from './loan-officer/LifetimeStats';
 import { CollectionEfficiencyGauge } from './loan-officer/CollectionEfficiencyGauge';
 import { TopBorrowers } from './loan-officer/TopBorrowers';
@@ -97,15 +96,6 @@ export function LoanOfficerDashboard() {
         collected: collectionsByMonth[month] || 0,
     }));
 
-    // For Portfolio Mix Chart
-    const productsMap = new Map(allLoanProducts.map(p => [p.id, p.name]));
-    const loanCountsByProduct = activeLoans.reduce((acc, loan) => {
-        const productName = productsMap.get(loan.loanProductId) || 'Unknown Product';
-        acc[productName] = (acc[productName] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-    const portfolioMixData = Object.entries(loanCountsByProduct).map(([name, value]) => ({ name, value }));
-
     // For Lifetime Stats & Collection Gauge
     const totalPrincipalDisbursed = loans.reduce((sum, l) => sum + l.principal, 0);
     const totalRepaymentsCollected = repayments.reduce((sum, r) => sum + r.amount, 0);
@@ -136,7 +126,6 @@ export function LoanOfficerDashboard() {
             borrowerCount: borrowers.length,
         },
         dualTrendData,
-        portfolioMixData,
         lifetimeStats: {
             totalLoans: loans.length,
             totalPrincipalDisbursed,
@@ -185,7 +174,6 @@ export function LoanOfficerDashboard() {
             </div>
             <div className='lg:col-span-1 space-y-6'>
                 <PerformanceTracker loans={loans} borrowers={borrowers} isLoading={isLoading} />
-                <PortfolioMixChart data={dashboardData?.portfolioMixData} isLoading={isLoading} />
                 <CollectionEfficiencyGauge value={dashboardData?.collectionEfficiency || 0} isLoading={isLoading} />
                 <LifetimeStats 
                     totalLoans={dashboardData?.lifetimeStats.totalLoans || 0}
