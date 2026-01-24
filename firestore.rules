@@ -3,70 +3,11 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helper Function for Write Rules ---
-    function getUserRole() {
-      // This function uses `get`, so it should only be used in 'allow write' rules.
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId;
-    }
-
-    // --- Collection Group Read Rule ---
-    // Explicitly allow reads on the 'installments' collection group for any authenticated user.
-    // This is required for the collection group queries used in the dashboards.
-    match /{path=**}/installments/{installmentId} {
-      allow read: if request.auth != null;
-    }
-
-    // --- Global Read Rule ---
-    // This allows any authenticated user to read/list any document.
+    // Development-only rule: Allow read/write to any authenticated user.
+    // This is insecure for production and should be replaced with
+    // more granular rules before launch.
     match /{document=**} {
-      allow read: if request.auth != null;
-    }
-
-    // --- Specific Write Rules ---
-    // These are evaluated only on write operations (create, update, delete).
-    
-    match /users/{userId} {
-      // A user can only write to their own document.
-      allow write: if request.auth.uid == userId;
-    }
-
-    match /roles/{roleId} {
-      allow write: if getUserRole() == 'admin';
-    }
-
-    match /branches/{branchId} {
-      allow write: if getUserRole() == 'admin';
-    }
-
-    match /borrowers/{borrowerId} {
-      allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
-    }
-
-    match /loans/{loanId} {
-      allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
-    }
-    
-    // Write rule for the installments subcollection.
-    match /loans/{loanId}/installments/{installmentId} {
-        // Admins create installments when approving loans. Managers might need to edit.
-        allow write: if getUserRole() in ['admin', 'manager'];
-    }
-
-    match /loanProducts/{loanProductId} {
-      allow write: if getUserRole() == 'admin';
-    }
-
-    match /repayments/{repaymentId} {
-      allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
-    }
-    
-    match /registrationPayments/{paymentId} {
-      allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
-    }
-    
-    match /auditLogs/{logId} {
-        allow write: if getUserRole() == 'admin';
+      allow read, write: if request.auth != null;
     }
   }
 }
