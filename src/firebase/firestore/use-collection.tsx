@@ -100,8 +100,8 @@ export function useCollection<T = any>(
         setData(null)
         setIsLoading(false)
 
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
+        // Removing global error propagation to allow local component handling of missing-index errors.
+        // errorEmitter.emit('permission-error', contextualError);
       }
     );
 

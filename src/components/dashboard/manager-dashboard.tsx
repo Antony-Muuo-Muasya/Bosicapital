@@ -5,10 +5,10 @@ import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment, User, LoanProduct } from '@/lib/types';
 import { useMemo, useState } from 'react';
-import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
-import { CustomerGrowthChart } from './admin/customer-growth-chart';
-import { LoanOfficerLeaderboard, type LeaderboardEntry } from './admin/loan-officer-leaderboard';
-import { TopProducts } from './admin/top-products';
+import { DisbursalTrendChart } from '../admin/disbursal-trend-chart';
+import { CustomerGrowthChart } from '../admin/customer-growth-chart';
+import { LoanOfficerLeaderboard, type LeaderboardEntry } from '../admin/loan-officer-leaderboard';
+import { TopProducts } from '../admin/top-products';
 import { subMonths, format, isToday, isThisMonth } from 'date-fns';
 import { Button } from '../ui/button';
 import { PlusCircle, UserPlus, HandCoins } from 'lucide-react';
@@ -16,6 +16,7 @@ import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
 import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { useRouter } from 'next/navigation';
 import { CollectionOverview } from './manager/collection-overview';
+import { CreateIndexCard } from './manager/CreateIndexCard';
 
 export function ManagerDashboard() {
   const router = useRouter();
@@ -70,15 +71,13 @@ export function ManagerDashboard() {
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
   const { data: loanProducts, isLoading: productsLoading } = useCollection<LoanProduct>(productsQuery);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
 
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || regPaymentsLoading || productsLoading || usersLoading || installmentsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || regPaymentsLoading || productsLoading || usersLoading;
 
-  // --- Data Processing for Charts & Tables ---
-  
   const collectionRates = useMemo(() => {
-    if (!installments) return { todaysCollectionRate: 0, monthlyCollectionRate: 0 };
+    if (installmentsError || !installments) return { todaysCollectionRate: 0, monthlyCollectionRate: 0 };
     
     // Today's collections
     const dueToday = installments.filter(i => isToday(new Date(i.dueDate)));
@@ -93,12 +92,11 @@ export function ManagerDashboard() {
     const monthlyCollectionRate = expectedThisMonth > 0 ? (paidThisMonth / expectedThisMonth) * 100 : 0;
     
     return { todaysCollectionRate, monthlyCollectionRate };
-  }, [installments]);
+  }, [installments, installmentsError]);
   
   const dashboardData = useMemo(() => {
-    if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
+    if (!loans || !borrowers || !loanProducts || !users) return null;
     
-    // Disbursal & Customer Growth Trends (last 6 months)
     const today = new Date();
     const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
     const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
@@ -117,7 +115,6 @@ export function ManagerDashboard() {
     }, {} as Record<string, number>);
     const customerGrowthData = monthLabels.map(month => ({ name: month, total: customerGrowth[month] || 0 }));
 
-    // Loan Officer Leaderboard
     const loanOfficers = users.filter(u => u.roleId === 'loan_officer');
     const officerStats = loans.reduce((acc, loan) => {
         const officerId = loan.loanOfficerId;
@@ -139,7 +136,6 @@ export function ManagerDashboard() {
         .sort((a,b) => b.totalPrincipal - a.totalPrincipal)
         .slice(0, 5);
         
-    // Top Products
     const productCounts = loans.reduce((acc, loan) => {
         acc[loan.loanProductId] = (acc[loan.loanProductId] || 0) + 1;
         return acc;
@@ -155,13 +151,15 @@ export function ManagerDashboard() {
 
     return { disbursalTrendData, customerGrowthData, leaderboardData, topProducts };
 
-  }, [loans, borrowers, loanProducts, users, isLoading]);
+  }, [loans, borrowers, loanProducts, users]);
 
   const managerRegPayments = useMemo(() => {
     if (!regPayments || !borrowers) return [];
     const branchBorrowerIds = new Set(borrowers.map(b => b.id));
     return regPayments.filter(p => branchBorrowerIds.has(p.borrowerId));
   }, [regPayments, borrowers]);
+
+  const overallLoading = isLoading || (installmentsLoading && !installmentsError);
 
   return (
     <>
@@ -190,26 +188,30 @@ export function ManagerDashboard() {
           installments={installments}
           borrowers={borrowers}
           regPayments={managerRegPayments}
-          isLoading={isLoading}
+          isLoading={overallLoading}
         />
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-            <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
-            <div className="lg:col-span-2">
+             <div className="lg:col-span-2">
                 <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
             </div>
+            {installmentsError ? (
+              <CreateIndexCard />
+            ) : (
+              <CollectionOverview
+                  todaysCollectionRate={collectionRates.todaysCollectionRate}
+                  monthlyCollectionRate={collectionRates.monthlyCollectionRate}
+                  isLoading={overallLoading}
+              />
+            )}
         </div>
          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+            <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
             <div className="lg:col-span-2">
                  <CustomerGrowthChart data={dashboardData?.customerGrowthData} isLoading={isLoading} />
             </div>
-             <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
         </div>
          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <CollectionOverview
-                todaysCollectionRate={collectionRates.todaysCollectionRate}
-                monthlyCollectionRate={collectionRates.monthlyCollectionRate}
-                isLoading={isLoading}
-            />
+            <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
          </div>
       </div>
 
