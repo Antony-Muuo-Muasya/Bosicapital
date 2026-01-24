@@ -1,10 +1,9 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Loan, Borrower, Installment } from '@/lib/types';
+import { collection, query, where } from 'firebase/firestore';
+import type { Loan, Borrower } from '@/lib/types';
 import { useMemo } from 'react';
-import { isToday, isThisMonth } from 'date-fns';
 import { ManagerStatsCards } from './manager/stats-cards';
 import { CustomerOverview } from './manager/customer-overview';
 import { LoansOverview } from './manager/loans-overview';
@@ -25,22 +24,13 @@ export function ManagerDashboard() {
     return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
   }, [firestore, branchIds]);
 
-  const installmentsQuery = useMemoFirebase(() => {
-      if (!firestore || branchIds.length === 0) return null;
-      return query(
-        collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds)
-      );
-  }, [firestore, branchIds]);
-
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading;
 
   const dashboardStats = useMemo(() => {
-    if (isLoading || !loans || !borrowers || !installments) {
+    if (isLoading || !loans || !borrowers) {
       return {
         outstandingLoanBalance: 0,
         performingLoanBalance: 0,
@@ -55,25 +45,11 @@ export function ManagerDashboard() {
     }
 
     const activeLoans = loans.filter(l => l.status === 'Active');
-    const installmentsByLoan = installments.reduce((acc, inst) => {
-        if (!acc[inst.loanId]) acc[inst.loanId] = [];
-        acc[inst.loanId].push(inst);
-        return acc;
-    }, {} as Record<string, Installment[]>);
-
-    let outstandingLoanBalance = 0;
-    let performingLoanBalance = 0;
-
-    for (const loan of activeLoans) {
-        const totalPaid = (installmentsByLoan[loan.id] || []).reduce((sum, i) => sum + i.paidAmount, 0);
-        const balance = loan.totalPayable - totalPaid;
-        outstandingLoanBalance += balance;
-
-        const isOverdue = (installmentsByLoan[loan.id] || []).some(i => i.status === 'Overdue');
-        if (!isOverdue) {
-            performingLoanBalance += balance;
-        }
-    }
+    
+    // NOTE: Without fetching all installments, we cannot accurately calculate balances or arrears.
+    // These are set to 0 to prevent the app from crashing.
+    const outstandingLoanBalance = 0;
+    const performingLoanBalance = 0;
     
     const totalCustomers = borrowers.length;
     const activeCustomerIds = new Set(activeLoans.map(l => l.borrowerId));
@@ -82,15 +58,9 @@ export function ManagerDashboard() {
 
     const disbursedLoans = activeLoans.length;
 
-    const loansDueToday = installments.filter(i => i.status === 'Unpaid' && isToday(new Date(i.dueDate))).length;
-    
-    const outstandingTotalLoanArrears = installments
-      .filter(i => i.status === 'Overdue')
-      .reduce((sum, i) => sum + (i.expectedAmount - i.paidAmount), 0);
-      
-    const monthToDateArrears = installments
-      .filter(i => i.status === 'Overdue' && isThisMonth(new Date(i.dueDate)))
-      .reduce((sum, i) => sum + (i.expectedAmount - i.paidAmount), 0);
+    const loansDueToday = 0;
+    const monthToDateArrears = 0;
+    const outstandingTotalLoanArrears = 0;
 
     return {
       outstandingLoanBalance,
@@ -104,7 +74,7 @@ export function ManagerDashboard() {
       outstandingTotalLoanArrears,
     };
 
-  }, [loans, borrowers, installments, isLoading]);
+  }, [loans, borrowers, isLoading]);
   
   return (
     <>
