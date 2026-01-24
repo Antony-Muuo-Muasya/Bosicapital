@@ -2,16 +2,17 @@
 import { PageHeader } from "@/components/page-header";
 import { useUserProfile, useCollection, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { collection, query, where, doc } from "firebase/firestore";
-import type { Borrower, Loan, Installment, User as LoanOfficer } from '@/lib/types';
+import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, TrendingUp, Trophy, Lightbulb, User, Phone, Mail } from "lucide-react";
+import { Loader2, Trophy, Lightbulb, User, Mail, Wallet, CalendarDays, Hourglass, Sparkles, BookOpen, ShieldCheck, History, PlusCircle } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { format, formatDistanceToNow } from 'date-fns';
 
 const financialTips = [
     "Create a monthly budget and stick to it.",
@@ -20,6 +21,20 @@ const financialTips = [
     "Build an emergency fund for unexpected expenses.",
     "Review your bank statements regularly for errors."
 ];
+
+const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold">{value}</div>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </CardContent>
+    </Card>
+);
+
 
 export default function MyDashboardPage() {
     const firestore = useFirestore();
@@ -30,30 +45,44 @@ export default function MyDashboardPage() {
         setRandomTip(financialTips[Math.floor(Math.random() * financialTips.length)]);
     }, []);
 
+    // 1. Fetch borrower profile
     const borrowerQuery = useMemoFirebase(() => {
         if (!user) return null;
         return query(collection(firestore, 'borrowers'), where('userId', '==', user.uid));
     }, [firestore, user]);
-
     const { data: borrowerData, isLoading: isLoadingBorrower } = useCollection<Borrower>(borrowerQuery);
     const borrower = useMemo(() => borrowerData?.[0], [borrowerData]);
 
-    const loansQuery = useMemoFirebase(() => {
+    // 2. Fetch all loans for the borrower (active, pending, etc.)
+    const allLoansQuery = useMemoFirebase(() => {
         if (!borrower) return null;
         return query(collection(firestore, 'loans'), 
             where('organizationId', '==', borrower.organizationId),
-            where('borrowerId', '==', borrower.id), 
-            where('status', '==', 'Active')
+            where('borrowerId', '==', borrower.id)
         );
     }, [firestore, borrower]);
-    const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-    const activeLoan = useMemo(() => loans?.[0], [loans]);
+    const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(allLoansQuery);
 
+    // 3. Separate loans by status
+    const { activeLoan, pendingLoan } = useMemo(() => {
+        if (!allLoans) return { activeLoan: undefined, pendingLoan: undefined };
+        const active = allLoans.find(l => l.status === 'Active');
+        const pending = allLoans.find(l => l.status === 'Pending Approval');
+        return { activeLoan, pendingLoan };
+    }, [allLoans]);
+
+    // 4. Fetch details for the active loan (installments, product, officer)
     const installmentsQuery = useMemoFirebase(() => {
         if (!activeLoan) return null;
         return collection(firestore, 'loans', activeLoan.id, 'installments');
     }, [firestore, activeLoan]);
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
+    
+    const productRef = useMemoFirebase(() => {
+        if (!activeLoan) return null;
+        return doc(firestore, 'loanProducts', activeLoan.loanProductId);
+    }, [firestore, activeLoan]);
+    const { data: loanProduct, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
 
     const loanOfficerRef = useMemoFirebase(() => {
         if (!activeLoan) return null;
@@ -61,6 +90,7 @@ export default function MyDashboardPage() {
     }, [firestore, activeLoan]);
     const { data: loanOfficer, isLoading: isLoadingLoanOfficer } = useDoc<LoanOfficer>(loanOfficerRef);
 
+    // 5. Compute derived data for the dashboard
     const { 
         nextDueDate, 
         nextInstallmentAmount, 
@@ -72,13 +102,13 @@ export default function MyDashboardPage() {
      } = useMemo(() => {
         if (!installments || !activeLoan) {
             return { 
-                nextDueDate: '-', 
+                nextDueDate: null, 
                 nextInstallmentAmount: 0, 
                 totalPaid: 0, 
                 totalOutstanding: 0, 
                 progress: 0,
                 upcomingInstallments: [],
-                achievements: { totalPayments: 0, isPromptPayer: false }
+                achievements: { totalPayments: 0, isPromptPayer: false, hasCompletedLoan: false }
             };
         }
         
@@ -88,23 +118,24 @@ export default function MyDashboardPage() {
 
         const nextInstallment = sortedUpcoming[0];
         const totalPaid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
-        const progress = activeLoan.principal > 0 ? (totalPaid / activeLoan.principal) * 100 : 0;
+        const progress = activeLoan.totalPayable > 0 ? (totalPaid / activeLoan.totalPayable) * 100 : 0;
 
         const totalPaymentsMade = installments.filter(i => i.status === 'Paid').length;
         const isPromptPayer = !installments.some(i => i.status === 'Overdue');
+        const hasCompletedLoan = allLoans?.some(l => l.status === 'Completed') || false;
 
         return {
-            nextDueDate: nextInstallment ? new Date(nextInstallment.dueDate).toLocaleDateString() : 'N/A',
-            nextInstallmentAmount: nextInstallment ? nextInstallment.expectedAmount : 0,
+            nextDueDate: nextInstallment ? new Date(nextInstallment.dueDate) : null,
+            nextInstallmentAmount: nextInstallment ? nextInstallment.expectedAmount - nextInstallment.paidAmount : 0,
             totalPaid: totalPaid,
             totalOutstanding: activeLoan.totalPayable - totalPaid,
             progress: progress,
             upcomingInstallments: sortedUpcoming.slice(0, 3),
-            achievements: { totalPayments: totalPaymentsMade, isPromptPayer }
+            achievements: { totalPayments: totalPaymentsMade, isPromptPayer, hasCompletedLoan }
         };
-    }, [installments, activeLoan]);
+    }, [installments, activeLoan, allLoans]);
 
-    const isLoading = isLoadingBorrower || isLoadingLoans || isLoadingInstallments || isLoadingLoanOfficer;
+    const isLoading = isLoadingBorrower || isLoadingLoans || isLoadingInstallments || isLoadingLoanOfficer || isLoadingProduct;
 
     if (isLoading) {
         return (
@@ -137,98 +168,54 @@ export default function MyDashboardPage() {
                 <p className="text-muted-foreground">Here’s a summary of your financial dashboard.</p>
             </div>
             
-            {!activeLoan && (
-                 <Card className="mt-6 text-center py-12">
-                    <CardHeader>
-                        <CardTitle>No Active Loan</CardTitle>
-                        <CardDescription className="max-w-md mx-auto">You don&apos;t have any active loans right now. If you&apos;re interested in a new loan, please contact your loan officer.</CardDescription>
-                    </CardHeader>
-                </Card>
-            )}
+            <div className="grid gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-2 space-y-6">
+                    {!activeLoan && !pendingLoan && (
+                        <Card className="text-center py-12">
+                            <CardHeader>
+                                <CardTitle>No Active Loans</CardTitle>
+                                <CardDescription className="max-w-md mx-auto">You don&apos;t have any active or pending loans right now. If you&apos;re interested in a new loan, please contact your loan officer.</CardDescription>
+                            </CardHeader>
+                        </Card>
+                    )}
 
-            {activeLoan && (
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                           <div className="flex justify-between items-start">
-                             <div>
-                                <CardTitle>Active Loan Summary</CardTitle>
-                                <CardDescription>Your current loan progress.</CardDescription>
-                             </div>
-                             <Button asChild variant="secondary" size="sm">
-                                <Link href={`/my-loans/${activeLoan.id}`}>View Details</Link>
-                             </Button>
-                           </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div>
-                                <div className="flex justify-between items-center mb-2 text-sm">
+                    {activeLoan && loanProduct && (
+                        <>
+                        <Card>
+                            <CardHeader>
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                    <CardTitle className="text-xl">{loanProduct.name}</CardTitle>
+                                    <CardDescription>Your active loan progress.</CardDescription>
+                                    </div>
+                                    <Button asChild variant="secondary" size="sm">
+                                    <Link href={`/my-loans/${activeLoan.id}`}>View Details</Link>
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Progress value={progress} className="h-3" />
+                                <div className="flex justify-between items-center text-sm">
                                     <span className="text-muted-foreground">Paid</span>
                                     <span className="font-medium text-foreground">{formatCurrency(totalPaid)} of {formatCurrency(activeLoan.totalPayable)}</span>
                                 </div>
-                                <Progress value={progress} className="h-3" />
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 text-center">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Next Due Date</p>
-                                    <p className="text-lg font-semibold">{nextDueDate}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Next Payment</p>
-                                    <p className="text-lg font-semibold text-primary">{formatCurrency(nextInstallmentAmount)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Outstanding</p>
-                                    <p className="text-lg font-semibold">{formatCurrency(totalOutstanding)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <StatCard title="Next Payment Due" value={nextDueDate ? format(nextDueDate, 'MMM dd, yyyy') : 'N/A'} icon={CalendarDays} description={nextDueDate ? formatDistanceToNow(nextDueDate, { addSuffix: true }) : 'Fully Paid'} />
+                            <StatCard title="Next Payment Amount" value={formatCurrency(nextInstallmentAmount)} icon={Wallet} description="Amount remaining for installment" />
+                            <StatCard title="Outstanding Balance" value={formatCurrency(totalOutstanding)} icon={Hourglass} description="Total remaining on loan" />
+                        </div>
 
-                    <div className="space-y-6">
                         <Card>
-                             <CardHeader className="pb-4">
-                                <CardTitle className="text-base flex items-center gap-2"><Trophy className="text-amber-500" /> Achievements</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4">
-                                <div className="text-center bg-muted/50 p-4 rounded-lg">
-                                    <p className="text-3xl font-bold">{achievements.totalPayments}</p>
-                                    <p className="text-xs text-muted-foreground">Payments Made</p>
-                                </div>
-                                {achievements.isPromptPayer ? (
-                                    <div className="text-center bg-green-500/10 text-green-700 p-4 rounded-lg">
-                                        <p className="text-xl font-bold">Prompt Payer</p>
-                                        <p className="text-xs">No overdue payments!</p>
-                                    </div>
-                                ) : (
-                                     <div className="text-center bg-destructive/10 text-destructive p-4 rounded-lg">
-                                        <p className="text-xl font-bold">Catch Up</p>
-                                        <p className="text-xs">You have overdue payments.</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                         <Card>
-                             <CardHeader className="pb-4">
-                                <CardTitle className="text-base flex items-center gap-2"><Lightbulb className="text-blue-500" /> Financial Tip</CardTitle>
-                            </CardHeader>
+                            <CardHeader><CardTitle>Upcoming Payments</CardTitle></CardHeader>
                             <CardContent>
-                                <p className="text-sm text-muted-foreground">{randomTip || 'Loading tip...'}</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Upcoming Payments</CardTitle>
-                            <CardDescription>Your next three due installments.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                             <Table>
+                                <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Due Date</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">Amount Due</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -242,15 +229,57 @@ export default function MyDashboardPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                            </CardContent>
+                        </Card>
+                        </>
+                    )}
+                    
+                    {pendingLoan && (
+                        <Card>
+                            <CardHeader className="flex-row items-center gap-4 space-y-0">
+                                <div className="p-3 bg-secondary rounded-full"><Hourglass className="w-6 h-6 text-primary"/></div>
+                                <div>
+                                    <CardTitle>Loan Application Pending</CardTitle>
+                                    <CardDescription>Your loan application submitted on {format(new Date(pendingLoan.issueDate), 'MMM dd, yyyy')} is currently under review.</CardDescription>
+                                </div>
+                            </CardHeader>
+                        </Card>
+                    )}
+                </div>
+
+                <div className="lg:col-span-1 space-y-6">
+                    <Card>
+                        <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+                        <CardContent className="flex flex-col gap-2">
+                             <Button disabled={!activeLoan}><Wallet className="mr-2 h-4 w-4"/> Make a Payment</Button>
+                             <Button variant="outline" asChild><Link href="/my-loans"><History className="mr-2 h-4 w-4"/> View Loan History</Link></Button>
+                             <Button variant="outline" disabled={!!activeLoan}><PlusCircle className="mr-2 h-4 w-4"/> Apply for a New Loan</Button>
                         </CardContent>
                     </Card>
 
+                    <Card>
+                         <CardHeader><CardTitle className="text-base flex items-center gap-2"><Sparkles className="text-amber-500" /> Achievements</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className={`flex items-center gap-3 p-3 rounded-lg ${achievements.isPromptPayer && activeLoan ? 'bg-green-500/10' : 'bg-muted'}`}>
+                                <ShieldCheck className={`w-6 h-6 ${achievements.isPromptPayer && activeLoan ? 'text-green-600' : 'text-muted-foreground'}`}/>
+                                <div>
+                                    <p className="text-sm font-semibold">Prompt Payer</p>
+                                    <p className="text-xs text-muted-foreground">You have no overdue payments.</p>
+                                </div>
+                            </div>
+                             <div className={`flex items-center gap-3 p-3 rounded-lg ${achievements.hasCompletedLoan ? 'bg-green-500/10' : 'bg-muted'}`}>
+                                <Trophy className={`w-6 h-6 ${achievements.hasCompletedLoan ? 'text-green-600' : 'text-muted-foreground'}`}/>
+                                <div>
+                                    <p className="text-sm font-semibold">Loan Veteran</p>
+                                    <p className="text-xs text-muted-foreground">You have successfully paid off loans.</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    
                     {loanOfficer && (
                         <Card>
-                             <CardHeader>
-                                <CardTitle>Your Loan Officer</CardTitle>
-                                <CardDescription>Your primary contact for any questions.</CardDescription>
-                            </CardHeader>
+                             <CardHeader><CardTitle>Your Loan Officer</CardTitle></CardHeader>
                              <CardContent className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <User className="w-5 h-5 text-muted-foreground"/>
@@ -258,14 +287,19 @@ export default function MyDashboardPage() {
                                 </div>
                                  <div className="flex items-center gap-4">
                                     <Mail className="w-5 h-5 text-muted-foreground"/>
-                                    <span className="text-muted-foreground">{loanOfficer.email}</span>
+                                    <a href={`mailto:${loanOfficer.email}`} className="text-muted-foreground hover:underline">{loanOfficer.email}</a>
                                 </div>
                                 <Button className="w-full">Send Message</Button>
                             </CardContent>
                         </Card>
                     )}
+
+                    <Card>
+                        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Lightbulb className="text-blue-500" /> Financial Tip</CardTitle></CardHeader>
+                        <CardContent><p className="text-sm text-muted-foreground">{randomTip}</p></CardContent>
+                    </Card>
                 </div>
-            )}
+            </div>
         </div>
     )
 }
