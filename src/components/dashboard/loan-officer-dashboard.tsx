@@ -1,7 +1,7 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
+import { collection, query, where, documentId } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, LoanProduct, Repayment } from '@/lib/types';
 import { Button } from '../ui/button';
 import { HandCoins, PlusCircle, UserPlus, Info } from 'lucide-react';
@@ -15,7 +15,12 @@ import { formatCurrency } from '@/lib/utils';
 import { PerformanceTracker } from './loan-officer/PerformanceTracker';
 import { LoanPipeline } from './loan-officer/LoanPipeline';
 import { RecentActivity } from './loan-officer/RecentActivity';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { subMonths, format } from 'date-fns';
+import { DualTrendChart } from './loan-officer/DualTrendChart';
+import { PortfolioMixChart } from './loan-officer/PortfolioMixChart';
+import { LifetimeStats } from './loan-officer/LifetimeStats';
+import { CollectionEfficiencyGauge } from './loan-officer/CollectionEfficiencyGauge';
+import { TopBorrowers } from './loan-officer/TopBorrowers';
 
 
 export function LoanOfficerDashboard() {
@@ -36,17 +41,12 @@ export function LoanOfficerDashboard() {
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
 
   // 2. Get borrowers associated with those loans.
-  // This query now correctly depends on `loans` being fetched first.
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || loansLoading) return null; // Wait for loans to be loaded
-    
+    if (!firestore || loansLoading) return null; 
     const borrowerIds = loans ? [...new Set(loans.map(l => l.borrowerId))] : [];
     if (borrowerIds.length === 0) {
-      // If there are no borrowers, return a query that will result in an empty set.
       return query(collection(firestore, 'borrowers'), where(documentId(), '==', 'no-borrowers-found'));
     }
-    
-    // Firestore 'in' queries are limited to 30 items. We slice to prevent an error.
     return query(collection(firestore, 'borrowers'), where(documentId(), 'in', borrowerIds.slice(0, 30)));
   }, [firestore, loans, loansLoading]);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
@@ -65,36 +65,87 @@ export function LoanOfficerDashboard() {
   // Overall loading state
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading || repaymentsLoading;
   
-  // --- DATA PROCESSING ---
-  const portfolioStats = useMemo(() => {
-    if (!loans || !borrowers) return { activeLoans: 0, portfolioValue: 0, avgLoanSize: 0, borrowerCount: 0 };
+  // --- DATA PROCESSING FOR DASHBOARD ---
+  const dashboardData = useMemo(() => {
+    if (isLoading || !loans || !borrowers || !repayments || !allLoanProducts) return null;
     
+    // Top-level stats
     const activeLoans = loans.filter(l => l.status === 'Active');
     const portfolioValue = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
     const avgLoanSize = activeLoans.length > 0 ? portfolioValue / activeLoans.length : 0;
     
-    return {
-      activeLoans: activeLoans.length,
-      portfolioValue,
-      avgLoanSize,
-      borrowerCount: borrowers.length,
-    }
-  }, [loans, borrowers]);
-
-  const topProducts = useMemo(() => {
-    if (!loans || !allLoanProducts) return [];
-    const productCount = loans.reduce((acc, loan) => {
-        acc[loan.loanProductId] = (acc[loan.loanProductId] || 0) + 1;
+    // For Dual Trend Chart
+    const today = new Date();
+    const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
+    const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
+    
+    const disbursalByMonth = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
+        const month = format(new Date(loan.issueDate), 'MMM yy');
+        acc[month] = (acc[month] || 0) + loan.principal;
         return acc;
     }, {} as Record<string, number>);
 
+    const collectionsByMonth = repayments.reduce((acc, repayment) => {
+        const month = format(new Date(repayment.paymentDate), 'MMM yy');
+        acc[month] = (acc[month] || 0) + repayment.amount;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const dualTrendData = monthLabels.map(month => ({
+        name: month,
+        disbursed: disbursalByMonth[month] || 0,
+        collected: collectionsByMonth[month] || 0,
+    }));
+
+    // For Portfolio Mix Chart
     const productsMap = new Map(allLoanProducts.map(p => [p.id, p.name]));
-    
-    return Object.entries(productCount)
-        .map(([id, count]) => ({ name: productsMap.get(id) || 'Unknown Product', count }))
-        .sort((a,b) => b.count - a.count)
-        .slice(0, 3);
-  }, [loans, allLoanProducts]);
+    const loanCountsByProduct = activeLoans.reduce((acc, loan) => {
+        const productName = productsMap.get(loan.loanProductId) || 'Unknown Product';
+        acc[productName] = (acc[productName] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const portfolioMixData = Object.entries(loanCountsByProduct).map(([name, value]) => ({ name, value }));
+
+    // For Lifetime Stats & Collection Gauge
+    const totalPrincipalDisbursed = loans.reduce((sum, l) => sum + l.principal, 0);
+    const totalRepaymentsCollected = repayments.reduce((sum, r) => sum + r.amount, 0);
+    const collectionEfficiency = totalPrincipalDisbursed > 0 ? (totalRepaymentsCollected / totalPrincipalDisbursed) * 100 : 0;
+
+    // For Top Borrowers
+    const borrowersMap = new Map(borrowers.map(b => [b.id, { name: b.fullName, avatar: b.photoUrl }]));
+    const principalByBorrower = loans.reduce((acc, loan) => {
+        acc[loan.borrowerId] = (acc[loan.borrowerId] || 0) + loan.principal;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const topBorrowersData = Object.entries(principalByBorrower)
+        .map(([id, amount]) => ({
+            id,
+            name: borrowersMap.get(id)?.name || 'Unknown Borrower',
+            avatar: borrowersMap.get(id)?.avatar || `https://picsum.photos/seed/${id}/100`,
+            amount,
+        }))
+        .sort((a,b) => b.amount - a.amount)
+        .slice(0, 5);
+        
+    return {
+        statCards: {
+            activeLoans: activeLoans.length,
+            portfolioValue,
+            avgLoanSize,
+            borrowerCount: borrowers.length,
+        },
+        dualTrendData,
+        portfolioMixData,
+        lifetimeStats: {
+            totalLoans: loans.length,
+            totalPrincipalDisbursed,
+            totalRepaymentsCollected,
+        },
+        collectionEfficiency,
+        topBorrowersData
+    }
+  }, [loans, borrowers, repayments, allLoanProducts, isLoading]);
 
 
   return (
@@ -121,34 +172,30 @@ export function LoanOfficerDashboard() {
       
       <div className="p-4 md:p-6 grid gap-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="My Portfolio Value" value={formatCurrency(portfolioStats.portfolioValue, 'KES')} icon={Landmark} featured isLoading={isLoading} />
-            <StatCard title="My Active Loans" value={portfolioStats.activeLoans} icon={AlertTriangle} isLoading={isLoading} />
-            <StatCard title="My Borrowers" value={portfolioStats.borrowerCount} icon={Users} isLoading={isLoading} />
-            <StatCard title="Avg. Loan Size" value={formatCurrency(portfolioStats.avgLoanSize, 'KES')} icon={Scale} isLoading={isLoading} />
+            <StatCard title="My Portfolio Value" value={formatCurrency(dashboardData?.statCards.portfolioValue || 0, 'KES')} icon={Landmark} featured isLoading={isLoading} />
+            <StatCard title="My Active Loans" value={dashboardData?.statCards.activeLoans || 0} icon={AlertTriangle} isLoading={isLoading} />
+            <StatCard title="My Borrowers" value={dashboardData?.statCards.borrowerCount || 0} icon={Users} isLoading={isLoading} />
+            <StatCard title="Avg. Loan Size" value={formatCurrency(dashboardData?.statCards.avgLoanSize || 0, 'KES')} icon={Scale} isLoading={isLoading} />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <PerformanceTracker loans={loans} borrowers={borrowers} isLoading={isLoading} />
-            <Card>
-                <CardHeader>
-                    <CardTitle>Action Center</CardTitle>
-                    <CardDescription>A prioritized list of borrowers who require your attention.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center text-center h-full min-h-[150px]">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Info className="h-8 w-8" />
-                        <p className="text-sm max-w-xs">
-                            The Action Center is disabled because it requires a database index. Please ask your administrator to create the required index in Firestore.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-          </div>
-          <div className="space-y-6">
-              <LoanPipeline loans={loans} isLoading={isLoading} />
-              <RecentActivity loans={loans} borrowers={borrowers} repayments={repayments} isLoading={isLoading || repaymentsLoading} />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className='lg:col-span-2 space-y-6'>
+                <DualTrendChart data={dashboardData?.dualTrendData} isLoading={isLoading} />
+                <LoanPipeline loans={loans} isLoading={isLoading} />
+            </div>
+            <div className='lg:col-span-1 space-y-6'>
+                <PerformanceTracker loans={loans} borrowers={borrowers} isLoading={isLoading} />
+                <PortfolioMixChart data={dashboardData?.portfolioMixData} isLoading={isLoading} />
+                <CollectionEfficiencyGauge value={dashboardData?.collectionEfficiency || 0} isLoading={isLoading} />
+                <LifetimeStats 
+                    totalLoans={dashboardData?.lifetimeStats.totalLoans || 0}
+                    totalPrincipal={dashboardData?.lifetimeStats.totalPrincipalDisbursed || 0}
+                    totalCollected={dashboardData?.lifetimeStats.totalRepaymentsCollected || 0}
+                    isLoading={isLoading}
+                />
+                <TopBorrowers data={dashboardData?.topBorrowersData} isLoading={isLoading} />
+                <RecentActivity loans={loans} borrowers={borrowers} repayments={repayments} isLoading={isLoading} />
+            </div>
         </div>
       </div>
       
