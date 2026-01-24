@@ -29,11 +29,11 @@ export function ManagerDashboard() {
 
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore || branchIds.length === 0) return null;
-      // This query is simplified to avoid requiring a composite index.
-      // Filtering by status is now done on the client-side.
+      // This uses a collection group query and requires a composite index.
       return query(
         collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds)
+        where('branchId', 'in', branchIds), 
+        where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
       );
   }, [firestore, branchIds]);
 
@@ -45,17 +45,13 @@ export function ManagerDashboard() {
 
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: allInstallments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
 
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading;
 
   const dueInstallmentsWithDetails = useMemo(() => {
-    if (!allInstallments || !borrowers || !loans) return [];
-    
-    const dueStatuses: Installment['status'][] = ['Overdue', 'Unpaid', 'Partial'];
-    const installments = allInstallments.filter(inst => dueStatuses.includes(inst.status));
-    
+    if (!installments || !borrowers) return [];
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
 
     return installments
@@ -69,13 +65,7 @@ export function ManagerDashboard() {
         };
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [allInstallments, borrowers, loans]);
-
-  const overviewInstallments = useMemo(() => {
-    // For overview cards, we use all installments for the branch.
-    return allInstallments;
-  }, [allInstallments]);
-
+  }, [installments, borrowers, loans]);
 
   const aiInput = useMemo((): DueDateMonitoringInput => {
     const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');
@@ -101,7 +91,7 @@ export function ManagerDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <OverviewCards
           loans={loans}
-          installments={overviewInstallments}
+          installments={installments}
           borrowers={borrowers}
           regPayments={regPayments}
           isLoading={isLoading}
