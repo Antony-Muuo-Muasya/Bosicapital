@@ -1,7 +1,7 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, LoanProduct, Repayment } from '@/lib/types';
 import { Button } from '../ui/button';
 import { HandCoins, PlusCircle, UserPlus } from 'lucide-react';
@@ -28,27 +28,43 @@ export function LoanOfficerDashboard() {
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
 
   // --- DATA QUERIES ---
-  // Base data for the loan officer
+
+  // 1. Get loans for the current officer
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'loans'), where('loanOfficerId', '==', user.uid));
   }, [firestore, user]);
+  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
 
+  // 2. Get borrowers associated with those loans.
+  // This query now correctly depends on `loans` being fetched first.
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !user || !userProfile?.branchIds?.length) return null;
-    return query(collection(firestore, 'borrowers'), where('branchId', 'in', userProfile.branchIds), where('userId', 'in', loans?.map(l => l.borrowerId).slice(0,30) || []));
-  }, [firestore, user, userProfile, loans]);
-  
-  // Data for dialogs and general context
-  const allLoanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+    if (!firestore || loansLoading) return null; // Wait for loans to be loaded
+    
+    const borrowerIds = loans ? [...new Set(loans.map(l => l.borrowerId))] : [];
+    if (borrowerIds.length === 0) {
+      // If there are no borrowers, return a query that will result in an empty set.
+      return query(collection(firestore, 'borrowers'), where(documentId(), '==', 'no-borrowers-found'));
+    }
+    
+    // Firestore 'in' queries are limited to 30 items. We slice to prevent an error.
+    return query(collection(firestore, 'borrowers'), where(documentId(), 'in', borrowerIds.slice(0, 30)));
+  }, [firestore, loans, loansLoading]);
+  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
 
-  // Data for activity feed
+  // 3. Get all loan products (for dialogs)
+  const allLoanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+  const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
+
+  // 4. Get repayments collected by the current officer
   const repaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'repayments'), where('collectedById', '==', user.uid));
   }, [firestore, user]);
+  const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
 
-  // --- ADVANCED QUERIES (may require indexes) ---
+
+  // 5. Get all installments for the officer's loans (may require index)
   const loanIds = useMemo(() => loans?.map(l => l.id) || [], [loans]);
   
   const installmentsQuery = useMemoFirebase(() => {
@@ -56,15 +72,9 @@ export function LoanOfficerDashboard() {
     // NOTE: This query requires a composite index on the 'installments' collection group.
     return query(collectionGroup(firestore, 'installments'), where('loanId', 'in', loanIds));
   }, [firestore, loanIds]);
-
-
-  // --- HOOKS ---
-  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
-  const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
   const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
 
+  // Overall loading state
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading || repaymentsLoading;
   
   // --- DATA PROCESSING ---
