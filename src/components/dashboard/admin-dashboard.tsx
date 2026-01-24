@@ -170,11 +170,6 @@ export function AdminDashboard() {
             regPayments={regPayments}
             isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-            <PortfolioStatusChart data={dashboardData?.portfolioStatusData} isLoading={isLoading} />
-            <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
-            <CustomerGrowthChart data={dashboardData?.customerGrowthData} isLoading={isLoading} />
-        </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <RecentActivity loans={loans} borrowers={borrowers} isLoading={isLoading} />
             <BranchPerformance loans={loans} branches={branches} isLoading={isLoading} />
@@ -182,8 +177,17 @@ export function AdminDashboard() {
         </div>
          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
-            <UserRolesChart users={users} roles={roles} isLoading={isLoading} />
-            <CategoryDistributionChart data={dashboardData?.categoryDistributionData} isLoading={isLoading} />
+         </div>
+         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+                <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
+            </div>
+            <CustomerGrowthChart data={dashboardData?.customerGrowthData} isLoading={isLoading} />
+        </div>
+         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+           <PortfolioStatusChart data={dashboardData?.portfolioStatusData} isLoading={isLoading} />
+           <UserRolesChart users={users} roles={roles} isLoading={isLoading} />
+           <CategoryDistributionChart data={dashboardData?.categoryDistributionData} isLoading={isLoading} />
          </div>
       </div>
       <AddLoanProductDialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen} />

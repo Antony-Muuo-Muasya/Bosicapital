@@ -14,7 +14,7 @@ const CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--c
 export function PortfolioStatusChart({ data, isLoading }: PortfolioStatusChartProps) {
     if (isLoading) {
         return (
-             <Card className="lg:col-span-2">
+             <Card>
                 <CardHeader>
                     <Skeleton className="h-6 w-1/2" />
                     <Skeleton className="h-4 w-3/4" />
@@ -28,7 +28,7 @@ export function PortfolioStatusChart({ data, isLoading }: PortfolioStatusChartPr
 
     if (!data || data.length === 0) {
          return (
-            <Card className="lg:col-span-2">
+            <Card>
                 <CardHeader>
                     <CardTitle>Portfolio Status</CardTitle>
                     <CardDescription>Distribution of loans by status.</CardDescription>
@@ -41,7 +41,7 @@ export function PortfolioStatusChart({ data, isLoading }: PortfolioStatusChartPr
     }
     
   return (
-    <Card className="lg:col-span-2">
+    <Card>
         <CardHeader>
             <CardTitle>Portfolio Status</CardTitle>
             <CardDescription>Distribution of loans by status.</CardDescription>

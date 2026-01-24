@@ -13,7 +13,7 @@ interface DisbursalTrendChartProps {
 export function DisbursalTrendChart({ data, isLoading }: DisbursalTrendChartProps) {
      if (isLoading) {
         return (
-             <Card className="lg:col-span-3">
+             <Card>
                 <CardHeader>
                     <Skeleton className="h-6 w-1/2" />
                     <Skeleton className="h-4 w-3/4" />
@@ -27,7 +27,7 @@ export function DisbursalTrendChart({ data, isLoading }: DisbursalTrendChartProp
     
     if (!data || data.length === 0) {
         return (
-           <Card className="lg:col-span-3">
+           <Card>
                <CardHeader>
                    <CardTitle>Disbursal Trend</CardTitle>
                    <CardDescription>Monthly loan principal disbursal.</CardDescription>
@@ -40,7 +40,7 @@ export function DisbursalTrendChart({ data, isLoading }: DisbursalTrendChartProp
    }
 
   return (
-    <Card className="lg:col-span-3">
+    <Card>
         <CardHeader>
             <CardTitle>Disbursal Trend</CardTitle>
             <CardDescription>Monthly loan principal disbursal.</CardDescription>
