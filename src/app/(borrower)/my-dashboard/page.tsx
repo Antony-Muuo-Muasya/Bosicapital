@@ -68,7 +68,7 @@ export default function MyDashboardPage() {
         if (!allLoans) return { activeLoan: undefined, pendingLoan: undefined };
         const active = allLoans.find(l => l.status === 'Active');
         const pending = allLoans.find(l => l.status === 'Pending Approval');
-        return { activeLoan, pendingLoan };
+        return { activeLoan: active, pendingLoan: pending };
     }, [allLoans]);
 
     // 4. Fetch details for the active loan (installments, product, officer)
