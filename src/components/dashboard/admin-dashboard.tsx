@@ -15,6 +15,10 @@ import { BranchPerformance } from './admin/branch-performance';
 import { RecentActivity } from './admin/recent-activity';
 import { TopProducts } from './admin/top-products';
 import { UserRolesChart } from './admin/user-roles-chart';
+import { CustomerGrowthChart } from './admin/customer-growth-chart';
+import { CategoryDistributionChart } from './admin/category-distribution-chart';
+import { LoanOfficerLeaderboard, type LeaderboardEntry } from './admin/loan-officer-leaderboard';
+import { subMonths, format } from 'date-fns';
 
 
 export function AdminDashboard() {
@@ -28,7 +32,6 @@ export function AdminDashboard() {
   // Data queries
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !organizationId) return null;
-    // Removed orderBy to prevent query from requiring a composite index
     return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId]);
 
@@ -71,41 +74,72 @@ export function AdminDashboard() {
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
   const { data: roles, isLoading: rolesLoading } = useCollection<Role>(rolesQuery);
 
-
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || productsLoading || usersLoading || branchesLoading || regPaymentsLoading || rolesLoading;
 
   const dashboardData = useMemo(() => {
-    if (isLoading || !loans) return null;
+    if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
 
+    const CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+    // Portfolio Status
     const loanStatusCounts = loans.reduce((acc, loan) => {
         acc[loan.status] = (acc[loan.status] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
-
-    const portfolioStatusData = Object.entries(loanStatusCounts).map(([name, value]) => ({ name, value, fill: `var(--chart-${Object.keys(loanStatusCounts).indexOf(name) + 1})` }));
+    const portfolioStatusData = Object.entries(loanStatusCounts).map(([name, value], index) => ({ name, value, fill: CHART_COLORS[index % CHART_COLORS.length] }));
     
-    // Get last 6 months for trend
-    const last6Months: string[] = [];
+    // Disbursal & Customer Growth Trends (last 6 months)
     const today = new Date();
-    for(let i=5; i>=0; i--) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        last6Months.push(d.toLocaleString('default', { month: 'short', year: '2-digit' }));
-    }
+    const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
+    const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
     
     const disbursalData = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const month = new Date(loan.issueDate).toLocaleString('default', { month: 'short', year: '2-digit' });
+        const month = format(new Date(loan.issueDate), 'MMM yy');
         acc[month] = (acc[month] || 0) + loan.principal;
         return acc;
     }, {} as Record<string, number>);
-    
-    const disbursalTrendData = last6Months.map(month => ({
-        name: month,
-        total: disbursalData[month] || 0
-    }));
-    
-    return { portfolioStatusData, disbursalTrendData };
+    const disbursalTrendData = monthLabels.map(month => ({ name: month, total: disbursalData[month] || 0 }));
 
-  }, [loans, isLoading]);
+    const customerGrowth = borrowers.filter(b => b.registrationFeePaidAt).reduce((acc, borrower) => {
+        const month = format(new Date(borrower.registrationFeePaidAt!), 'MMM yy');
+        acc[month] = (acc[month] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const customerGrowthData = monthLabels.map(month => ({ name: month, total: customerGrowth[month] || 0 }));
+
+
+    // Category Distribution
+    const productsMap = new Map(loanProducts.map(p => [p.id, p.category]));
+    const categoryCounts = loans.reduce((acc, loan) => {
+        const category = productsMap.get(loan.loanProductId) || 'Uncategorized';
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const categoryDistributionData = Object.entries(categoryCounts).map(([name, value], index) => ({ name, value, fill: CHART_COLORS[index % CHART_COLORS.length] }));
+
+    // Loan Officer Leaderboard
+    const officerStats = loans.reduce((acc, loan) => {
+        const officerId = loan.loanOfficerId;
+        if (!acc[officerId]) acc[officerId] = { loanCount: 0, totalPrincipal: 0 };
+        acc[officerId].loanCount++;
+        acc[officerId].totalPrincipal += loan.principal;
+        return acc;
+    }, {} as Record<string, { loanCount: number, totalPrincipal: number }>);
+    
+    const usersMap = new Map(users.map(u => [u.id, u]));
+    const leaderboardData: LeaderboardEntry[] = Object.entries(officerStats)
+        .map(([officerId, stats]) => ({
+            officerId,
+            officerName: usersMap.get(officerId)?.fullName || 'Unknown Officer',
+            officerAvatar: usersMap.get(officerId)?.avatarUrl,
+            ...stats
+        }))
+        .sort((a,b) => b.totalPrincipal - a.totalPrincipal)
+        .slice(0, 5);
+    
+    return { portfolioStatusData, disbursalTrendData, customerGrowthData, categoryDistributionData, leaderboardData };
+
+  }, [loans, borrowers, loanProducts, users, isLoading]);
   
   return (
     <>
@@ -131,23 +165,26 @@ export function AdminDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <OverviewCards 
             loans={loans}
-            installments={null} // Not fetching installments for performance
+            installments={null}
             borrowers={borrowers}
             regPayments={regPayments}
             isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
             <PortfolioStatusChart data={dashboardData?.portfolioStatusData} isLoading={isLoading} />
             <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
+            <CustomerGrowthChart data={dashboardData?.customerGrowthData} isLoading={isLoading} />
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <RecentActivity loans={loans} borrowers={borrowers} isLoading={isLoading} />
             <BranchPerformance loans={loans} branches={branches} isLoading={isLoading} />
-            <div className="space-y-6">
-                <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
-                <UserRolesChart users={users} roles={roles} isLoading={isLoading} />
-            </div>
+            <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
         </div>
+         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
+            <UserRolesChart users={users} roles={roles} isLoading={isLoading} />
+            <CategoryDistributionChart data={dashboardData?.categoryDistributionData} isLoading={isLoading} />
+         </div>
       </div>
       <AddLoanProductDialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen} />
     </>
