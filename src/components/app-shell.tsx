@@ -7,6 +7,13 @@ import { AdooLogo } from '@/components/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -14,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import {
@@ -96,6 +104,7 @@ function SidebarNav() {
 function Header() {
   const auth = useAuth();
   const { user, userProfile } = useUserProfile();
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   
   const displayName = userProfile?.fullName || user?.email;
   const nameParts = userProfile?.fullName?.split(' ') || [];
@@ -106,68 +115,98 @@ function Header() {
 
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="shrink-0 md:hidden">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle navigation menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="flex flex-col">
-          <nav className="grid gap-2 text-lg font-medium">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 text-lg font-semibold mb-4"
-            >
-              <AdooLogo className="h-6 w-6 text-primary" />
-              <span className="font-headline text-xl">Adoo</span>
-            </Link>
-             <SidebarNav />
-          </nav>
-        </SheetContent>
-      </Sheet>
-      <div className="w-full flex-1">
-        {/* Empty div for spacing. Logo is in the sidebar for desktop. */}
-      </div>
-      <Button variant="ghost" size="icon">
-        <Search className="h-5 w-5" />
-        <span className="sr-only">Search</span>
-      </Button>
-      <Button variant="ghost" size="icon">
-        <RefreshCw className="h-5 w-5" />
-        <span className="sr-only">Refresh</span>
-      </Button>
-      <Button variant="ghost" size="icon">
-        <Bell className="h-5 w-5" />
-        <span className="sr-only">Notifications</span>
-      </Button>
-      <ThemeToggle />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="secondary" size="icon" className="rounded-full">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
-              <AvatarFallback>{fallback}</AvatarFallback>
-            </Avatar>
-            <span className="sr-only">Toggle user menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/profile">Profile</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem>Support</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => auth.signOut()}>
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </header>
+    <>
+      <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="shrink-0 md:hidden">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle navigation menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="flex flex-col">
+            <nav className="grid gap-2 text-lg font-medium">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 text-lg font-semibold mb-4"
+              >
+                <AdooLogo className="h-6 w-6 text-primary" />
+                <span className="font-headline text-xl">Adoo</span>
+              </Link>
+               <SidebarNav />
+            </nav>
+          </SheetContent>
+        </Sheet>
+        <div className="w-full flex-1">
+          {/* Empty div for spacing. Logo is in the sidebar for desktop. */}
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(true)}>
+          <Search className="h-5 w-5" />
+          <span className="sr-only">Search</span>
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => window.location.reload()}>
+          <RefreshCw className="h-5 w-5" />
+          <span className="sr-only">Refresh</span>
+        </Button>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                    <Bell className="h-5 w-5" />
+                    <span className="sr-only">Notifications</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="p-4 text-sm text-center text-muted-foreground">
+                    <p>No new notifications</p>
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+        <ThemeToggle />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="secondary" size="icon" className="rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
+                <AvatarFallback>{fallback}</AvatarFallback>
+              </Avatar>
+              <span className="sr-only">Toggle user menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile">Profile</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>Support</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => auth.signOut()}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
+      <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Global Search</DialogTitle>
+                <DialogDescription>
+                    Search for borrowers, loans, and more across the entire application.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+                <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search..." className="pl-8" />
+            </div>
+              <div className="text-center text-xs text-muted-foreground pt-2">
+                <p>Global search is not yet implemented.</p>
+            </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
