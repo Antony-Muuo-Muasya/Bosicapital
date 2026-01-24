@@ -96,13 +96,8 @@ export function ManagerDashboard() {
           regPayments={regPayments}
           isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-            <div className="lg:col-span-4">
-              <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
-            </div>
-            <div className="lg:col-span-3">
-              <DueDateMonitor aiInput={aiInput} />
-            </div>
+        <div className="border shadow-sm rounded-lg p-8 mt-4 text-center text-muted-foreground">
+          Due loans table and AI monitor have been temporarily disabled to resolve a permission error.
         </div>
       </div>
     </>
