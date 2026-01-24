@@ -33,8 +33,7 @@ export function CollectionOverview({ todaysCollectionRate, monthlyCollectionRate
   }
 
   // A check to see if this feature is actually implemented.
-  // In this case, we are showing a message instead of a broken feature.
-  const isImplemented = false; 
+  const isImplemented = true; 
 
   if (!isImplemented) {
     return (
@@ -65,14 +64,14 @@ export function CollectionOverview({ todaysCollectionRate, monthlyCollectionRate
             <div>
                 <div className="flex justify-between items-center mb-1">
                     <p className="text-sm font-medium">Today's Collection Rate</p>
-                    <p className="text-sm font-semibold">{todaysCollectionRate.toFixed(2)}%</p>
+                    <p className="text-sm font-semibold">{todaysCollectionRate.toFixed(1)}%</p>
                 </div>
                 <Progress value={todaysCollectionRate} />
             </div>
             <div>
                 <div className="flex justify-between items-center mb-1">
                     <p className="text-sm font-medium">Monthly Collection Rate</p>
-                    <p className="text-sm font-semibold">{monthlyCollectionRate.toFixed(2)}%</p>
+                    <p className="text-sm font-semibold">{monthlyCollectionRate.toFixed(1)}%</p>
                 </div>
                 <Progress value={monthlyCollectionRate} />
             </div>
