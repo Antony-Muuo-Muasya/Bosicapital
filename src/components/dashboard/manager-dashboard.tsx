@@ -5,10 +5,10 @@ import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment, User, LoanProduct } from '@/lib/types';
 import { useMemo, useState } from 'react';
-import { DisbursalTrendChart } from '../admin/disbursal-trend-chart';
-import { CustomerGrowthChart } from '../admin/customer-growth-chart';
-import { LoanOfficerLeaderboard, type LeaderboardEntry } from '../admin/loan-officer-leaderboard';
-import { TopProducts } from '../admin/top-products';
+import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
+import { CustomerGrowthChart } from './admin/customer-growth-chart';
+import { LoanOfficerLeaderboard, type LeaderboardEntry } from './admin/loan-officer-leaderboard';
+import { TopProducts } from './admin/top-products';
 import { subMonths, format, isToday, isThisMonth } from 'date-fns';
 import { Button } from '../ui/button';
 import { PlusCircle, UserPlus, HandCoins } from 'lucide-react';
