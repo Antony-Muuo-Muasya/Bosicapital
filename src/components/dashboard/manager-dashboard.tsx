@@ -1,19 +1,38 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
+import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Loan, Borrower } from '@/lib/types';
-import { useMemo } from 'react';
-import { ManagerStatsCards } from './manager/stats-cards';
-import { CustomerOverview } from './manager/customer-overview';
-import { LoansOverview } from './manager/loans-overview';
-import { CollectionOverview } from './manager/collection-overview';
+import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import type { Loan, Borrower, Installment, RegistrationPayment, User, LoanProduct } from '@/lib/types';
+import { DueLoansTable } from './due-loans-table';
+import { useMemo, useState } from 'react';
+import { DueDateMonitor } from './due-date-monitor';
+import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
+import { formatCurrency } from '@/lib/utils';
+import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
+import { CustomerGrowthChart } from './admin/customer-growth-chart';
+import { LoanOfficerLeaderboard, type LeaderboardEntry } from './admin/loan-officer-leaderboard';
+import { CategoryDistributionChart } from './admin/category-distribution-chart';
+import { TopProducts } from './admin/top-products';
+import { PortfolioStatusChart } from './admin/portfolio-status-chart';
+import { subMonths, format } from 'date-fns';
+import { Button } from '../ui/button';
+import { PlusCircle, UserPlus, HandCoins } from 'lucide-react';
+import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
+import { AddLoanDialog } from '../loans/add-loan-dialog';
+import { useRouter } from 'next/navigation';
 
 export function ManagerDashboard() {
+  const router = useRouter();
   const firestore = useFirestore();
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
+  const organizationId = userProfile?.organizationId;
   const branchIds = userProfile?.branchIds || [];
 
+  const [isAddBorrowerOpen, setIsAddBorrowerOpen] = useState(false);
+  const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
+
+  // --- Data Queries (scoped to manager's branches) ---
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || branchIds.length === 0) return null;
     return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
@@ -24,90 +43,226 @@ export function ManagerDashboard() {
     return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
   }, [firestore, branchIds]);
 
+  const installmentsQuery = useMemoFirebase(() => {
+      if (!firestore || branchIds.length === 0) return null;
+      // This uses a collection group query and requires a composite index.
+      return query(
+        collectionGroup(firestore, 'installments'), 
+        where('branchId', 'in', branchIds)
+      );
+  }, [firestore, branchIds]);
+
+  const regPaymentsQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
+    // Registration payments may not have branchIds, so query by org and filter later
+    return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId]);
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
+    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId]);
+
+  // Query users to find loan officers in manager's branches.
+  const usersQuery = useMemoFirebase(() => {
+    if (!firestore || branchIds.length === 0) return null;
+    return query(collection(firestore, 'users'), where('branchIds', 'array-contains-any', branchIds));
+  }, [firestore, branchIds]);
+
+  // --- Data Fetching ---
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
+  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
+  const { data: loanProducts, isLoading: productsLoading } = useCollection<LoanProduct>(productsQuery);
+  const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading || productsLoading || usersLoading;
 
-  const dashboardStats = useMemo(() => {
-    if (isLoading || !loans || !borrowers) {
-      return {
-        outstandingLoanBalance: 0,
-        performingLoanBalance: 0,
-        totalCustomers: 0,
-        activeCustomers: 0,
-        inactiveCustomers: 0,
-        disbursedLoans: 0,
-        loansDueToday: 0,
-        monthToDateArrears: 0,
-        outstandingTotalLoanArrears: 0,
-      };
-    }
+  // --- Data Processing for Charts & Tables ---
 
-    const activeLoans = loans.filter(l => l.status === 'Active');
-    
-    // NOTE: Without fetching all installments, we cannot accurately calculate balances or arrears.
-    // These are set to 0 to prevent the app from crashing.
-    const outstandingLoanBalance = 0;
-    const performingLoanBalance = 0;
-    
-    const totalCustomers = borrowers.length;
-    const activeCustomerIds = new Set(activeLoans.map(l => l.borrowerId));
-    const activeCustomers = activeCustomerIds.size;
-    const inactiveCustomers = totalCustomers - activeCustomers;
+  const dueInstallmentsWithDetails = useMemo(() => {
+    if (!installments || !borrowers || !loans) return [];
+    const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
+    const due = installments.filter(i => ['Overdue', 'Unpaid', 'Partial'].includes(i.status));
 
-    const disbursedLoans = activeLoans.length;
+    return due
+      .map(inst => {
+        const loan = loans?.find(l => l.id === inst.loanId);
+        const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
+        return {
+          ...inst,
+          borrowerName: borrower?.fullName || 'Unknown Borrower',
+          borrowerPhotoUrl: borrower?.photoUrl || `https://picsum.photos/seed/${inst.id}/400/400`,
+        };
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [installments, borrowers, loans]);
 
-    // NOTE: The following metrics are not implemented due to query complexity and the need for database indexes.
-    const loansDueToday = 0;
-    const monthToDateArrears = 0;
-    const outstandingTotalLoanArrears = 0;
+  const aiInput = useMemo((): DueDateMonitoringInput => {
+    const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');
+    const upcoming = dueInstallmentsWithDetails.filter(i => i.status === 'Unpaid').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
+    const overdue = dueInstallmentsWithDetails.filter(i => i.status === 'Overdue').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
 
     return {
-      outstandingLoanBalance,
-      performingLoanBalance,
-      totalCustomers,
-      activeCustomers,
-      inactiveCustomers,
-      disbursedLoans,
-      loansDueToday,
-      monthToDateArrears,
-      outstandingTotalLoanArrears,
-    };
-
-  }, [loans, borrowers, isLoading]);
+      repaymentHistory: history || 'No relevant repayment history.',
+      externalEvents: 'No major external events reported.',
+      upcomingSchedule: upcoming || 'No upcoming payments.',
+      overdueSchedule: overdue || 'No overdue payments.',
+      currentSchedule: 'All other loans are current.'
+    }
+  }, [dueInstallmentsWithDetails]);
   
+  const dashboardData = useMemo(() => {
+    if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
+
+    const CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+    // Portfolio Status
+    const loanStatusCounts = loans.reduce((acc, loan) => {
+        acc[loan.status] = (acc[loan.status] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const portfolioStatusData = Object.entries(loanStatusCounts).map(([name, value], index) => ({ name, value, fill: CHART_COLORS[index % CHART_COLORS.length] }));
+    
+    // Disbursal & Customer Growth Trends (last 6 months)
+    const today = new Date();
+    const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
+    const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
+    
+    const disbursalData = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
+        const month = format(new Date(loan.issueDate), 'MMM yy');
+        acc[month] = (acc[month] || 0) + loan.principal;
+        return acc;
+    }, {} as Record<string, number>);
+    const disbursalTrendData = monthLabels.map(month => ({ name: month, total: disbursalData[month] || 0 }));
+
+    const customerGrowth = borrowers.filter(b => b.registrationFeePaidAt).reduce((acc, borrower) => {
+        const month = format(new Date(borrower.registrationFeePaidAt!), 'MMM yy');
+        acc[month] = (acc[month] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const customerGrowthData = monthLabels.map(month => ({ name: month, total: customerGrowth[month] || 0 }));
+
+
+    // Category Distribution
+    const productsMap = new Map(loanProducts.map(p => [p.id, p.category]));
+    const categoryCounts = loans.reduce((acc, loan) => {
+        const category = productsMap.get(loan.loanProductId) || 'Uncategorized';
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const categoryDistributionData = Object.entries(categoryCounts).map(([name, value], index) => ({ name, value, fill: CHART_COLORS[index % CHART_COLORS.length] }));
+
+    // Loan Officer Leaderboard
+    const loanOfficers = users.filter(u => u.roleId === 'loan_officer');
+    const officerStats = loans.reduce((acc, loan) => {
+        const officerId = loan.loanOfficerId;
+        if (!acc[officerId]) acc[officerId] = { loanCount: 0, totalPrincipal: 0 };
+        acc[officerId].loanCount++;
+        acc[officerId].totalPrincipal += loan.principal;
+        return acc;
+    }, {} as Record<string, { loanCount: number, totalPrincipal: number }>);
+    
+    const usersMap = new Map(users.map(u => [u.id, u]));
+    const leaderboardData: LeaderboardEntry[] = loanOfficers
+        .map(officer => ({
+            officerId: officer.id,
+            officerName: officer.fullName,
+            officerAvatar: officer.avatarUrl,
+            loanCount: officerStats[officer.id]?.loanCount || 0,
+            totalPrincipal: officerStats[officer.id]?.totalPrincipal || 0,
+        }))
+        .sort((a,b) => b.totalPrincipal - a.totalPrincipal)
+        .slice(0, 5);
+        
+    // Top Products
+    const productCounts = loans.reduce((acc, loan) => {
+        acc[loan.loanProductId] = (acc[loan.loanProductId] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const productsNameMap = new Map(loanProducts.map(p => [p.id, p.name]));
+    const topProducts = Object.entries(productCounts)
+        .map(([id, count]) => ({
+            name: productsNameMap.get(id) || 'Unknown Product',
+            count
+        }))
+        .sort((a,b) => b.count - a.count)
+        .slice(0, 5);
+
+    return { portfolioStatusData, disbursalTrendData, customerGrowthData, categoryDistributionData, leaderboardData, topProducts };
+
+  }, [loans, borrowers, loanProducts, users, isLoading]);
+
+  const managerRegPayments = useMemo(() => {
+    if (!regPayments || !borrowers) return [];
+    const branchBorrowerIds = new Set(borrowers.map(b => b.id));
+    return regPayments.filter(p => branchBorrowerIds.has(p.borrowerId));
+  }, [regPayments, borrowers]);
+
   return (
     <>
       <PageHeader
         title="Manager Dashboard"
-        description="Overview of your assigned branches."
-      />
+        description="A comprehensive overview of your assigned branches."
+      >
+        <div className='flex items-center gap-2'>
+            <Button onClick={() => setIsAddBorrowerOpen(true)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add Borrower
+            </Button>
+            <Button onClick={() => setIsAddLoanOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Loan
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/repayments')}>
+                <HandCoins className="mr-2 h-4 w-4" />
+                Record Repayment
+            </Button>
+        </div>
+      </PageHeader>
       <div className="p-4 md:p-6 grid gap-6">
-        <ManagerStatsCards 
-            outstandingLoanBalance={dashboardStats.outstandingLoanBalance}
-            performingLoanBalance={dashboardStats.performingLoanBalance}
-            totalCustomers={dashboardStats.totalCustomers}
-            isLoading={isLoading}
+        <OverviewCards
+          loans={loans}
+          installments={installments}
+          borrowers={borrowers}
+          regPayments={managerRegPayments}
+          isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <CustomerOverview 
-                activeCustomers={dashboardStats.activeCustomers}
-                inactiveCustomers={dashboardStats.inactiveCustomers}
-                isLoading={isLoading}
-            />
-            <div className="lg:col-span-2">
-                <LoansOverview
-                    disbursedLoans={dashboardStats.disbursedLoans}
-                    loansDueToday={dashboardStats.loansDueToday}
-                    monthToDateArrears={dashboardStats.monthToDateArrears}
-                    outstandingTotalLoanArrears={dashboardStats.outstandingTotalLoanArrears}
-                    isLoading={isLoading}
-                />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+            <div className="lg:col-span-4">
+              <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
+            </div>
+            <div className="lg:col-span-3">
+              <DueDateMonitor aiInput={aiInput} />
             </div>
         </div>
-        <CollectionOverview todaysCollectionRate={0} monthlyCollectionRate={0} isLoading={false} />
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+            <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
+            <div className="lg:col-span-2">
+                <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
+            </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+                 <CustomerGrowthChart data={dashboardData?.customerGrowthData} isLoading={isLoading} />
+            </div>
+             <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+           <PortfolioStatusChart data={dashboardData?.portfolioStatusData} isLoading={isLoading} />
+           <CategoryDistributionChart data={dashboardData?.categoryDistributionData} isLoading={isLoading} />
+        </div>
       </div>
+
+       <AddBorrowerDialog open={isAddBorrowerOpen} onOpenChange={setIsAddBorrowerOpen} />
+      <AddLoanDialog 
+        open={isAddLoanOpen} 
+        onOpenChange={setIsAddLoanOpen}
+        borrowers={borrowers || []}
+        loanProducts={loanProducts || []}
+        isLoading={isLoading}
+       />
     </>
   );
 }
