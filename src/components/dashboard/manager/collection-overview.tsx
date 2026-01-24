@@ -1,0 +1,82 @@
+'use client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Info } from 'lucide-react';
+
+interface CollectionOverviewProps {
+    todaysCollectionRate: number;
+    monthlyCollectionRate: number;
+    isLoading: boolean;
+}
+
+export function CollectionOverview({ todaysCollectionRate, monthlyCollectionRate, isLoading }: CollectionOverviewProps) {
+  if (isLoading) {
+      return (
+          <Card>
+              <CardHeader>
+                  <CardTitle>Collection Overview</CardTitle>
+                  <CardDescription>Performance on collecting loan repayments.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-4 w-full" />
+                  </div>
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-4 w-full" />
+                  </div>
+              </CardContent>
+          </Card>
+      )
+  }
+
+  // A check to see if this feature is actually implemented.
+  // In this case, we are showing a message instead of a broken feature.
+  const isImplemented = false; 
+
+  if (!isImplemented) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Collection Overview</CardTitle>
+                <CardDescription>Performance on collecting loan repayments.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-center text-center h-full min-h-[150px]">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Info className="h-8 w-8" />
+                    <p className="text-sm max-w-xs">
+                        Collection rate tracking requires further data model enhancements to be implemented efficiently.
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+  }
+
+  return (
+    <Card>
+        <CardHeader>
+            <CardTitle>Collection Overview</CardTitle>
+            <CardDescription>Performance on collecting loan repayments.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            <div>
+                <div className="flex justify-between items-center mb-1">
+                    <p className="text-sm font-medium">Today's Collection Rate</p>
+                    <p className="text-sm font-semibold">{todaysCollectionRate.toFixed(2)}%</p>
+                </div>
+                <Progress value={todaysCollectionRate} />
+            </div>
+            <div>
+                <div className="flex justify-between items-center mb-1">
+                    <p className="text-sm font-medium">Monthly Collection Rate</p>
+                    <p className="text-sm font-semibold">{monthlyCollectionRate.toFixed(2)}%</p>
+                </div>
+                <Progress value={monthlyCollectionRate} />
+            </div>
+        </CardContent>
+    </Card>
+  );
+}
