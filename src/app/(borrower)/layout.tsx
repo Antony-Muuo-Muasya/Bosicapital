@@ -99,7 +99,7 @@ export default function BorrowerLayout({
             <DropdownMenuContent align="end">
             <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link href="/profile">Profile</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href="/my-profile">Profile</Link></DropdownMenuItem>
              <DropdownMenuItem asChild><Link href="/help">
                 <LifeBuoy className="mr-2 h-4 w-4" />
                 <span>Help Center</span>
