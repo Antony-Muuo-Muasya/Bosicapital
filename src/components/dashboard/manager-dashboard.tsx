@@ -4,10 +4,7 @@ import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment, User, LoanProduct } from '@/lib/types';
-import { DueLoansTable } from './due-loans-table';
 import { useMemo, useState } from 'react';
-import { DueDateMonitor } from './due-date-monitor';
-import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
 import { formatCurrency } from '@/lib/utils';
 import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
 import { CustomerGrowthChart } from './admin/customer-growth-chart';
@@ -17,10 +14,11 @@ import { TopProducts } from './admin/top-products';
 import { PortfolioStatusChart } from './admin/portfolio-status-chart';
 import { subMonths, format } from 'date-fns';
 import { Button } from '../ui/button';
-import { PlusCircle, UserPlus, HandCoins } from 'lucide-react';
+import { PlusCircle, UserPlus, HandCoins, Info } from 'lucide-react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
 import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 export function ManagerDashboard() {
   const router = useRouter();
@@ -43,15 +41,6 @@ export function ManagerDashboard() {
     return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
   }, [firestore, branchIds]);
 
-  const installmentsQuery = useMemoFirebase(() => {
-      if (!firestore || branchIds.length === 0) return null;
-      // This uses a collection group query and requires a composite index.
-      return query(
-        collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds)
-      );
-  }, [firestore, branchIds]);
-
   const regPaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !organizationId) return null;
     // Registration payments may not have branchIds, so query by org and filter later
@@ -72,46 +61,17 @@ export function ManagerDashboard() {
   // --- Data Fetching ---
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
   const { data: loanProducts, isLoading: productsLoading } = useCollection<LoanProduct>(productsQuery);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading || productsLoading || usersLoading;
+  // The collectionGroup query for installments has been removed to prevent crashing due to missing indexes.
+  // The 'installments' variable is set to null.
+  const installments: Installment[] | null = null;
+
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || regPaymentsLoading || productsLoading || usersLoading;
 
   // --- Data Processing for Charts & Tables ---
-
-  const dueInstallmentsWithDetails = useMemo(() => {
-    if (!installments || !borrowers || !loans) return [];
-    const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
-    const due = installments.filter(i => ['Overdue', 'Unpaid', 'Partial'].includes(i.status));
-
-    return due
-      .map(inst => {
-        const loan = loans?.find(l => l.id === inst.loanId);
-        const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
-        return {
-          ...inst,
-          borrowerName: borrower?.fullName || 'Unknown Borrower',
-          borrowerPhotoUrl: borrower?.photoUrl || `https://picsum.photos/seed/${inst.id}/400/400`,
-        };
-      })
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [installments, borrowers, loans]);
-
-  const aiInput = useMemo((): DueDateMonitoringInput => {
-    const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');
-    const upcoming = dueInstallmentsWithDetails.filter(i => i.status === 'Unpaid').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
-    const overdue = dueInstallmentsWithDetails.filter(i => i.status === 'Overdue').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
-
-    return {
-      repaymentHistory: history || 'No relevant repayment history.',
-      externalEvents: 'No major external events reported.',
-      upcomingSchedule: upcoming || 'No upcoming payments.',
-      overdueSchedule: overdue || 'No overdue payments.',
-      currentSchedule: 'All other loans are current.'
-    }
-  }, [dueInstallmentsWithDetails]);
   
   const dashboardData = useMemo(() => {
     if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
@@ -229,13 +189,21 @@ export function ManagerDashboard() {
           regPayments={managerRegPayments}
           isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-            <div className="lg:col-span-4">
-              <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
-            </div>
-            <div className="lg:col-span-3">
-              <DueDateMonitor aiInput={aiInput} />
-            </div>
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-1">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Due Payments & AI Analysis</CardTitle>
+                    <CardDescription>Real-time due payments and AI-powered recommendations.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center text-center h-full min-h-[200px]">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Info className="h-8 w-8" />
+                        <p className="text-sm max-w-md">
+                            This feature requires a composite index on the 'installments' collection. A Firestore expert can add this index to enable real-time due payment tracking.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
             <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
