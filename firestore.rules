@@ -4,77 +4,62 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
-    // These functions should only be used in 'allow write' rules
-    // to avoid issues with list queries.
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
+    // --- Helper Function for Write Rules ---
     function getUserRole() {
-      // Check for document existence before trying to access its data.
-      if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
-        return getUserData().roleId;
-      }
-      return 'user'; // Default to least privileged
+      // This function uses `get`, so it should only be used in 'allow write' rules.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId;
     }
 
-
-    // --- Collection Group Rules ---
-    // Rule for the 'installments' collection group query.
-    // Any authenticated user can read from it.
-    match /{path=**}/installments/{installmentId} {
+    // --- Global Read Rule ---
+    // This allows any authenticated user to read/list any document.
+    // This will resolve the "Missing or insufficient permissions" error on list queries.
+    match /{document=**} {
       allow read: if request.auth != null;
-      allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
     }
 
-
-    // --- Individual Collection Rules ---
-
-    // Any authenticated user can read from these top-level collections.
+    // --- Specific Write Rules ---
+    // These rules are evaluated only on write operations (create, update, delete).
+    
     match /users/{userId} {
-      allow read: if request.auth != null;
-      // Users can only write to their own document.
+      // A user can only write to their own document.
       allow write: if request.auth.uid == userId;
     }
 
     match /roles/{roleId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() == 'admin';
     }
 
     match /branches/{branchId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() == 'admin';
     }
 
     match /borrowers/{borrowerId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
     }
 
     match /loans/{loanId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
-      // Note: the rule for the installments subcollection is handled by the collection group rule above.
+    }
+    
+    // Write rule for the installments subcollection.
+    match /loans/{loanId}/installments/{installmentId} {
+        // Admins create installments when approving loans. Managers might need to edit.
+        allow write: if getUserRole() in ['admin', 'manager'];
     }
 
     match /loanProducts/{loanProductId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() == 'admin';
     }
 
     match /repayments/{repaymentId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
     }
     
     match /registrationPayments/{paymentId} {
-      allow read: if request.auth != null;
       allow write: if getUserRole() in ['admin', 'manager', 'loan_officer'];
     }
     
     match /auditLogs/{logId} {
-        allow read: if request.auth != null;
         allow write: if getUserRole() == 'admin';
     }
   }
