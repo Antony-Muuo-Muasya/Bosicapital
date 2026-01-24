@@ -189,22 +189,6 @@ export function ManagerDashboard() {
           regPayments={managerRegPayments}
           isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-1">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Due Payments & AI Analysis</CardTitle>
-                    <CardDescription>Real-time due payments and AI-powered recommendations.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center justify-center text-center h-full min-h-[200px]">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Info className="h-8 w-8" />
-                        <p className="text-sm max-w-md">
-                            This feature requires a composite index on the 'installments' collection. A Firestore expert can add this index to enable real-time due payment tracking.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
             <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
             <div className="lg:col-span-2">
