@@ -3,7 +3,7 @@ import type { Branch } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,7 @@ import { Badge } from '../ui/badge';
 const BranchActions = ({ branch, onEdit }: { branch: Branch, onEdit: (branch: Branch) => void }) => {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { userProfile } = useUserProfile();
 
   const handleDelete = () => {
     if (branch.isMain) {
@@ -39,9 +40,11 @@ const BranchActions = ({ branch, onEdit }: { branch: Branch, onEdit: (branch: Br
         <DropdownMenuItem onClick={() => onEdit(branch)}>
           Edit Branch
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleDelete} className="text-destructive" disabled={branch.isMain}>
-          Delete Branch
-        </DropdownMenuItem>
+        {userProfile?.roleId === 'admin' && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive" disabled={branch.isMain}>
+                Delete Branch
+            </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

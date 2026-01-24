@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 import type { Branch } from '@/lib/types';
 import { getBranchColumns } from './branch-columns';
 import { Button } from '../ui/button';
@@ -15,23 +15,44 @@ import { EditBranchDialog } from './edit-branch-dialog';
 
 export function BranchManagement() {
     const firestore = useFirestore();
+    const { userProfile, isLoading: isProfileLoading } = useUserProfile();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
 
-    const branchesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'branches') : null, [firestore]);
-    const { data: branches, isLoading } = useCollection<Branch>(branchesQuery);
+    const branchesQuery = useMemoFirebase(() => {
+        if (!firestore || !userProfile) return null;
+        
+        const branchesCol = collection(firestore, 'branches');
+        const orgId = userProfile.organizationId;
+
+        if (userProfile.roleId === 'admin') {
+            return query(branchesCol, where('organizationId', '==', orgId));
+        }
+
+        if (userProfile.roleId === 'manager' && userProfile.branchIds?.length > 0) {
+            return query(branchesCol, where('organizationId', '==', orgId), where('id', 'in', userProfile.branchIds));
+        }
+
+        // For other roles or managers with no branches, return a query that finds nothing.
+        return query(branchesCol, where('id', '==', 'no-branches-found'));
+    }, [firestore, userProfile]);
+
+    const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
+    const isLoading = isProfileLoading || areBranchesLoading;
 
     const handleEdit = (branch: Branch) => {
         setEditingBranch(branch);
     }
     
-    const columns = useMemo(() => getBranchColumns(handleEdit), [handleEdit]);
+    const columns = useMemo(() => getBranchColumns(handleEdit), []);
 
     const table = useReactTable({
         data: branches || [],
         columns,
         getCoreRowModel: getCoreRowModel(),
     });
+
+    const canAddBranches = userProfile?.roleId === 'admin';
 
   return (
     <>
@@ -42,10 +63,12 @@ export function BranchManagement() {
                     <CardTitle>Branch Management</CardTitle>
                     <CardDescription>Manage your organization's branches.</CardDescription>
                 </div>
-                <Button onClick={() => setIsAddDialogOpen(true)}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Branch
-                </Button>
+                {canAddBranches && (
+                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Branch
+                    </Button>
+                )}
             </div>
         </CardHeader>
         <CardContent>
@@ -82,7 +105,7 @@ export function BranchManagement() {
                     {!isLoading && (!branches || branches.length === 0) && (
                         <TableRow>
                             <TableCell colSpan={columns.length} className="h-24 text-center">
-                                No branches found. Start by adding one.
+                                No branches found.
                             </TableCell>
                         </TableRow>
                     )}
@@ -91,7 +114,7 @@ export function BranchManagement() {
             </div>
         </CardContent>
     </Card>
-    <AddBranchDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
+    {canAddBranches && <AddBranchDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />}
     {editingBranch && (
         <EditBranchDialog 
             branch={editingBranch}

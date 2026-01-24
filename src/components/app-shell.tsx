@@ -45,7 +45,7 @@ const allNavItems = [
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager'] },
   { href: '/users', label: 'Users', icon: UserCog, roles: ['admin'] },
-  { href: '/branches', label: 'Branches', icon: Building, roles: ['admin'] },
+  { href: '/branches', label: 'Branches', icon: Building, roles: ['admin', 'manager'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ];
 

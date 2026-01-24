@@ -11,7 +11,7 @@ const staffRoles = ['admin', 'manager', 'loan_officer'];
 const routePermissions = {
     '/users': ['admin'],
     '/settings': ['admin'],
-    '/branches': ['admin'],
+    '/branches': ['admin', 'manager'],
     '/loan-products': ['admin'], // Assuming this will be a page
     '/approvals': ['admin'],
     '/reports': ['admin', 'manager'],
