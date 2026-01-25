@@ -2,21 +2,19 @@
 import { PageHeader } from '@/components/page-header';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Loan, Borrower, Installment, RegistrationPayment, User, LoanProduct } from '@/lib/types';
+import { collection, query, where } from 'firebase/firestore';
+import type { Loan, Borrower, RegistrationPayment, User, LoanProduct } from '@/lib/types';
 import { useMemo, useState } from 'react';
 import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
 import { CustomerGrowthChart } from './admin/customer-growth-chart';
 import { LoanOfficerLeaderboard, type LeaderboardEntry } from './admin/loan-officer-leaderboard';
 import { TopProducts } from './admin/top-products';
-import { subMonths, format, isToday, isThisMonth } from 'date-fns';
+import { subMonths, format } from 'date-fns';
 import { Button } from '../ui/button';
 import { PlusCircle, UserPlus, HandCoins } from 'lucide-react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
 import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { useRouter } from 'next/navigation';
-import { CollectionOverview } from './manager/collection-overview';
-import { CreateIndexCard } from './manager/CreateIndexCard';
 
 export function ManagerDashboard() {
   const router = useRouter();
@@ -56,43 +54,15 @@ export function ManagerDashboard() {
     return query(collection(firestore, 'users'), where('branchIds', 'array-contains-any', branchIds));
   }, [firestore, branchIds]);
   
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
-    // This uses a collection group query and requires a composite index.
-    return query(
-      collectionGroup(firestore, 'installments'), 
-      where('branchId', 'in', branchIds)
-    );
-  }, [firestore, branchIds]);
-
   // --- Data Fetching ---
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
   const { data: loanProducts, isLoading: productsLoading } = useCollection<LoanProduct>(productsQuery);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
-  const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
-
 
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || regPaymentsLoading || productsLoading || usersLoading;
 
-  const collectionRates = useMemo(() => {
-    if (installmentsError || !installments) return { todaysCollectionRate: 0, monthlyCollectionRate: 0 };
-    
-    // Today's collections
-    const dueToday = installments.filter(i => isToday(new Date(i.dueDate)));
-    const expectedToday = dueToday.reduce((sum, i) => sum + i.expectedAmount, 0);
-    const paidToday = dueToday.reduce((sum, i) => sum + i.paidAmount, 0);
-    const todaysCollectionRate = expectedToday > 0 ? (paidToday / expectedToday) * 100 : 0;
-    
-    // Monthly collections
-    const dueThisMonth = installments.filter(i => isThisMonth(new Date(i.dueDate)));
-    const expectedThisMonth = dueThisMonth.reduce((sum, i) => sum + i.expectedAmount, 0);
-    const paidThisMonth = dueThisMonth.reduce((sum, i) => sum + i.paidAmount, 0);
-    const monthlyCollectionRate = expectedThisMonth > 0 ? (paidThisMonth / expectedThisMonth) * 100 : 0;
-    
-    return { todaysCollectionRate, monthlyCollectionRate };
-  }, [installments, installmentsError]);
   
   const dashboardData = useMemo(() => {
     if (!loans || !borrowers || !loanProducts || !users) return null;
@@ -159,8 +129,6 @@ export function ManagerDashboard() {
     return regPayments.filter(p => branchBorrowerIds.has(p.borrowerId));
   }, [regPayments, borrowers]);
 
-  const overallLoading = isLoading || (installmentsLoading && !installmentsError);
-
   return (
     <>
       <PageHeader
@@ -185,24 +153,13 @@ export function ManagerDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <OverviewCards
           loans={loans}
-          installments={installments}
+          installments={null}
           borrowers={borrowers}
           regPayments={managerRegPayments}
-          isLoading={overallLoading}
+          isLoading={isLoading}
         />
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-             <div className="lg:col-span-2">
-                <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
-            </div>
-            {installmentsError ? (
-              <CreateIndexCard />
-            ) : (
-              <CollectionOverview
-                  todaysCollectionRate={collectionRates.todaysCollectionRate}
-                  monthlyCollectionRate={collectionRates.monthlyCollectionRate}
-                  isLoading={overallLoading}
-              />
-            )}
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-1">
+            <DisbursalTrendChart data={dashboardData?.disbursalTrendData} isLoading={isLoading} />
         </div>
          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
             <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />

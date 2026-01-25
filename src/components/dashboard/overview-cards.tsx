@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { CircleDollarSign, Landmark, Users, AlertTriangle, HandCoins, UserCheck, Hourglass, Scale } from 'lucide-react';
+import { Landmark, Users, AlertTriangle, HandCoins, UserCheck, Hourglass } from 'lucide-react';
 import type { Loan, Installment, Borrower, RegistrationPayment } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
@@ -60,9 +60,6 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
   const registeredBorrowers = borrowers ? borrowers.filter(b => b.registrationFeePaid).length : 0;
 
   const pendingApprovalsCount = loans ? loans.filter(l => l.status === 'Pending Approval').length : 0;
-  
-  const averageLoanSize = activeLoansCount > 0 ? totalPortfolio / activeLoansCount : 0;
-
 
   const stats = [
     {
@@ -76,12 +73,6 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
       value: borrowers?.length ?? 0,
       icon: Users,
       description: 'Across all branches',
-    },
-     {
-      title: 'Avg. Loan Size',
-      value: formatCurrency(averageLoanSize, 'KES'),
-      icon: Scale,
-      description: 'For all active loans',
     },
     {
       title: 'Pending Approvals',
@@ -112,7 +103,7 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {stats.map((stat) => (
         <StatCard key={stat.title} {...stat} isLoading={isLoading} />
       ))}
