@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
@@ -48,7 +49,8 @@ import { ThemeToggle } from './theme-toggle';
 const allNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/loans', label: 'Loans', icon: CircleDollarSign, roles: ['admin', 'manager', 'loan_officer'] },
-  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['admin'] },
+  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['manager'] },
+  { href: '/disbursements', label: 'Disbursements', icon: FileKey, roles: ['admin'] },
   { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager'] },

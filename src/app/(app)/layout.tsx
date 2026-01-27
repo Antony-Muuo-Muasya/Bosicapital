@@ -1,3 +1,4 @@
+
 'use client';
 import { AppShell } from '@/components/app-shell';
 import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
@@ -13,7 +14,8 @@ const routePermissions = {
     '/settings': ['admin'],
     '/branches': ['admin', 'manager'],
     '/loan-products': ['admin'], // Assuming this will be a page
-    '/approvals': ['admin'],
+    '/approvals': ['manager'],
+    '/disbursements': ['admin'],
     '/reports': ['admin', 'manager'],
 };
 
