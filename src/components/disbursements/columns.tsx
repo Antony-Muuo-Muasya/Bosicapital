@@ -123,9 +123,11 @@ const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
              <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure you want to disburse?</AlertDialogTitle>
+                        <AlertDialogTitle>Confirm Loan Disbursement</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will activate the loan and generate the repayment schedule. This action cannot be undone.
+                            Have you already sent {formatCurrency(loan.principal)} to {loan.borrowerName} via your external payment system (e.g., bank transfer, mobile money)?
+                            <br/><br/>
+                            Clicking 'Yes, disburse' will activate this loan in the system and generate the repayment schedule. It does **not** transfer any money.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
