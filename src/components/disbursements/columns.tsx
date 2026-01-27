@@ -25,6 +25,7 @@ import {
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
+  borrowerPhone: string;
   borrowerPhotoUrl?: string;
   loanProductName: string;
   repaymentCycle?: 'Weekly' | 'Monthly';
