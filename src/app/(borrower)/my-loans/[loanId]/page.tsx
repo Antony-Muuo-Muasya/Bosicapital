@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, use } from "react";
+import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +73,17 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
     
     const sortedInstallments = useMemo(() => {
-        return installments?.sort((a,b) => a.installmentNumber - b.installmentNumber) || [];
+        if (!installments) return [];
+        const today = startOfToday();
+        return installments.map(inst => {
+            const [year, month, day] = inst.dueDate.split('-').map(Number);
+            const dueDate = new Date(year, month - 1, day);
+            const isOverdue = dueDate < today && inst.status !== 'Paid';
+            return {
+                ...inst,
+                status: isOverdue ? 'Overdue' : inst.status,
+            };
+        }).sort((a,b) => a.installmentNumber - b.installmentNumber);
     }, [installments]);
     
     const { totalPaid, totalOutstanding } = useMemo(() => {

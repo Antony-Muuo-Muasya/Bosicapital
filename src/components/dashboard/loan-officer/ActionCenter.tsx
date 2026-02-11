@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { Borrower, Installment, Loan } from '@/lib/types';
 import { useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
-import { formatDistanceToNow, isToday, isFuture } from 'date-fns';
+import { formatDistanceToNow, isToday, isFuture, startOfToday } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -41,30 +41,35 @@ export function ActionCenter({ installments, loans, borrowers, isLoading }: Acti
         
         const loansMap = new Map(loans.map(l => [l.id, l]));
         const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
+        const today = startOfToday();
 
         const processedInstallments = installments
-            .filter(i => i.status === 'Overdue' || (i.status === 'Unpaid' && (isToday(new Date(i.dueDate)) || isFuture(new Date(i.dueDate)))))
+            .filter(i => i.status !== 'Paid')
             .map(inst => {
                 const loan = loansMap.get(inst.loanId);
                 if (!loan) return null;
                 const borrower = borrowersMap.get(loan.borrowerId);
                 if (!borrower) return null;
 
+                const [year, month, day] = inst.dueDate.split('-').map(Number);
+                const dueDate = new Date(year, month - 1, day);
+                const isOverdue = dueDate < today;
+
                 return {
                     ...inst,
                     borrowerName: borrower.fullName,
                     borrowerPhoto: borrower.photoUrl,
-                    isOverdue: inst.status === 'Overdue',
-                    dueDistance: formatDistanceToNow(new Date(inst.dueDate), { addSuffix: true }),
+                    isOverdue: isOverdue,
+                    dueDistance: formatDistanceToNow(dueDate, { addSuffix: true }),
                     amountDue: inst.expectedAmount - inst.paidAmount
                 }
             })
             .filter(Boolean) as any[];
 
-        const overdue = processedInstallments.filter(i => i.isOverdue);
-        const upcoming = processedInstallments.filter(i => !i.isOverdue);
+        const overdueList = processedInstallments.filter(i => i.isOverdue).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        const upcomingList = processedInstallments.filter(i => !i.isOverdue).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         
-        return { overdue, upcoming };
+        return { overdue: overdueList, upcoming: upcomingList };
 
     }, [installments, loans, borrowers]);
 

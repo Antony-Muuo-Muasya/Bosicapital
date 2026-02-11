@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, startOfToday } from 'date-fns';
 
 const financialTips = [
     "Create a monthly budget and stick to it.",
@@ -112,16 +112,27 @@ export default function MyDashboardPage() {
             };
         }
         
-        const sortedUpcoming = installments
+        const today = startOfToday();
+        const processedInstallments = installments.map(inst => {
+            const [year, month, day] = inst.dueDate.split('-').map(Number);
+            const dueDate = new Date(year, month - 1, day);
+            const isOverdue = dueDate < today && inst.status !== 'Paid';
+            return {
+                ...inst,
+                status: isOverdue ? 'Overdue' : inst.status
+            };
+        });
+
+        const sortedUpcoming = processedInstallments
             .filter(i => i.status === 'Unpaid' || i.status === 'Partial' || i.status === 'Overdue')
             .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
         const nextInstallment = sortedUpcoming[0];
-        const totalPaid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
+        const totalPaid = processedInstallments.reduce((acc, curr) => acc + curr.paidAmount, 0);
         const progress = activeLoan.totalPayable > 0 ? (totalPaid / activeLoan.totalPayable) * 100 : 0;
 
-        const totalPaymentsMade = installments.filter(i => i.status === 'Paid').length;
-        const isPromptPayer = !installments.some(i => i.status === 'Overdue');
+        const totalPaymentsMade = processedInstallments.filter(i => i.status === 'Paid').length;
+        const isPromptPayer = !processedInstallments.some(i => i.status === 'Overdue');
         const hasCompletedLoan = allLoans?.some(l => l.status === 'Completed') || false;
 
         return {
