@@ -2,7 +2,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import * as cors from "cors";
+import cors from "cors";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -65,14 +65,14 @@ async function sendSms(to: string, message: string) {
 
   try {
     await axios.post("https://api.africastalking.com/version1/messaging",
-        payload.toString(),
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "apiKey": apikey,
-            "Accept": "application/json",
-          },
-        }
+      payload.toString(),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "apiKey": apikey,
+          "Accept": "application/json",
+        },
+      }
     );
     functions.logger.info(`SMS sent to ${to}`);
   } catch (error) {
@@ -146,10 +146,10 @@ export const mpesaPaymentCallback = functions.https.onRequest((req, res) => {
 
             // Find the most recent active loan for this borrower
             const loansQuery = await db.collection("loans")
-                .where("borrowerId", "==", borrowerId)
-                .where("status", "==", "Active")
-                .orderBy("issueDate", "desc")
-                .limit(1).get();
+              .where("borrowerId", "==", borrowerId)
+              .where("status", "==", "Active")
+              .orderBy("issueDate", "desc")
+              .limit(1).get();
             if (!loansQuery.empty) {
               loanRef = loansQuery.docs[0].ref;
               loanData = loansQuery.docs[0].data() as Loan;
@@ -169,7 +169,7 @@ export const mpesaPaymentCallback = functions.https.onRequest((req, res) => {
       const finalLoanStatus = await db.runTransaction(async (transaction) => {
         const installmentsRef = loanRef.collection("installments");
         const unpaidInstallmentsQuery = await transaction.get(
-            installmentsRef.where("status", "in", ["Unpaid", "Partial", "Overdue"]).orderBy("dueDate")
+          installmentsRef.where("status", "in", ["Unpaid", "Partial", "Overdue"]).orderBy("dueDate")
         );
 
         let paymentRemaining = paymentAmount;
