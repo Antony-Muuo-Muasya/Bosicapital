@@ -1,8 +1,11 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as dotenv from "dotenv";
 import axios from "axios";
 import cors from "cors";
+
+dotenv.config();
 
 admin.initializeApp();
 const db = admin.firestore();
