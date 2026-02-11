@@ -16,33 +16,41 @@ export function ManagerDashboard() {
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
   const organizationId = userProfile?.organizationId;
   const branchIds = userProfile?.branchIds || [];
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
   // Branch-specific queries
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'loans');
+    if (branchIds.length === 0) return null;
     return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
-  }, [firestore, branchIds]);
+  }, [firestore, branchIds, isSuperAdmin]);
   
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'borrowers');
+    if (branchIds.length === 0) return null;
     return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
-  }, [firestore, branchIds]);
+  }, [firestore, branchIds, isSuperAdmin]);
 
   const installmentsQuery = useMemoFirebase(() => {
-      if (!firestore || branchIds.length === 0) return null;
-      // This uses a collection group query and requires a composite index.
+      if (!firestore) return null;
+      if (isSuperAdmin) return query(collectionGroup(firestore, 'installments'), where('status', 'in', ['Overdue', 'Unpaid', 'Partial']));
+      if (branchIds.length === 0) return null;
       return query(
         collectionGroup(firestore, 'installments'), 
         where('branchId', 'in', branchIds), 
         where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
       );
-  }, [firestore, branchIds]);
+  }, [firestore, branchIds, isSuperAdmin]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'registrationPayments');
+    if (!organizationId) return null;
     // Registration payments may not have branchIds, so query by org
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);

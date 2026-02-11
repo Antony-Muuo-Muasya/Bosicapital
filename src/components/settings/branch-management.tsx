@@ -19,11 +19,17 @@ export function BranchManagement() {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
 
+    const isSuperAdmin = userProfile?.roleId === 'superadmin';
+
     const branchesQuery = useMemoFirebase(() => {
         if (!firestore || !userProfile) return null;
         
         const branchesCol = collection(firestore, 'branches');
         const orgId = userProfile.organizationId;
+
+        if (isSuperAdmin) {
+            return branchesCol;
+        }
 
         if (userProfile.roleId === 'admin') {
             return query(branchesCol, where('organizationId', '==', orgId));
@@ -35,7 +41,7 @@ export function BranchManagement() {
 
         // For other roles or managers with no branches, return a query that finds nothing.
         return query(branchesCol, where('id', '==', 'no-branches-found'));
-    }, [firestore, userProfile]);
+    }, [firestore, userProfile, isSuperAdmin]);
 
     const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
     const isLoading = isProfileLoading || areBranchesLoading;
@@ -64,7 +70,7 @@ export function BranchManagement() {
                     <CardDescription>Manage your organization's branches.</CardDescription>
                 </div>
                 {canAddBranches && (
-                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSuperAdmin}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Branch
                     </Button>

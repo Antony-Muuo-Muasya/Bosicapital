@@ -24,7 +24,7 @@
         },
         "roleId": {
             "type": "string",
-            "description": "The ID of the role assigned to the user."
+            "description": "The ID of the role assigned to the user (e.g., superadmin, admin, manager)."
         },
         "branchIds": {
             "type": "array",

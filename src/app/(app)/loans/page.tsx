@@ -15,12 +15,17 @@ export default function LoansPage() {
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const firestore = useFirestore();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile || !user) return null;
 
     const { roleId, branchIds, organizationId } = userProfile;
     const loansCol = collection(firestore, 'loans');
+
+    if (isSuperAdmin) {
+        return loansCol;
+    }
 
     if (roleId === 'admin') {
       return query(loansCol, where('organizationId', '==', organizationId));
@@ -35,26 +40,31 @@ export default function LoansPage() {
     }
 
     return null;
-  }, [firestore, user, userProfile]);
+  }, [firestore, user, userProfile, isSuperAdmin]);
 
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     const { roleId, branchIds, organizationId } = userProfile;
+    const borrowersCol = collection(firestore, 'borrowers');
 
-    if (roleId === 'admin') {
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
+    if (isSuperAdmin) {
+        return borrowersCol;
     }
-   
+    if (roleId === 'admin') {
+        return query(borrowersCol, where('organizationId', '==', organizationId));
+    }
     if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
+        return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
     return null;
-  }, [firestore, userProfile]);
+  }, [firestore, userProfile, isSuperAdmin]);
 
   const loanProductsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return collection(firestore, 'loanProducts');
-  }, [firestore]);
+    if (isSuperAdmin) return collection(firestore, 'loanProducts');
+    if (!userProfile) return null;
+    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId));
+  }, [firestore, userProfile, isSuperAdmin]);
 
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
@@ -80,8 +90,8 @@ export default function LoansPage() {
 
   return (
     <>
-      <PageHeader title="Loans" description="View and manage all loans across branches.">
-        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isLoading}>
+      <PageHeader title="Loans" description="View and manage all loans across organizations.">
+        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isLoading || isSuperAdmin}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Loan
         </Button>

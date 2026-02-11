@@ -18,6 +18,7 @@ export default function DashboardPage() {
   }
 
   switch (userProfile.roleId) {
+    case 'superadmin':
     case 'admin':
       return <AdminDashboard />;
     case 'manager':

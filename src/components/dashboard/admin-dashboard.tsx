@@ -30,46 +30,63 @@ export function AdminDashboard() {
   
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
 
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
+
   // Data queries
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'loans');
+    if (!organizationId) return null;
     return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'borrowers');
+    if (!organizationId) return null;
     return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const productsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'loanProducts');
+    if (!organizationId) return null;
     return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const usersQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'users');
+    if (!organizationId) return null;
     return query(collection(firestore, 'users'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const branchesQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'branches');
+    if (!organizationId) return null;
     return query(collection(firestore, 'branches'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'registrationPayments');
+    if (!organizationId) return null;
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const rolesQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    return query(collection(firestore, 'roles'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+    if (!firestore) return null;
+    // Roles are global in this version
+    return collection(firestore, 'roles');
+  }, [firestore]);
 
   const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
+    if (!firestore) return null;
+    if (isSuperAdmin) return collectionGroup(firestore, 'installments');
+    if (!organizationId) return null;
     return query(collectionGroup(firestore, 'installments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  }, [firestore, organizationId, isSuperAdmin]);
 
 
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
@@ -151,8 +168,8 @@ export function AdminDashboard() {
   return (
     <>
       <PageHeader
-        title="Admin Dashboard"
-        description="Organization-wide overview of all lending activities."
+        title={isSuperAdmin ? "Superadmin Dashboard" : "Admin Dashboard"}
+        description={isSuperAdmin ? "Platform-wide overview of all organizations." : "Organization-wide overview of all lending activities."}
       >
         <div className='flex items-center gap-2'>
             <Button variant="outline" onClick={() => router.push('/users')}>

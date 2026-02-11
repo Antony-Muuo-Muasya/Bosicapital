@@ -8,15 +8,15 @@ import { Loader2 } from 'lucide-react';
 import { doc, collection, getDocs, writeBatch, query, where, setDoc } from 'firebase/firestore';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
 
-const staffRoles = ['admin', 'manager', 'loan_officer'];
+const staffRoles = ['superadmin', 'admin', 'manager', 'loan_officer'];
 const routePermissions = {
-    '/users': ['admin'],
-    '/settings': ['admin'],
-    '/branches': ['admin', 'manager'],
-    '/loan-products': ['admin'], // Assuming this will be a page
-    '/approvals': ['manager'],
-    '/disbursements': ['admin'],
-    '/reports': ['admin', 'manager'],
+    '/users': ['superadmin', 'admin'],
+    '/settings': ['superadmin', 'admin'],
+    '/branches': ['superadmin', 'admin', 'manager'],
+    '/loan-products': ['superadmin', 'admin'], // Assuming this will be a page
+    '/approvals': ['superadmin', 'manager'],
+    '/disbursements': ['superadmin', 'admin'],
+    '/reports': ['superadmin', 'admin', 'manager'],
 };
 
 type ProtectedRoute = keyof typeof routePermissions;

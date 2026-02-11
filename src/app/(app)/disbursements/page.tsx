@@ -13,25 +13,35 @@ export default function DisbursementsPage() {
     const firestore = useFirestore();
     const { userProfile } = useUserProfile();
     const organizationId = userProfile?.organizationId;
+    const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
     const approvedLoansQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        const loansCol = collection(firestore, 'loans');
+        if (isSuperAdmin) {
+            return query(loansCol, where('status', '==', 'Approved'));
+        }
+        if (!organizationId) return null;
         return query(
-            collection(firestore, 'loans'), 
+            loansCol, 
             where('organizationId', '==', organizationId),
             where('status', '==', 'Approved')
         );
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
 
     const borrowersQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'borrowers');
+        if (!organizationId) return null;
         return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     
     const loanProductsQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'loanProducts');
+        if (!organizationId) return null;
         return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
 
     const { data: approvedLoans, isLoading: isLoadingLoans } = useCollection<Loan>(approvedLoansQuery);
     const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);

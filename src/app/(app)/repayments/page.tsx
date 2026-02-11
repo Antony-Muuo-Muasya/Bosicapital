@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function RepaymentsPage() {
   const firestore = useFirestore();
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
   // Query for loans visible to the current user
   const loansQuery = useMemoFirebase(() => {
@@ -29,6 +30,7 @@ export default function RepaymentsPage() {
     const { roleId, branchIds, organizationId } = userProfile;
     const loansCol = collection(firestore, 'loans');
 
+    if (isSuperAdmin) return loansCol;
     if (roleId === 'admin') {
       return query(loansCol, where('organizationId', '==', organizationId));
     }
@@ -39,13 +41,16 @@ export default function RepaymentsPage() {
       return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', user.uid));
     }
     return null;
-  }, [firestore, user, userProfile]);
+  }, [firestore, user, userProfile, isSuperAdmin]);
   const { data: visibleLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
 
   // Query for repayments related to the visible loans
   const repaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
 
+    if (isSuperAdmin) {
+        return collection(firestore, 'repayments');
+    }
     if (userProfile.roleId === 'admin' && userProfile.organizationId) {
         return query(collection(firestore, 'repayments'), where('organizationId', '==', userProfile.organizationId));
     }
@@ -63,7 +68,7 @@ export default function RepaymentsPage() {
         return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds.slice(0, 30)));
     }
     return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds));
-  }, [firestore, userProfile, visibleLoans, isLoadingLoans]);
+  }, [firestore, userProfile, visibleLoans, isLoadingLoans, isSuperAdmin]);
   const { data: repayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
 
   // Query for borrowers visible to the current user
@@ -72,6 +77,7 @@ export default function RepaymentsPage() {
     const { roleId, branchIds, organizationId } = userProfile;
     const borrowersCol = collection(firestore, 'borrowers');
 
+    if (isSuperAdmin) return borrowersCol;
     if (roleId === 'admin') {
       return query(borrowersCol, where('organizationId', '==', organizationId));
     }
@@ -79,11 +85,18 @@ export default function RepaymentsPage() {
       return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
     return null;
-  }, [firestore, userProfile]);
+  }, [firestore, userProfile, isSuperAdmin]);
   const { data: visibleBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
 
   // All users can see all loan products
-  const loanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+  const loanProductsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'loanProducts');
+    if (userProfile?.organizationId) {
+        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId));
+    }
+    return null;
+  }, [firestore, isSuperAdmin, userProfile]);
   const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingRepayments || isLoadingBorrowers || isLoadingProducts;

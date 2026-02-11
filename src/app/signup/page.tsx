@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { doc, collection, writeBatch, getDocs, query } from 'firebase/firestore';
+import { doc, collection, writeBatch, getDocs, query, where } from 'firebase/firestore';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
 
 
@@ -45,9 +45,10 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     setIsSubmitting(true);
     try {
+      // Check if this is the first user ever to sign up.
       const usersCol = collection(firestore, 'users');
-      const allUsersSnapshot = await getDocs(usersCol);
-      const isFirstUser = allUsersSnapshot.empty;
+      const allUsersSnapshot = await getDocs(query(usersCol));
+      const isFirstUserEver = allUsersSnapshot.empty;
 
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, {
@@ -55,51 +56,64 @@ export default function SignupPage() {
       });
 
       const batch = writeBatch(firestore);
-      const organizationId = isFirstUser ? doc(collection(firestore, 'organizations')).id : allUsersSnapshot.docs[0].data().organizationId;
 
-      if (isFirstUser) {
-        // This is the first user ever, so they create the organization and become admin.
-        const rolesToSeed: Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] }[] = [
+      if (isFirstUserEver) {
+        // --- This is the first user ever: They become SUPERADMIN. ---
+        const organizationId = 'adoo_super_org'; // A special, known ID for the super admin org
+        
+        // Seed all system roles globally. This happens only once.
+        const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
+            { id: 'superadmin', name: 'Super Administrator', systemRole: true, permissions: ['*'] as any },
             { id: 'admin', name: 'Administrator', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
             { id: 'manager', name: 'Manager', systemRole: true, permissions: ['user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
             { id: 'loan_officer', name: 'Loan Officer', systemRole: true, permissions: ['loan.create', 'loan.view', 'repayment.create'] },
             { id: 'user', name: 'User', systemRole: true, permissions: ['borrower.view.own'] },
         ];
-
+        
         rolesToSeed.forEach(roleData => {
             const roleDocRef = doc(firestore, 'roles', roleData.id);
-            batch.set(roleDocRef, { ...roleData, organizationId });
+            batch.set(roleDocRef, { ...roleData, organizationId: 'system' }); // Roles are global
         });
         
+        // Create a special branch for the superadmin org
         const mainBranchRef = doc(collection(firestore, 'branches'));
         const mainBranch: Branch = {
-            id: mainBranchRef.id, name: 'Headquarters', location: 'Main City', isMain: true, organizationId: organizationId,
+            id: mainBranchRef.id, name: 'Global', location: 'Cloud', isMain: true, organizationId,
         };
         batch.set(mainBranchRef, mainBranch);
         
+        // Create the superadmin user profile
         const userDocRef = doc(firestore, 'users', userCredential.user.uid);
         const newUserProfile: AppUser = {
             id: userCredential.user.uid,
-            organizationId: organizationId,
+            organizationId,
             fullName: values.fullName,
             email: values.email,
-            roleId: 'admin', // First user is Admin
-            branchIds: [mainBranch.id], // Assign to the new main branch
+            roleId: 'superadmin',
+            branchIds: [mainBranch.id],
             status: 'active',
             createdAt: new Date().toISOString(),
         };
         batch.set(userDocRef, newUserProfile);
 
       } else {
-         // Subsequent users join the existing organization as a standard 'user'.
+         // --- A regular user is signing up: Create a new organization for them. ---
+         const organizationId = doc(collection(firestore, 'organizations')).id;
+
+         const mainBranchRef = doc(collection(firestore, 'branches'));
+         const mainBranch: Branch = {
+             id: mainBranchRef.id, name: 'Headquarters', location: 'Main City', isMain: true, organizationId,
+         };
+         batch.set(mainBranchRef, mainBranch);
+         
          const userDocRef = doc(firestore, 'users', userCredential.user.uid);
          const newUserProfile: AppUser = {
              id: userCredential.user.uid,
-             organizationId: organizationId,
+             organizationId,
              fullName: values.fullName,
              email: values.email,
-             roleId: 'user', 
-             branchIds: [],
+             roleId: 'admin', // First user of a new org is an Admin
+             branchIds: [mainBranch.id],
              status: 'active',
              createdAt: new Date().toISOString(),
          };

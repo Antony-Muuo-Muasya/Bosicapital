@@ -19,11 +19,17 @@ export default function BorrowersPage() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedBorrower, setSelectedBorrower] = useState<Borrower | null>(null);
 
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
+
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
 
     const { roleId, branchIds, organizationId } = userProfile;
     const borrowersCol = collection(firestore, 'borrowers');
+
+    if (isSuperAdmin) {
+      return borrowersCol;
+    }
 
     if (roleId === 'admin') {
       return query(borrowersCol, where('organizationId', '==', organizationId));
@@ -34,7 +40,7 @@ export default function BorrowersPage() {
     }
 
     return null;
-  }, [firestore, userProfile]);
+  }, [firestore, userProfile, isSuperAdmin]);
 
   const { data: borrowers, isLoading: isBorrowersLoading } = useCollection<Borrower>(borrowersQuery);
   const isLoading = isProfileLoading || isBorrowersLoading;
@@ -50,7 +56,7 @@ export default function BorrowersPage() {
   return (
     <>
       <PageHeader title="Borrowers" description="Manage your list of borrowers.">
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSuperAdmin}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Borrower
         </Button>

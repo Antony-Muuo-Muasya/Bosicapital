@@ -14,25 +14,37 @@ export default function ApprovalsPage() {
     const { userProfile } = useUserProfile();
     const organizationId = userProfile?.organizationId;
     const branchIds = userProfile?.branchIds || [];
+    const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
     const pendingLoansQuery = useMemoFirebase(() => {
-        if (!firestore || branchIds.length === 0) return null;
+        if (!firestore) return null;
+        const loansCol = collection(firestore, 'loans');
+        
+        if (isSuperAdmin) {
+            return query(loansCol, where('status', '==', 'Pending Approval'));
+        }
+
+        if (!userProfile || branchIds.length === 0) return null;
         return query(
-            collection(firestore, 'loans'), 
+            loansCol,
             where('branchId', 'in', branchIds),
             where('status', '==', 'Pending Approval')
         );
-    }, [firestore, branchIds]);
+    }, [firestore, branchIds, userProfile, isSuperAdmin]);
 
     const borrowersQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'borrowers');
+        if (!organizationId) return null;
         return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     
     const loanProductsQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'loanProducts');
+        if (!organizationId) return null;
         return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
 
     const { data: pendingLoans, isLoading: isLoadingLoans } = useCollection<Loan>(pendingLoansQuery);
     const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);

@@ -30,13 +30,22 @@ export default function UsersPage() {
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
 
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
+
   const usersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile || userProfile.roleId !== 'admin') return null;
+    if (!firestore || !userProfile) return null;
+    if (isSuperAdmin) return collection(firestore, 'users');
+    if (userProfile.roleId !== 'admin') return null;
     return query(collection(firestore, 'users'), where('organizationId', '==', userProfile.organizationId));
-  }, [firestore, userProfile]);
+  }, [firestore, userProfile, isSuperAdmin]);
 
   const rolesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
-  const branchesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'branches') : null, [firestore]);
+  
+  const branchesQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    if (isSuperAdmin) return collection(firestore, 'branches');
+    return query(collection(firestore, 'branches'), where('organizationId', '==', userProfile.organizationId));
+  }, [firestore, userProfile, isSuperAdmin]);
 
 
   const { data: users, isLoading: areUsersLoading } = useCollection<AppUser>(usersQuery);
@@ -110,7 +119,7 @@ export default function UsersPage() {
                 </div>
                  <div className='space-y-1'>
                     <p className='font-medium'>2. User creates an account</p>
-                    <p className='text-xs text-muted-foreground'>The user will fill in their name, email, and password.</p>
+                    <p className='text-xs text-muted-foreground'>The user will fill in their name, email, and password. An admin can then assign them a role.</p>
                 </div>
                 <div className='space-y-1'>
                     <p className='font-medium'>3. Manage the new user</p>

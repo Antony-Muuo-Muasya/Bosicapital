@@ -13,7 +13,7 @@ export type Permission =
   | 'borrower.view.own';
 
 export type Role = {
-  id: 'admin' | 'manager' | 'loan_officer' | 'user';
+  id: 'superadmin' | 'admin' | 'manager' | 'loan_officer' | 'user';
   organizationId: string;
   name: string;
   systemRole: boolean;
