@@ -38,7 +38,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [actionToConfirm, setActionToConfirm] = useState<'Approved' | 'Rejected' | null>(null);
 
-    const canApprove = userRole?.id === 'manager';
+    const canApprove = userRole?.id === 'manager' || userRole?.id === 'superadmin';
 
     const handleActionConfirmation = (status: 'Approved' | 'Rejected') => {
         setActionToConfirm(status);

@@ -39,7 +39,7 @@ const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
     const [isUpdating, setIsUpdating] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     
-    const canDisburse = userRole?.id === 'admin';
+    const canDisburse = userRole?.id === 'admin' || userRole?.id === 'superadmin';
 
     const handleDisburseLoan = async () => {
       if(isUpdating || !canDisburse) return;
