@@ -149,7 +149,8 @@
         "issueDate": { "type": "string", "format": "date" },
         "status": { "type": "string", "enum": ["Draft", "Pending Approval", "Approved", "Active", "Completed", "Rejected"] },
         "loanOfficerId": { "type": "string" },
-        "branchId": { "type": "string" }
+        "branchId": { "type": "string" },
+        "lastPaymentDate": { "type": "string", "format": "date-time" }
       },
       "required": [
         "id",
@@ -218,12 +219,16 @@
         "id": { "type": "string" },
         "organizationId": { "type": "string" },
         "loanId": { "type": "string" },
+        "borrowerId": { "type": "string" },
+        "transId": { "type": "string" },
         "amount": { "type": "number" },
         "paymentDate": { "type": "string", "format": "date" },
         "collectedById": { "type": "string" },
-        "method": { "type": "string", "enum": ["Cash", "Bank Transfer", "Mobile Money"] }
+        "method": { "type": "string", "enum": ["Cash", "Bank Transfer", "Mobile Money"] },
+        "phone": { "type": "string" },
+        "balanceAfterPayment": { "type": "number" }
       },
-      "required": ["id", "organizationId", "loanId", "amount", "paymentDate", "collectedById"]
+      "required": ["id", "organizationId", "loanId", "borrowerId", "amount", "paymentDate", "collectedById", "transId"]
     },
     "RegistrationPayment": {
       "title": "Registration Payment",
