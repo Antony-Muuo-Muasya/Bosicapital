@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Landmark, Users, AlertTriangle, HandCoins, UserCheck, Hourglass } from 'lucide-react';
 import type { Loan, Installment, Borrower, RegistrationPayment } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
+import { startOfToday } from 'date-fns';
 
 interface OverviewCardsProps {
   loans: Loan[] | null;
@@ -48,13 +49,18 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
   const totalPortfolio = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
   const activeLoansCount = activeLoans.length;
 
-  const overdueAmount = installments
-    ? installments.filter(i => i.status === 'Overdue').reduce((sum, inst) => sum + (inst.expectedAmount - inst.paidAmount), 0)
-    : 0;
+  const today = startOfToday();
 
-  const overdueLoansCount = installments 
-    ? new Set(installments.filter(i => i.status === 'Overdue').map(i => i.loanId)).size
-    : 0;
+  const overdueInstallments = installments ? installments.filter(i => {
+    if (i.status === 'Paid') return false;
+    // Create date in local timezone from 'YYYY-MM-DD' string to avoid timezone issues
+    const [year, month, day] = i.dueDate.split('-').map(Number);
+    const dueDate = new Date(year, month - 1, day);
+    return dueDate < today;
+  }) : [];
+
+  const overdueAmount = overdueInstallments.reduce((sum, inst) => sum + (inst.expectedAmount - inst.paidAmount), 0);
+  const overdueLoansCount = new Set(overdueInstallments.map(i => i.loanId)).size;
   
   const totalRegFees = regPayments ? regPayments.reduce((sum, p) => sum + p.amount, 0) : 0;
   const registeredBorrowers = borrowers ? borrowers.filter(b => b.registrationFeePaid).length : 0;
