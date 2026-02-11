@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -90,27 +90,19 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     const fetchUnlinkedUsers = async () => {
       setUsersLoading(true);
       try {
-        let usersData: AppUser[] = [];
+        const usersData: AppUser[] = [];
         const borrowerUserIds = new Set(borrowers?.map(b => b.userId) || []);
   
-        if (staffProfile.roleId === 'admin') {
-          const q = query(collection(firestore, 'users'), where('roleId', '==', 'user'), where('organizationId', '==', staffProfile.organizationId));
-          const querySnapshot = await getDocs(q);
-          querySnapshot.forEach(doc => {
+        // All staff who can create borrowers should be able to see all unlinked users in the org.
+        const q = query(
+            collection(firestore, 'users'), 
+            where('roleId', '==', 'user'), 
+            where('organizationId', '==', staffProfile.organizationId)
+        );
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(doc => {
             usersData.push({ id: doc.id, ...doc.data() } as AppUser);
-          });
-        } else if ((staffProfile.roleId === 'manager' || staffProfile.roleId === 'loan_officer') && staffProfile.branchIds?.length > 0) {
-            const q = query(
-              collection(firestore, 'users'), 
-              where('roleId', '==', 'user'), 
-              where('branchIds', 'array-contains-any', staffProfile.branchIds),
-              where('organizationId', '==', staffProfile.organizationId)
-            );
-            const querySnapshot = await getDocs(q);
-            querySnapshot.forEach(doc => {
-                usersData.push({ id: doc.id, ...doc.data() } as AppUser);
-            });
-        }
+        });
   
         const filteredUsers = usersData.filter(u => !borrowerUserIds.has(u.id));
         setUnlinkedUsers(filteredUsers);
@@ -154,16 +146,19 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     }
     setIsSubmitting(true);
 
-    const borrowersColRef = collection(firestore, 'borrowers');
-    const newBorrowerRef = doc(borrowersColRef);
-    
+    const batch = writeBatch(firestore);
+
+    // 1. Create Borrower Document
+    const newBorrowerRef = doc(collection(firestore, 'borrowers'));
+    const assignedBranchId = staffProfile.branchIds[0] || 'branch-1';
+
     const newBorrowerData = {
       ...values,
       id: newBorrowerRef.id,
       email: selectedUser.email,
       fullName: selectedUser.fullName,
       photoUrl: `https://picsum.photos/seed/${newBorrowerRef.id}/400/400`,
-      branchId: staffProfile.branchIds[0] || 'branch-1', // Default to staff's first branch
+      branchId: assignedBranchId,
       organizationId: staffProfile.organizationId,
       registrationFeeRequired: true,
       registrationFeeAmount: 800,
@@ -171,20 +166,29 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
       registrationFeePaidAt: null,
       registrationPaymentId: null,
     };
+    batch.set(newBorrowerRef, newBorrowerData);
 
-    setDoc(newBorrowerRef, newBorrowerData, { merge: false })
+    // 2. Update User Document with branchId
+    const userDocRef = doc(firestore, 'users', selectedUser.id);
+    const newBranchIds = Array.from(new Set([...(selectedUser.branchIds || []), assignedBranchId]));
+    batch.update(userDocRef, { branchIds: newBranchIds });
+
+
+    batch.commit()
       .then(() => {
         toast({ title: 'Success', description: 'Borrower created and linked successfully.' });
         form.reset();
         onOpenChange(false);
       })
       .catch(error => {
+        console.error("Error creating borrower:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not create borrower.' });
         errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
-            path: newBorrowerRef.path,
-            operation: 'create',
-            requestResourceData: newBorrowerData,
+            path: newBorrowerRef.path, // We can report on the borrower path, batch errors are harder to debug.
+            operation: 'write', // 'write' for batch
+            requestResourceData: { borrower: newBorrowerData, userUpdate: { branchIds: newBranchIds } },
           })
         )
       })
