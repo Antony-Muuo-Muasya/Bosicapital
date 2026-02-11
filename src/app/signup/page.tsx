@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,8 +15,8 @@ import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { doc } from 'firebase/firestore';
-import type { User as AppUser } from '@/lib/types';
+import { doc, collection, writeBatch, getDocs, query } from 'firebase/firestore';
+import type { User as AppUser, Role, Branch } from '@/lib/types';
 
 
 const signupSchema = z.object({
@@ -45,30 +45,74 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     setIsSubmitting(true);
     try {
+      const usersCol = collection(firestore, 'users');
+      const allUsersSnapshot = await getDocs(usersCol);
+      const isFirstUser = allUsersSnapshot.empty;
+
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, {
         displayName: values.fullName,
       });
 
-      // Create the corresponding user document in Firestore.
-      // This is the correct place for this logic, as it only runs once upon successful user creation.
-      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
-      const newUserProfile: AppUser = {
-          id: userCredential.user.uid,
-          organizationId: 'org_1',
-          fullName: values.fullName,
-          email: values.email,
-          roleId: 'user', // All new signups default to the 'user' role. An admin can change this later.
-          branchIds: [], // New users are unassigned from any branch by default.
-          status: 'active',
-          createdAt: new Date().toISOString(),
-      };
-      await setDocumentNonBlocking(userDocRef, newUserProfile, { merge: false });
+      const batch = writeBatch(firestore);
+      const organizationId = isFirstUser ? doc(collection(firestore, 'organizations')).id : allUsersSnapshot.docs[0].data().organizationId;
+
+      if (isFirstUser) {
+        // This is the first user ever, so they create the organization and become admin.
+        const rolesToSeed: Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] }[] = [
+            { id: 'admin', name: 'Administrator', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
+            { id: 'manager', name: 'Manager', systemRole: true, permissions: ['user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
+            { id: 'loan_officer', name: 'Loan Officer', systemRole: true, permissions: ['loan.create', 'loan.view', 'repayment.create'] },
+            { id: 'user', name: 'User', systemRole: true, permissions: ['borrower.view.own'] },
+        ];
+
+        rolesToSeed.forEach(roleData => {
+            const roleDocRef = doc(firestore, 'roles', roleData.id);
+            batch.set(roleDocRef, { ...roleData, organizationId });
+        });
+        
+        const mainBranchRef = doc(collection(firestore, 'branches'));
+        const mainBranch: Branch = {
+            id: mainBranchRef.id, name: 'Headquarters', location: 'Main City', isMain: true, organizationId: organizationId,
+        };
+        batch.set(mainBranchRef, mainBranch);
+        
+        const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+        const newUserProfile: AppUser = {
+            id: userCredential.user.uid,
+            organizationId: organizationId,
+            fullName: values.fullName,
+            email: values.email,
+            roleId: 'admin', // First user is Admin
+            branchIds: [mainBranch.id], // Assign to the new main branch
+            status: 'active',
+            createdAt: new Date().toISOString(),
+        };
+        batch.set(userDocRef, newUserProfile);
+
+      } else {
+         // Subsequent users join the existing organization as a standard 'user'.
+         const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+         const newUserProfile: AppUser = {
+             id: userCredential.user.uid,
+             organizationId: organizationId,
+             fullName: values.fullName,
+             email: values.email,
+             roleId: 'user', 
+             branchIds: [],
+             status: 'active',
+             createdAt: new Date().toISOString(),
+         };
+         batch.set(userDocRef, newUserProfile);
+      }
+
+      await batch.commit();
 
       toast({
         title: 'Account Created!',
-        description: "You're now being redirected to the dashboard.",
+        description: "You're now being redirected to your dashboard.",
       });
+
     } catch (error: any) {
       toast({
         variant: 'destructive',

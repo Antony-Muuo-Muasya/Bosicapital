@@ -200,13 +200,15 @@
       "properties": {
         "id": { "type": "string" },
         "loanId": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "branchId": { "type": "string" },
         "installmentNumber": { "type": "number" },
         "dueDate": { "type": "string", "format": "date" },
         "expectedAmount": { "type": "number" },
         "paidAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["Paid", "Unpaid", "Partial", "Overdue"] }
       },
-      "required": ["id", "loanId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
+      "required": ["id", "loanId", "organizationId", "branchId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
     },
     "Repayment": {
       "title": "Repayment",
@@ -214,13 +216,14 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "organizationId": { "type": "string" },
         "loanId": { "type": "string" },
         "amount": { "type": "number" },
         "paymentDate": { "type": "string", "format": "date" },
         "collectedById": { "type": "string" },
         "method": { "type": "string", "enum": ["Cash", "Bank Transfer", "Mobile Money"] }
       },
-      "required": ["id", "loanId", "amount", "paymentDate", "collectedById"]
+      "required": ["id", "organizationId", "loanId", "amount", "paymentDate", "collectedById"]
     },
     "RegistrationPayment": {
       "title": "Registration Payment",

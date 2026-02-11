@@ -53,61 +53,6 @@ export default function AppLayout({
             return;
         }
     }
-
-    // One-time data seeding for new deployments
-    if (firestore && user) {
-        const seedRoles = async () => {
-            const rolesColRef = collection(firestore, 'roles');
-            const rolesSnapshot = await getDocs(rolesColRef);
-
-            if (rolesSnapshot.empty) {
-                const batch = writeBatch(firestore);
-                const organizationId = 'org_1';
-                const rolesToSeed: Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] }[] = [
-                    {
-                      id: 'admin', name: 'Administrator', systemRole: true,
-                      permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'],
-                    },
-                    {
-                      id: 'manager', name: 'Manager', systemRole: true,
-                      permissions: ['user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'],
-                    },
-                    {
-                      id: 'loan_officer', name: 'Loan Officer', systemRole: true,
-                      permissions: ['loan.create', 'loan.view', 'repayment.create'],
-                    },
-                    {
-                      id: 'user', name: 'User', systemRole: true, // For borrowers
-                      permissions: ['borrower.view.own'],
-                    },
-                ];
-
-                rolesToSeed.forEach(roleData => {
-                    const docRef = doc(firestore, 'roles', roleData.id);
-                    batch.set(docRef, { ...roleData, organizationId });
-                });
-                
-                await batch.commit();
-            }
-        };
-
-        const seedMainBranch = async () => {
-            const branchesColRef = collection(firestore, 'branches');
-            const mainBranchQuery = query(branchesColRef, where('isMain', '==', true));
-            const mainBranchSnapshot = await getDocs(mainBranchQuery);
-        
-            if (mainBranchSnapshot.empty) {
-                const mainBranchRef = doc(firestore, 'branches', 'branch-1');
-                await setDoc(mainBranchRef, {
-                    id: 'branch-1', name: 'Headquarters', location: 'Main City', isMain: true, organizationId: 'org_1',
-                });
-            }
-        };
-
-        // The user creation logic has been moved to the /signup page to prevent
-        // race conditions that were incorrectly overwriting user roles.
-        seedRoles().then(seedMainBranch).catch(console.error);
-    }
   }, [user, userProfile, isLoading, router, firestore, pathname]);
   
   if (isLoading || !userProfile) {

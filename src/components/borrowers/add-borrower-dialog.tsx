@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,
@@ -34,6 +34,7 @@ import {
     SelectValue,
   } from "@/components/ui/select";
 import type { User as AppUser, Borrower } from '@/lib/types';
+import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
 
 const borrowerSchema = z.object({
@@ -140,8 +141,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   const selectedUser = useMemo(() => unlinkedUsers.find(u => u.id === selectedUserId), [unlinkedUsers, selectedUserId]);
 
   const onSubmit = (values: BorrowerFormData) => {
-    if (!staffProfile || !firestore || !selectedUser) {
-        toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or database not available.' });
+    if (!staffProfile || !firestore || !selectedUser || !staffProfile.branchIds?.[0]) {
+        toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated, not assigned to a branch, or database not available.' });
         return;
     }
     setIsSubmitting(true);
@@ -150,7 +151,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
     // 1. Create Borrower Document
     const newBorrowerRef = doc(collection(firestore, 'borrowers'));
-    const assignedBranchId = staffProfile.branchIds[0] || 'branch-1';
+    const assignedBranchId = staffProfile.branchIds[0];
 
     const newBorrowerData = {
       ...values,
@@ -213,6 +214,15 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             Select a registered user to link to a new borrower profile.
           </DialogDescription>
         </DialogHeader>
+        {!staffProfile?.branchIds?.length && (
+            <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Branch Assignment Required</AlertTitle>
+                <AlertDescription>
+                You must be assigned to a branch before you can add a borrower. Please contact an administrator.
+                </AlertDescription>
+            </Alert>
+        )}
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="userId" render={({ field }) => (
@@ -319,7 +329,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button type="submit" disabled={isSubmitting || isLoading || unlinkedUsers.length === 0}>
+                    <Button type="submit" disabled={isSubmitting || isLoading || unlinkedUsers.length === 0 || !staffProfile?.branchIds?.length}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Save Borrower
                     </Button>

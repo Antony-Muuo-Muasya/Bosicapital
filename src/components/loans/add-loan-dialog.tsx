@@ -93,8 +93,8 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
 
 
   const onSubmit = async (values: LoanFormData) => {
-    if (!user || !firestore || !selectedProduct || !userProfile) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Missing required information.' });
+    if (!user || !firestore || !selectedProduct || !userProfile || !userProfile.branchIds?.[0]) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Missing required information or branch assignment.' });
         return;
     }
     setIsSubmitting(true);
@@ -119,7 +119,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       issueDate: new Date().toISOString().split('T')[0], // This is the request date
       status: 'Pending Approval',
       loanOfficerId: user.uid,
-      branchId: userProfile.branchIds[0] || 'branch-1',
+      branchId: userProfile.branchIds[0],
     };
     
     setDocumentNonBlocking(loanRef, newLoanData, { merge: false })
@@ -152,6 +152,15 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 <AlertTitle>No Eligible Borrowers</AlertTitle>
                 <AlertDescription>
                 There are no registered borrowers available to receive a loan. Please ensure borrowers have paid their registration fee.
+                </AlertDescription>
+            </Alert>
+        )}
+        {!userProfile?.branchIds?.length && (
+             <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Branch Assignment Required</AlertTitle>
+                <AlertDescription>
+                You must be assigned to a branch to create a loan. Please contact an administrator.
                 </AlertDescription>
             </Alert>
         )}
@@ -202,7 +211,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button type="submit" disabled={isSubmitting || !selectedProduct || isLoading || eligibleBorrowers.length === 0}>
+                    <Button type="submit" disabled={isSubmitting || !selectedProduct || isLoading || eligibleBorrowers.length === 0 || !userProfile?.branchIds?.length}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Submit for Approval
                     </Button>

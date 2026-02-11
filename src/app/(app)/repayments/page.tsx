@@ -45,10 +45,11 @@ export default function RepaymentsPage() {
   // Query for repayments related to the visible loans
   const repaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
+
     if (userProfile.roleId === 'admin' && userProfile.organizationId) {
-        // This is inefficient. For a larger app, repayments should have an organizationId.
-        // We are fetching all and will filter client-side if needed, but the list of loanIds below is better.
+        return query(collection(firestore, 'repayments'), where('organizationId', '==', userProfile.organizationId));
     }
+
     if (isLoadingLoans) return null; // Wait for loans to load
     if (!visibleLoans || visibleLoans.length === 0) {
         // No loans, so no repayments to fetch. Query a non-existent path to return empty.
@@ -56,6 +57,7 @@ export default function RepaymentsPage() {
     }
 
     const loanIds = visibleLoans.map(l => l.id);
+    // Firestore 'in' query is limited to 30 items in new SDK versions
     if (loanIds.length > 30) {
         console.warn(`Repayment query limited to 30 loans due to Firestore limitations.`);
         return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds.slice(0, 30)));

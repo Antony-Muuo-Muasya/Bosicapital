@@ -105,6 +105,7 @@ export type Installment = {
 
 export type Repayment = {
   id:string;
+  organizationId: string;
   loanId: string;
   amount: number;
   paymentDate: string;
