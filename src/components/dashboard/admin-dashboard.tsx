@@ -1,3 +1,4 @@
+
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '../ui/button';
@@ -6,8 +7,8 @@ import { useState, useMemo } from 'react';
 import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role } from '@/lib/types';
+import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role, Installment } from '@/lib/types';
 import { OverviewCards } from './overview-cards';
 import { PortfolioStatusChart } from './admin/portfolio-status-chart';
 import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
@@ -65,6 +66,11 @@ export function AdminDashboard() {
     return query(collection(firestore, 'roles'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId]);
 
+  const installmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
+    return query(collectionGroup(firestore, 'installments'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId]);
+
 
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
@@ -73,8 +79,9 @@ export function AdminDashboard() {
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
   const { data: roles, isLoading: rolesLoading } = useCollection<Role>(rolesQuery);
+  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || productsLoading || usersLoading || branchesLoading || regPaymentsLoading || rolesLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || productsLoading || usersLoading || branchesLoading || regPaymentsLoading || rolesLoading || installmentsLoading;
 
   const dashboardData = useMemo(() => {
     if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
@@ -165,7 +172,7 @@ export function AdminDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <OverviewCards 
             loans={loans}
-            installments={null}
+            installments={installments}
             borrowers={borrowers}
             regPayments={regPayments}
             isLoading={isLoading}
