@@ -49,6 +49,8 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
     },
   });
 
+  const repaymentCycle = form.watch('repaymentCycle');
+
   const onSubmit = (values: ProductFormData) => {
     if (!userProfile || !firestore) return;
     setIsSubmitting(true);
@@ -125,7 +127,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
               )} />
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (Months)</FormLabel>
+                  <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

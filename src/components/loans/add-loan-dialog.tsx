@@ -103,9 +103,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
     const interest = values.principal * (selectedProduct.interestRate / 100);
     const totalPayable = values.principal + interest;
     
-    const numberOfInstallments = selectedProduct.repaymentCycle === 'Weekly'
-        ? selectedProduct.duration * 4 // Simple assumption
-        : selectedProduct.duration;
+    const numberOfInstallments = selectedProduct.duration;
     const installmentAmount = totalPayable / numberOfInstallments;
 
     const newLoanData = {
