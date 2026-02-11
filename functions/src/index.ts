@@ -54,10 +54,11 @@ function normalizePhoneNumber(msisdn: string): string | null {
  * @param {string} message The message to send.
  */
 async function sendSms(to: string, message: string) {
-  const {username, apikey} = functions.config().africastalking;
+  const username = process.env.AFRICASTALKING_USERNAME!;
+  const apikey = process.env.AFRICASTALKING_APIKEY!;
 
   if (!username || !apikey) {
-    functions.logger.error("Africa's Talking credentials are not set in function config.");
+    functions.logger.error("Africa's Talking credentials are not set in environment variables.");
     return;
   }
 
