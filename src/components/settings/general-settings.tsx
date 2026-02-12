@@ -58,7 +58,7 @@ export function GeneralSettings() {
     const onSubmit = (values: SettingsFormData) => {
         if (!orgRef) return;
         setIsSubmitting(true);
-        setDoc(orgRef, values, { merge: true })
+        updateDocumentNonBlocking(orgRef, values)
             .then(() => {
                 toast({ title: 'Success', description: 'Organization settings updated.' });
             })
