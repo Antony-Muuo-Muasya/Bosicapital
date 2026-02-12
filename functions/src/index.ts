@@ -1,3 +1,4 @@
+'use client';
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as dotenv from "dotenv";
@@ -181,70 +182,68 @@ export const mpesaPaymentCallback = functions.https.onRequest(
           }
         }
 
-        if (!loanRef || !loanData || !borrowerId) {
-          await db.collection("failed_mpesa_callbacks").add(callbackData);
-          res.status(200).json({ResultCode: 0, ResultDesc: "Accepted"});
-          return;
-        }
-
-        const finalLoanStatus = await db.runTransaction(async (transaction) => {
-          const installmentsRef = loanRef.collection("installments");
-          const unpaidInstallmentsQuery = await transaction.get(
-            installmentsRef
-              .where("status", "in", ["Unpaid", "Partial", "Overdue"])
-              .orderBy("dueDate")
-          );
-
-          let paymentRemaining = paymentAmount;
-          let totalPaidOnLoan = 0;
-
-          const allInstallments = await transaction.get(installmentsRef);
-          allInstallments.forEach((doc) => {
-            totalPaidOnLoan += (doc.data() as Installment).paidAmount;
-          });
-
-          for (const doc of unpaidInstallmentsQuery.docs) {
-            if (paymentRemaining <= 0) break;
-            const installment = doc.data() as Installment;
-            const amountDue = installment.expectedAmount - installment.paidAmount;
-
-            if (paymentRemaining >= amountDue) {
-              transaction.update(doc.ref, {paidAmount: installment.expectedAmount, status: "Paid"});
-              paymentRemaining -= amountDue;
-            } else {
-              transaction.update(doc.ref, {paidAmount: installment.paidAmount + paymentRemaining, status: "Partial"});
-              paymentRemaining = 0;
+        if (loanRef && loanData && borrowerId) {
+            const finalLoanStatus = await db.runTransaction(async (transaction) => {
+              const installmentsRef = loanRef.collection("installments");
+              const unpaidInstallmentsQuery = await transaction.get(
+                installmentsRef
+                  .where("status", "in", ["Unpaid", "Partial", "Overdue"])
+                  .orderBy("dueDate")
+              );
+    
+              let paymentRemaining = paymentAmount;
+              let totalPaidOnLoan = 0;
+    
+              const allInstallments = await transaction.get(installmentsRef);
+              allInstallments.forEach((doc) => {
+                totalPaidOnLoan += (doc.data() as Installment).paidAmount;
+              });
+    
+              for (const doc of unpaidInstallmentsQuery.docs) {
+                if (paymentRemaining <= 0) break;
+                const installment = doc.data() as Installment;
+                const amountDue = installment.expectedAmount - installment.paidAmount;
+    
+                if (paymentRemaining >= amountDue) {
+                  transaction.update(doc.ref, {paidAmount: installment.expectedAmount, status: "Paid"});
+                  paymentRemaining -= amountDue;
+                } else {
+                  transaction.update(doc.ref, {paidAmount: installment.paidAmount + paymentRemaining, status: "Partial"});
+                  paymentRemaining = 0;
+                }
+              }
+    
+              totalPaidOnLoan += paymentAmount;
+              const balanceAfterPayment = loanData.totalPayable - totalPaidOnLoan;
+              const newLoanStatus = balanceAfterPayment <= 0 ? "Completed" : "Active";
+    
+              transaction.update(loanRef, {status: newLoanStatus, lastPaymentDate: new Date().toISOString()});
+    
+              const newRepaymentRef = db.collection("repayments").doc();
+              transaction.set(newRepaymentRef, {
+                id: newRepaymentRef.id,
+                organizationId: loanData.organizationId,
+                loanId: loanRef.id,
+                borrowerId,
+                transId: TransID,
+                amount: paymentAmount,
+                paymentDate: new Date().toISOString(),
+                collectedById: "mpesa_system",
+                method: "Mobile Money",
+                phone: MSISDN,
+                balanceAfterPayment,
+              });
+    
+              return {newLoanStatus, balanceAfterPayment, loanId: loanRef.id};
+            });
+    
+            if (borrowerPhone) {
+              const {newLoanStatus, balanceAfterPayment, loanId} = finalLoanStatus;
+              const smsMessage = `Payment Received: KES ${paymentAmount}.\nLoan ID: ${loanId.substring(0, 8)}...\nRemaining Balance: KES ${balanceAfterPayment.toFixed(2)}.\nStatus: ${newLoanStatus}.\nThank you for your payment.`;
+              await sendSms(borrowerPhone, smsMessage);
             }
-          }
-
-          totalPaidOnLoan += paymentAmount;
-          const balanceAfterPayment = loanData.totalPayable - totalPaidOnLoan;
-          const newLoanStatus = balanceAfterPayment <= 0 ? "Completed" : "Active";
-
-          transaction.update(loanRef, {status: newLoanStatus, lastPaymentDate: new Date().toISOString()});
-
-          const newRepaymentRef = db.collection("repayments").doc();
-          transaction.set(newRepaymentRef, {
-            id: newRepaymentRef.id,
-            organizationId: loanData.organizationId,
-            loanId: loanRef.id,
-            borrowerId,
-            transId: TransID,
-            amount: paymentAmount,
-            paymentDate: new Date().toISOString(),
-            collectedById: "mpesa_system",
-            method: "Mobile Money",
-            phone: MSISDN,
-            balanceAfterPayment,
-          });
-
-          return {newLoanStatus, balanceAfterPayment, loanId: loanRef.id};
-        });
-
-        if (borrowerPhone) {
-          const {newLoanStatus, balanceAfterPayment, loanId} = finalLoanStatus;
-          const smsMessage = `Payment Received: KES ${paymentAmount}.\nLoan ID: ${loanId.substring(0, 8)}...\nRemaining Balance: KES ${balanceAfterPayment.toFixed(2)}.\nStatus: ${newLoanStatus}.\nThank you for your payment.`;
-          await sendSms(borrowerPhone, smsMessage);
+        } else {
+            await db.collection("failed_mpesa_callbacks").add(callbackData);
         }
 
         res.status(200).json({ResultCode: 0, ResultDesc: "Accepted"});
