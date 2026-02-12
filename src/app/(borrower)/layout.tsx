@@ -69,53 +69,55 @@ export default function BorrowerLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-24 items-center">
-            <Link href="/my-dashboard" className="mr-6 flex items-center space-x-2">
-              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={80} height={80} className="rounded-md" />}
-              <span className="font-bold sm:inline-block font-headline">{organization?.name || ''}</span>
+        <div className="container flex flex-col items-center gap-4 py-6">
+            <Link href="/my-dashboard" className="flex flex-col items-center gap-2 text-center">
+              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" />}
+              <span className="text-2xl font-bold sm:inline-block font-headline">{organization?.name || ''}</span>
             </Link>
-             <nav className="flex items-center space-x-6 text-sm font-medium">
-              {borrowerNavItems.map((item) => (
-                  <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                          'transition-colors hover:text-primary',
-                          pathname === item.href ? 'text-foreground' : 'text-muted-foreground'
-                      )}
-                  >
-                      {item.label}
-                  </Link>
-              ))}
-            </nav>
-          <div className="flex flex-1 items-center justify-end space-x-4">
-          <ThemeToggle />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="icon" className="rounded-full">
-                <Avatar className="h-8 w-8">
-                <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
-                <AvatarFallback>{fallback}</AvatarFallback>
-                </Avatar>
-                <span className="sr-only">Toggle user menu</span>
-            </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link href="/my-profile">Profile</Link></DropdownMenuItem>
-             <DropdownMenuItem asChild><Link href="/help">
-                <LifeBuoy className="mr-2 h-4 w-4" />
-                <span>Help Center</span>
-             </Link></DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => auth.signOut()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-            </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-          </div>
+            <div className='flex w-full items-center'>
+                <nav className="flex items-center space-x-6 text-sm font-medium">
+                {borrowerNavItems.map((item) => (
+                    <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                            'transition-colors hover:text-primary',
+                            pathname === item.href ? 'text-foreground' : 'text-muted-foreground'
+                        )}
+                    >
+                        {item.label}
+                    </Link>
+                ))}
+                </nav>
+                <div className="flex flex-1 items-center justify-end space-x-4">
+                    <ThemeToggle />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                        <Button variant="secondary" size="icon" className="rounded-full">
+                            <Avatar className="h-8 w-8">
+                            <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
+                            <AvatarFallback>{fallback}</AvatarFallback>
+                            </Avatar>
+                            <span className="sr-only">Toggle user menu</span>
+                        </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild><Link href="/my-profile">Profile</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href="/help">
+                            <LifeBuoy className="mr-2 h-4 w-4" />
+                            <span>Help Center</span>
+                        </Link></DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => auth.signOut()}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Log out</span>
+                        </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
         </div>
       </header>
       <main className="flex-1 bg-muted/20">{children}</main>
