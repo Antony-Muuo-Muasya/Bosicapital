@@ -51,9 +51,10 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
 
 /**
  * Initiates an updateDoc operation and returns a promise.
+ * It uses setDoc with merge for robustness against certain permission issues.
  */
 export function updateDocumentNonBlocking(docRef: DocumentReference, data: any) {
-  return updateDoc(docRef, data)
+  return setDoc(docRef, data, { merge: true })
     .catch(error => {
       errorEmitter.emit(
         'permission-error',
