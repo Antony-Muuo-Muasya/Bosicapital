@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { doc, collection, writeBatch, getDocs, query, limit } from 'firebase/firestore';
+import { doc, collection, writeBatch, getDocs, query, limit, where } from 'firebase/firestore';
 import type { User as AppUser, Role, Branch, Organization } from '@/lib/types';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -77,9 +77,10 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     setIsSubmitting(true);
     try {
-      const usersCol = collection(firestore, 'users');
-      const allUsersSnapshot = await getDocs(query(usersCol));
-      const isFirstUserEver = allUsersSnapshot.empty;
+      // Check if an organization already exists.
+      const orgsQuery = query(collection(firestore, 'organizations'), limit(1));
+      const orgsSnapshot = await getDocs(orgsQuery);
+      const isFirstUserEver = orgsSnapshot.empty;
 
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, {
@@ -88,15 +89,26 @@ export default function SignupPage() {
 
       const batch = writeBatch(firestore);
       let organizationId: string;
-      let orgName: string;
       let roleId: AppUser['roleId'];
       let branchIds: string[] = [];
-      const orgCreatedAt = new Date().toISOString();
+      const createdAt = new Date().toISOString();
 
       if (isFirstUserEver) {
-        organizationId = 'default_org'; 
-        orgName = 'My Organization';
+        // First user setup: creates the organization, roles, and main branch
+        const orgRef = doc(collection(firestore, 'organizations'));
+        organizationId = orgRef.id;
         roleId = 'superadmin';
+        
+        const orgData: Organization = {
+            id: organizationId,
+            name: `${values.fullName}'s Organization`,
+            logoUrl: '',
+            slogan: 'Capital that works',
+            createdAt,
+            phone: '0755595565',
+            address: 'Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi',
+        };
+        batch.set(orgRef, orgData);
         
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
             { id: 'superadmin', name: 'CEO / Business Developer', systemRole: true, permissions: ['*'] as any },
@@ -119,30 +131,25 @@ export default function SignupPage() {
         branchIds = [mainBranch.id];
 
       } else {
-         const newOrgRef = doc(collection(firestore, 'organizations'));
-         organizationId = newOrgRef.id;
-         orgName = `${values.fullName}'s Organization`;
-         roleId = 'admin'; 
-         
-         const mainBranchRef = doc(collection(firestore, 'branches'));
-         const mainBranch: Branch = {
-             id: mainBranchRef.id, name: 'Headquarters', location: 'Default Location', isMain: true, organizationId,
-         };
-         batch.set(mainBranchRef, mainBranch);
-         branchIds = [mainBranch.id];
+        // Subsequent user setup: join the existing organization
+        const existingOrg = orgsSnapshot.docs[0].data() as Organization;
+        organizationId = existingOrg.id;
+        roleId = 'user'; // Default new users to the 'Borrower' role.
+        
+        // Find the main branch of the existing organization to assign the user
+        const branchesQuery = query(
+            collection(firestore, 'branches'), 
+            where('organizationId', '==', organizationId), 
+            where('isMain', '==', true),
+            limit(1)
+        );
+        const branchSnapshot = await getDocs(branchesQuery);
+        if (!branchSnapshot.empty) {
+            branchIds = [branchSnapshot.docs[0].id];
+        }
       }
 
-      const orgDocRef = doc(firestore, 'organizations', organizationId);
-      const newOrganizationData: Omit<Organization, 'id'> = {
-        name: orgName,
-        logoUrl: '',
-        slogan: 'Capital that works',
-        createdAt: orgCreatedAt,
-        phone: '0755595565',
-        address: 'Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi',
-      };
-      batch.set(orgDocRef, { ...newOrganizationData, id: orgDocRef.id });
-
+      // Create the user document in Firestore
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
       const newUserProfile: AppUser = {
           id: userCredential.user.uid,
@@ -152,7 +159,7 @@ export default function SignupPage() {
           roleId: roleId,
           branchIds: branchIds,
           status: 'active',
-          createdAt: new Date().toISOString(),
+          createdAt: createdAt,
       };
       batch.set(userDocRef, newUserProfile);
 
@@ -176,6 +183,9 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!isUserLoading && user) {
+      // The redirect should depend on the user's role, which is set during signup.
+      // A fresh user might not have their profile immediately, so a simple push is okay.
+      // The layout for the destination will handle role-based redirection if needed.
       router.push('/dashboard');
     }
   }, [user, isUserLoading, router]);
