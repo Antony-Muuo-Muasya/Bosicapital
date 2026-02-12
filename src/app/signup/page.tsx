@@ -1,6 +1,6 @@
 'use client';
 
-import { AdooLogo } from '@/components/icons';
+import { BosiCapitalLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -59,7 +59,7 @@ export default function SignupPage() {
 
       if (isFirstUserEver) {
         // --- This is the first user ever: They become SUPERADMIN. ---
-        const organizationId = 'adoo_super_org'; // A special, known ID for the super admin org
+        const organizationId = 'bosi_capital_super_org'; // A special, known ID for the super admin org
         
         // Seed all system roles globally. This happens only once.
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
@@ -156,7 +156,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <AdooLogo className="mx-auto h-8 w-8 text-primary" />
+          <BosiCapitalLogo className="mx-auto h-8 w-8 text-primary" />
           <CardTitle className="text-2xl">Create an Account</CardTitle>
           <CardDescription>Enter your details to get started.</CardDescription>
         </CardHeader>

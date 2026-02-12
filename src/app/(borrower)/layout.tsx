@@ -1,5 +1,5 @@
 'use client';
-import { AdooLogo } from '@/components/icons';
+import { BosiCapitalLogo } from '@/components/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -67,8 +67,8 @@ export default function BorrowerLayout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
             <Link href="/my-dashboard" className="mr-6 flex items-center space-x-2">
-              <AdooLogo className="h-6 w-6 text-primary" />
-              <span className="font-bold sm:inline-block font-headline">Adoo</span>
+              <BosiCapitalLogo className="h-6 w-6 text-primary" />
+              <span className="font-bold sm:inline-block font-headline">BOSI CAPITAL</span>
             </Link>
              <nav className="flex items-center space-x-6 text-sm font-medium">
               {borrowerNavItems.map((item) => (

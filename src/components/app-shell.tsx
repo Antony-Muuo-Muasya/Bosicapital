@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { AdooLogo } from '@/components/icons';
+import { BosiCapitalLogo } from '@/components/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -90,6 +90,7 @@ function SidebarNav() {
 
   const visibleNavItems = React.useMemo(() => {
     if (!userRole) return [];
+    if (userRole.id === 'superadmin') return allNavItems;
     return allNavItems.filter(item => item.roles.includes(userRole.id));
   }, [userRole]);
 
@@ -132,8 +133,8 @@ function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-lg font-semibold mb-4"
               >
-                <AdooLogo className="h-6 w-6 text-primary" />
-                <span className="font-headline text-xl">Adoo</span>
+                <BosiCapitalLogo className="h-6 w-6 text-primary" />
+                <span className="font-headline text-xl">BOSI CAPITAL</span>
               </Link>
                <SidebarNav />
             </nav>
@@ -219,8 +220,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <AdooLogo className="h-6 w-6 text-primary" />
-              <span className="font-headline text-xl">Adoo</span>
+              <BosiCapitalLogo className="h-6 w-6 text-primary" />
+              <span className="font-headline text-xl">BOSI CAPITAL</span>
             </Link>
           </div>
           <div className="flex-1">

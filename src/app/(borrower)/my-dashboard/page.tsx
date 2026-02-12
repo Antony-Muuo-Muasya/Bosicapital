@@ -5,7 +5,7 @@ import { collection, query, where, doc } from "firebase/firestore";
 import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, Trophy, Lightbulb, User, Mail, Wallet, CalendarDays, Hourglass, Sparkles, BookOpen, ShieldCheck, History, PlusCircle } from "lucide-react";
+import { Loader2, Trophy, Lightbulb, User, Mail, Wallet, CalendarDays, Hourglass, Sparkles, BookOpen, ShieldCheck, History, PlusCircle, Info } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -259,12 +259,18 @@ export default function MyDashboardPage() {
                 </div>
 
                 <div className="lg:col-span-1 space-y-6">
-                    <Card>
-                        <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
-                        <CardContent className="flex flex-col gap-2">
-                             <Button disabled={!activeLoan}><Wallet className="mr-2 h-4 w-4"/> Make a Payment</Button>
-                             <Button variant="outline" asChild><Link href="/my-loans"><History className="mr-2 h-4 w-4"/> View Loan History</Link></Button>
-                             <Button variant="outline" disabled={!!activeLoan}><PlusCircle className="mr-2 h-4 w-4"/> Apply for a New Loan</Button>
+                     <Card className="bg-primary/5 border-primary/20">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Info className="text-primary"/> How to Pay</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                            <p>You can easily pay your loan via M-Pesa:</p>
+                            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                                <li>Go to Lipa na M-Pesa, then Pay Bill.</li>
+                                <li>Enter Business No: <strong className="text-foreground">4159879</strong></li>
+                                <li>Enter Account No: <strong className="text-foreground">{borrower.nationalId}</strong></li>
+                                <li>Enter the amount and your PIN.</li>
+                            </ol>
                         </CardContent>
                     </Card>
 

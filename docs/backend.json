@@ -113,6 +113,8 @@
         "employmentStatus": { "type": "string", "enum": ["Employed", "Self-employed", "Unemployed"] },
         "monthlyIncome": { "type": "number" },
         "photoUrl": { "type": "string", "format": "uri" },
+        "businessPhotoUrl": { "type": "string", "format": "uri" },
+        "homeAssetsPhotoUrl": { "type": "string", "format": "uri" },
         "branchId": { "type": "string" },
         "userId": { "type": "string" },
         "registrationFeeRequired": { "type": "boolean", "default": true },
@@ -181,7 +183,8 @@
         "maxAmount": { "type": "number" },
         "interestRate": { "type": "number" },
         "duration": { "type": "number" },
-        "repaymentCycle": { "type": "string", "enum": ["Weekly", "Monthly"] }
+        "repaymentCycle": { "type": "string", "enum": ["Weekly", "Monthly"] },
+        "processingFee": { "type": "number" }
       },
       "required": [
         "id",

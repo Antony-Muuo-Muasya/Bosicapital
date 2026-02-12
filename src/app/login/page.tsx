@@ -1,6 +1,6 @@
 'use client';
 
-import { AdooLogo } from '@/components/icons';
+import { BosiCapitalLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -70,7 +70,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <AdooLogo className="mx-auto h-8 w-8 text-primary" />
+          <BosiCapitalLogo className="mx-auto h-8 w-8 text-primary" />
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <CardDescription>Enter your credentials to access your account.</CardDescription>
         </CardHeader>

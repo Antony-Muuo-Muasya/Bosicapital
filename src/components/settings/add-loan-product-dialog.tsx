@@ -21,6 +21,7 @@ const productSchema = z.object({
   interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
   duration: z.coerce.number().int().positive('Duration must be a positive integer.'),
   repaymentCycle: z.enum(['Weekly', 'Monthly']),
+  processingFee: z.coerce.number().min(0, 'Processing fee cannot be negative.').optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -41,11 +42,12 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
     defaultValues: {
       name: '',
       category: '',
-      minAmount: 0,
-      maxAmount: 0,
-      interestRate: 0,
-      duration: 0,
+      minAmount: 5000,
+      maxAmount: 30000,
+      interestRate: 25,
+      duration: 1,
       repaymentCycle: 'Monthly',
+      processingFee: 500,
     },
   });
 
@@ -117,7 +119,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
                 </FormItem>
               )} />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="interestRate" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Interest Rate (%)</FormLabel>
@@ -125,6 +127,15 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
                   <FormMessage />
                 </FormItem>
               )} />
+               <FormField control={form.control} name="processingFee" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Processing Fee (KES)</FormLabel>
+                  <FormControl><Input type="number" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>

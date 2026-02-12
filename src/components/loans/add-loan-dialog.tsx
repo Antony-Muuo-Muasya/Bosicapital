@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,
@@ -70,15 +70,25 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
   });
 
   const selectedProductId = form.watch('loanProductId');
-  const selectedProduct = loanProducts.find(p => p.id === selectedProductId);
+  const principalValue = form.watch('principal');
+  const selectedProduct = useMemo(() => loanProducts.find(p => p.id === selectedProductId), [loanProducts, selectedProductId]);
   
   const eligibleBorrowers = useMemo(() => {
     return borrowers.filter(b => b.registrationFeePaid);
   }, [borrowers]);
 
+  const { totalPayable, interest, processingFee } = useMemo(() => {
+    if (!selectedProduct || !principalValue || principalValue <= 0) {
+        return { totalPayable: 0, interest: 0, processingFee: 0 };
+    }
+    const interest = principalValue * (selectedProduct.interestRate / 100);
+    const processingFee = selectedProduct.processingFee || 0;
+    const totalPayable = principalValue + interest + processingFee;
+    return { totalPayable, interest, processingFee };
+  }, [selectedProduct, principalValue]);
+
 
   useEffect(() => {
-    const principalValue = form.getValues('principal');
     if (selectedProduct && principalValue > 0) {
       if (principalValue > selectedProduct.maxAmount || principalValue < selectedProduct.minAmount) {
         form.setError('principal', {
@@ -89,7 +99,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
         form.clearErrors('principal');
       }
     }
-  }, [form.watch('principal'), selectedProduct, form]);
+  }, [principalValue, selectedProduct, form]);
 
 
   const onSubmit = async (values: LoanFormData) => {
@@ -100,8 +110,6 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
     setIsSubmitting(true);
 
     const loanRef = doc(collection(firestore, 'loans'));
-    const interest = values.principal * (selectedProduct.interestRate / 100);
-    const totalPayable = values.principal + interest;
     
     const numberOfInstallments = selectedProduct.duration;
     const installmentAmount = totalPayable / numberOfInstallments;
@@ -113,7 +121,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       loanProductId: values.loanProductId,
       principal: values.principal,
       interestRate: selectedProduct.interestRate,
-      duration: selectedProduct.duration,
+      duration: numberOfInstallments,
       totalPayable: totalPayable,
       installmentAmount: installmentAmount,
       issueDate: new Date().toISOString().split('T')[0], // This is the request date
@@ -197,15 +205,17 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 <FormField control={form.control} name="principal" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Principal Amount (KES)</FormLabel>
-                        <FormControl><Input type="number" placeholder="50000" {...field} disabled={!selectedProductId} /></FormControl>
+                        <FormControl><Input type="number" placeholder="5000" {...field} disabled={!selectedProductId} /></FormControl>
                         <FormMessage />
                     </FormItem>
                 )}/>
                 
-                {selectedProduct && form.getValues('principal') > 0 && !form.formState.errors.principal && (
-                    <div className="text-sm text-muted-foreground space-y-1 rounded-md bg-muted p-3">
-                       <p>Interest Rate: <strong>{selectedProduct.interestRate}%</strong></p>
-                       <p>Total Payable: <strong>{formatCurrency(form.getValues('principal') * (1 + selectedProduct.interestRate / 100), 'KES')}</strong></p>
+                {selectedProduct && principalValue > 0 && !form.formState.errors.principal && (
+                    <div className="text-sm text-muted-foreground space-y-2 rounded-md bg-muted p-3">
+                        <div className="flex justify-between items-center"><span>Principal</span> <strong>{formatCurrency(principalValue, 'KES')}</strong></div>
+                        <div className="flex justify-between items-center"><span>Interest ({selectedProduct.interestRate}%)</span> <strong>{formatCurrency(interest, 'KES')}</strong></div>
+                        {processingFee > 0 && <div className="flex justify-between items-center"><span>Processing Fee</span> <strong>{formatCurrency(processingFee, 'KES')}</strong></div>}
+                        <div className="flex justify-between items-center font-semibold border-t pt-2 mt-2"><span>Total Payable</span> <strong className="text-base">{formatCurrency(totalPayable, 'KES')}</strong></div>
                     </div>
                 )}
 

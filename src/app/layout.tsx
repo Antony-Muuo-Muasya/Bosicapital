@@ -5,8 +5,8 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Adoo - Smart Microfinancing',
-  description: 'Smart Microfinancing for Modern Lenders',
+  title: 'BOSI CAPITAL LIMITED',
+  description: 'Capital that works',
 };
 
 export default function RootLayout({

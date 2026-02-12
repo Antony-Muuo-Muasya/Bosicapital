@@ -54,6 +54,8 @@ export type Borrower = {
   employmentStatus: 'Employed' | 'Self-employed' | 'Unemployed';
   monthlyIncome: number;
   photoUrl: string;
+  businessPhotoUrl?: string;
+  homeAssetsPhotoUrl?: string;
   branchId: string;
   registrationFeeRequired: boolean;
   registrationFeeAmount: number;
@@ -73,6 +75,7 @@ export type LoanProduct = {
   interestRate: number;
   duration: number; // in intervals (e.g., months or weeks, depending on repaymentCycle)
   repaymentCycle: 'Weekly' | 'Monthly';
+  processingFee?: number;
 };
 
 export type Loan = {

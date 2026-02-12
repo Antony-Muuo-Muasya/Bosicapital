@@ -46,6 +46,8 @@ const borrowerSchema = z.object({
   gender: z.enum(['Male', 'Female', 'Other']),
   employmentStatus: z.enum(['Employed', 'Self-employed', 'Unemployed']),
   monthlyIncome: z.coerce.number().min(0, 'Monthly income must be a positive number.'),
+  businessPhotoUrl: z.string().url().optional().or(z.literal('')),
+  homeAssetsPhotoUrl: z.string().url().optional().or(z.literal('')),
 });
 
 type BorrowerFormData = z.infer<typeof borrowerSchema>;
@@ -66,25 +68,16 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !staffProfile) return null;
-    const { organizationId, roleId, branchIds } = staffProfile;
-    const borrowersCol = collection(firestore, 'borrowers');
-
-    if (roleId === 'admin') {
-      return query(borrowersCol, where('organizationId', '==', organizationId));
-    }
-    
-    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
-      return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-    }
-
-    return null;
+    const { organizationId, roleId } = staffProfile;
+    if (roleId === 'superadmin') return collection(firestore, 'borrowers');
+    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
   }, [firestore, staffProfile]);
 
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
 
   useEffect(() => {
-    if (!firestore || !staffProfile || borrowersLoading || !['admin', 'manager', 'loan_officer'].includes(staffProfile.roleId)) {
-      setUsersLoading(false);
+    if (!firestore || !staffProfile || borrowersLoading) {
+      if (!borrowersLoading) setUsersLoading(false);
       return;
     }
   
@@ -93,13 +86,21 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
       try {
         const usersData: AppUser[] = [];
         const borrowerUserIds = new Set(borrowers?.map(b => b.userId) || []);
-  
-        // All staff who can create borrowers should be able to see all unlinked users in the org.
-        const q = query(
-            collection(firestore, 'users'), 
-            where('roleId', '==', 'user'), 
-            where('organizationId', '==', staffProfile.organizationId)
-        );
+        
+        let q;
+        if (staffProfile.roleId === 'superadmin') {
+            q = query(
+                collection(firestore, 'users'), 
+                where('roleId', '==', 'user')
+            );
+        } else {
+            q = query(
+                collection(firestore, 'users'), 
+                where('roleId', '==', 'user'), 
+                where('organizationId', '==', staffProfile.organizationId)
+            );
+        }
+        
         const querySnapshot = await getDocs(q);
         querySnapshot.forEach(doc => {
             usersData.push({ id: doc.id, ...doc.data() } as AppUser);
@@ -112,7 +113,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
         toast({
           variant: "destructive",
           title: "Could not fetch users",
-          description: "You may not have the required permissions. Please contact an administrator."
+          description: "An error occurred while fetching user accounts."
         });
       } finally {
         setUsersLoading(false);
@@ -134,6 +135,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
       gender: 'Male',
       employmentStatus: 'Employed',
       monthlyIncome: 0,
+      businessPhotoUrl: '',
+      homeAssetsPhotoUrl: ''
     },
   });
 
@@ -153,14 +156,14 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     const newBorrowerRef = doc(collection(firestore, 'borrowers'));
     const assignedBranchId = staffProfile.branchIds[0];
 
-    const newBorrowerData = {
+    const newBorrowerData: Borrower = {
       ...values,
       id: newBorrowerRef.id,
       email: selectedUser.email,
       fullName: selectedUser.fullName,
       photoUrl: `https://picsum.photos/seed/${newBorrowerRef.id}/400/400`,
       branchId: assignedBranchId,
-      organizationId: staffProfile.organizationId,
+      organizationId: selectedUser.organizationId,
       registrationFeeRequired: true,
       registrationFeeAmount: 800,
       registrationFeePaid: false,
@@ -169,7 +172,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     };
     batch.set(newBorrowerRef, newBorrowerData);
 
-    // 2. Update User Document with branchId
+    // 2. Update User Document with branchId if it's not already there
     const userDocRef = doc(firestore, 'users', selectedUser.id);
     const newBranchIds = Array.from(new Set([...(selectedUser.branchIds || []), assignedBranchId]));
     batch.update(userDocRef, { branchIds: newBranchIds });
@@ -257,7 +260,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                     <FormField control={form.control} name="phone" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Phone</FormLabel>
-                            <FormControl><Input placeholder="555-123-4567" {...field} /></FormControl>
+                            <FormControl><Input placeholder="07..." {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )}/>
@@ -326,6 +329,23 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                         </FormItem>
                     )}/>
                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="businessPhotoUrl" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Business Photo URL</FormLabel>
+                            <FormControl><Input placeholder="https://example.com/photo.jpg" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}/>
+                    <FormField control={form.control} name="homeAssetsPhotoUrl" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Home Assets Photo URL</FormLabel>
+                            <FormControl><Input placeholder="https://example.com/photo.jpg" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}/>
+                </div>
+
 
                 <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
