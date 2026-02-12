@@ -106,7 +106,7 @@ function SidebarNav() {
 
 function Header() {
   const auth = useAuth();
-  const { user, userProfile } = useUserProfile();
+  const { user, userProfile, organization } = useUserProfile();
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   
   const displayName = userProfile?.fullName || user?.email;
@@ -133,8 +133,8 @@ function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-lg font-semibold mb-4"
               >
-                <Image src="/logo.jpg" alt="BOSI CAPITAL" width={28} height={28} className="rounded-md" />
-                <span className="font-headline text-xl">BOSI CAPITAL</span>
+                <Image src={organization?.logoUrl || '/logo.jpg'} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
+                <span className="font-headline text-xl">{organization?.name || 'BOSI CAPITAL'}</span>
               </Link>
                <SidebarNav />
             </nav>
@@ -214,14 +214,15 @@ function Header() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { organization } = useUserProfile();
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <Image src="/logo.jpg" alt="BOSI CAPITAL" width={28} height={28} className="rounded-md" />
-              <span className="font-headline text-xl">BOSI CAPITAL</span>
+              <Image src={organization?.logoUrl || '/logo.jpg'} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
+              <span className="font-headline text-xl">{organization?.name || 'BOSI CAPITAL'}</span>
             </Link>
           </div>
           <div className="flex-1">

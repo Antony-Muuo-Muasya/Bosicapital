@@ -22,7 +22,7 @@ export default function BorrowerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, userProfile, isLoading } = useUserProfile();
+  const { user, userProfile, organization, isLoading } = useUserProfile();
   const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -67,8 +67,8 @@ export default function BorrowerLayout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
             <Link href="/my-dashboard" className="mr-6 flex items-center space-x-2">
-              <Image src="/logo.jpg" alt="BOSI CAPITAL" width={28} height={28} className="rounded-md" />
-              <span className="font-bold sm:inline-block font-headline">BOSI CAPITAL</span>
+              <Image src={organization?.logoUrl || '/logo.jpg'} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
+              <span className="font-bold sm:inline-block font-headline">{organization?.name || 'BOSI CAPITAL'}</span>
             </Link>
              <nav className="flex items-center space-x-6 text-sm font-medium">
               {borrowerNavItems.map((item) => (

@@ -15,7 +15,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { doc, collection, writeBatch, getDocs, query } from 'firebase/firestore';
-import type { User as AppUser, Role, Branch } from '@/lib/types';
+import type { User as AppUser, Role, Branch, Organization } from '@/lib/types';
 import Image from 'next/image';
 
 
@@ -56,11 +56,14 @@ export default function SignupPage() {
 
       const batch = writeBatch(firestore);
       let organizationId: string;
+      let orgName: string;
       let roleId: AppUser['roleId'];
       let branchIds: string[] = [];
+      const orgCreatedAt = new Date().toISOString();
 
       if (isFirstUserEver) {
         organizationId = 'bosi_capital_org'; 
+        orgName = 'BOSI CAPITAL LIMITED';
         roleId = 'superadmin';
         
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
@@ -84,8 +87,9 @@ export default function SignupPage() {
         branchIds = [mainBranch.id];
 
       } else {
-         const newOrgRef = doc(collection(firestore, 'organizations')); // Just a placeholder to get an ID
+         const newOrgRef = doc(collection(firestore, 'organizations'));
          organizationId = newOrgRef.id;
+         orgName = `${values.fullName}'s Organization`;
          roleId = 'admin'; 
          
          const mainBranchRef = doc(collection(firestore, 'branches'));
@@ -95,6 +99,14 @@ export default function SignupPage() {
          batch.set(mainBranchRef, mainBranch);
          branchIds = [mainBranch.id];
       }
+
+      const orgDocRef = doc(firestore, 'organizations', organizationId);
+      const newOrganizationData: Omit<Organization, 'id'> = {
+        name: orgName,
+        logoUrl: '/logo.jpg',
+        createdAt: orgCreatedAt,
+      };
+      batch.set(orgDocRef, { ...newOrganizationData, id: orgDocRef.id });
 
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
       const newUserProfile: AppUser = {

@@ -1,5 +1,17 @@
 {
   "entities": {
+    "Organization": {
+      "title": "Organization",
+      "description": "Represents a microfinancing organization tenant in the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "logoUrl": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "createdAt"]
+    },
     "User": {
       "title": "User",
       "description": "Represents a user of the application.",
@@ -259,6 +271,14 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/organizations/{organizationId}",
+        "definition": {
+          "entityName": "Organization",
+          "schema": { "$ref": "#/backend/entities/Organization" },
+          "description": "Stores details for each tenant organization."
+        }
+      },
       {
         "path": "/users/{userId}",
         "definition": {

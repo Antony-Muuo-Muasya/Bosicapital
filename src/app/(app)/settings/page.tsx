@@ -2,6 +2,7 @@
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoanProductsManagement } from '@/components/settings/loan-products-management';
+import { GeneralSettings } from '@/components/settings/general-settings';
 
 
 export default function SettingsPage() {
@@ -24,9 +25,7 @@ export default function SettingsPage() {
             </div>
           </TabsContent>
            <TabsContent value="general">
-          <div className="border shadow-sm rounded-lg p-8 mt-4 text-center text-muted-foreground">
-              General organization settings will be here.
-            </div>
+              <GeneralSettings />
           </TabsContent>
         </Tabs>
       </div>

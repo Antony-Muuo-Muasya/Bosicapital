@@ -6,7 +6,7 @@ import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { useDoc } from './firestore/use-doc';
-import type { User as AppUser, Role } from '@/lib/types';
+import type { User as AppUser, Role, Organization } from '@/lib/types';
 
 
 interface FirebaseProviderProps {
@@ -56,6 +56,7 @@ export interface UserProfileHookResult {
   user: User | null;
   userProfile: WithId<AppUser> | null;
   userRole: WithId<Role> | null;
+  organization: WithId<Organization> | null;
   isLoading: boolean;
 }
 
@@ -205,16 +206,24 @@ export const useUserProfile = (): UserProfileHookResult => {
 
   const roleRef = useMemoFirebase(() => {
     if (!userProfile) return null;
-    // @ts-ignore
     return doc(firestore, 'roles', userProfile.roleId);
   }, [userProfile, firestore]);
 
   const { data: userRole, isLoading: isRoleLoading } = useDoc<Role>(roleRef);
 
+  const orgRef = useMemoFirebase(() => {
+    if (!userProfile) return null;
+    return doc(firestore, 'organizations', userProfile.organizationId);
+  }, [userProfile, firestore]);
+
+  const { data: organization, isLoading: isOrgLoading } = useDoc<Organization>(orgRef);
+
+
   return {
     user,
     userProfile,
     userRole,
-    isLoading: isAuthLoading || isProfileLoading || isRoleLoading,
+    organization,
+    isLoading: isAuthLoading || isProfileLoading || isRoleLoading || isOrgLoading,
   };
 };

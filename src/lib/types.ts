@@ -1,3 +1,10 @@
+export type Organization = {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  createdAt: string;
+};
+
 export type Permission = 
   | 'user.create'
   | 'user.edit'
