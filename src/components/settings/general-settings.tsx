@@ -45,7 +45,7 @@ export function GeneralSettings() {
     const form = useForm<SettingsFormData>({
         resolver: zodResolver(settingsSchema),
         values: {
-            name: organization?.name || '',
+            name: organization?.name || 'Bosi Capital Limited',
             logoUrl: organization?.logoUrl || '',
             slogan: organization?.slogan || 'Capital that works',
             phone: organization?.phone || '0755595565',
@@ -166,5 +166,3 @@ export function GeneralSettings() {
         </Card>
     );
 }
-
-    

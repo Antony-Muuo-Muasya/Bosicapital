@@ -101,7 +101,7 @@ export default function SignupPage() {
         
         const orgData: Organization = {
             id: organizationId,
-            name: `${values.fullName}'s Organization`,
+            name: "Bosi Capital Limited",
             logoUrl: '',
             slogan: 'Capital that works',
             createdAt,
