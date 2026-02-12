@@ -268,7 +268,7 @@ export default function MyDashboardPage() {
                             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
                                 <li>Go to Lipa na M-Pesa, then Pay Bill.</li>
                                 <li>Enter Business No: <strong className="text-foreground">4159879</strong></li>
-                                <li>Enter Account No: Your National ID (<strong className="text-foreground">{borrower.nationalId}</strong>)</li>
+                                <li>Enter Account No: Your National ID Number</li>
                                 <li>Enter the amount and your PIN.</li>
                             </ol>
                         </CardContent>
