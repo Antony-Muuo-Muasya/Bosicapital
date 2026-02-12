@@ -56,26 +56,31 @@ export const getLoanProductColumns = (onEdit: (product: LoanProduct) => void): C
   },
   {
     accessorKey: 'minAmount',
-    header: 'Min Amount',
+    header: 'Min',
     cell: ({ row }) => formatCurrency(row.original.minAmount, 'KES'),
   },
   {
     accessorKey: 'maxAmount',
-    header: 'Max Amount',
+    header: 'Max',
     cell: ({ row }) => formatCurrency(row.original.maxAmount, 'KES'),
   },
   {
     accessorKey: 'interestRate',
-    header: 'Interest Rate',
+    header: 'Interest',
     cell: ({ row }) => `${row.original.interestRate}%`,
   },
   {
     accessorKey: 'duration',
-    header: 'Duration (Months)',
+    header: 'Duration',
+    cell: ({ row }) => {
+        const product = row.original;
+        const unit = product.repaymentCycle === 'Weekly' ? 'wks' : 'mos';
+        return `${product.duration} ${unit}`;
+    }
   },
   {
     accessorKey: 'repaymentCycle',
-    header: 'Repayment Cycle',
+    header: 'Cycle',
   },
   {
     id: 'actions',
