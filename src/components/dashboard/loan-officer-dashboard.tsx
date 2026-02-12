@@ -39,19 +39,25 @@ export function LoanOfficerDashboard() {
   }, [firestore, user]);
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
 
-  // 2. Get borrowers associated with those loans.
+  // 2. Get all borrowers in the officer's branch(es).
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || loansLoading) return null; 
-    const borrowerIds = loans ? [...new Set(loans.map(l => l.borrowerId))] : [];
-    if (borrowerIds.length === 0) {
+    if (!firestore || !userProfile?.branchIds || userProfile.branchIds.length === 0) {
+      // Return a query that finds nothing if there are no branch IDs
       return query(collection(firestore, 'borrowers'), where(documentId(), '==', 'no-borrowers-found'));
-    }
-    return query(collection(firestore, 'borrowers'), where(documentId(), 'in', borrowerIds.slice(0, 30)));
-  }, [firestore, loans, loansLoading]);
+    };
+    return query(
+        collection(firestore, 'borrowers'), 
+        where('branchId', 'in', userProfile.branchIds)
+    );
+  }, [firestore, JSON.stringify(userProfile?.branchIds)]);
   const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
 
+
   // 3. Get all loan products (for dialogs)
-  const allLoanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
+  const allLoanProductsQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile) return null;
+    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId))
+  }, [firestore, userProfile]);
   const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
 
   // 4. Get repayments collected by the current officer
