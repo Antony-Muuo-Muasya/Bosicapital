@@ -1,6 +1,5 @@
 'use client';
 
-import { BosiCapitalLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -15,6 +14,7 @@ import { z } from 'zod';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import Image from 'next/image';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -70,8 +70,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <BosiCapitalLogo className="mx-auto h-8 w-8 text-primary" />
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
+          <Image src="/logo.jpg" alt="BOSI CAPITAL" width={40} height={40} className="mx-auto rounded-md" />
+          <CardTitle className="text-2xl pt-2">Welcome Back</CardTitle>
           <CardDescription>Enter your credentials to access your account.</CardDescription>
         </CardHeader>
         <CardContent>

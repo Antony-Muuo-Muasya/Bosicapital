@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { BosiCapitalLogo } from '@/components/icons';
+import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,14 +49,14 @@ import { ThemeToggle } from './theme-toggle';
 const allNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/loans', label: 'Loans', icon: CircleDollarSign, roles: ['admin', 'manager', 'loan_officer'] },
-  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['manager'] },
-  { href: '/disbursements', label: 'Disbursements', icon: FileKey, roles: ['admin'] },
+  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['manager', 'superadmin'] },
+  { href: '/disbursements', label: 'Disbursements', icon: FileKey, roles: ['admin', 'superadmin'] },
   { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager'] },
-  { href: '/users', label: 'Users', icon: UserCog, roles: ['admin'] },
-  { href: '/branches', label: 'Branches', icon: Building, roles: ['admin', 'manager'] },
-  { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
+  { href: '/users', label: 'Users', icon: UserCog, roles: ['admin', 'superadmin'] },
+  { href: '/branches', label: 'Branches', icon: Building, roles: ['admin', 'manager', 'superadmin'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin', 'superadmin'] },
 ];
 
 const NavLink = ({
@@ -133,7 +133,7 @@ function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-lg font-semibold mb-4"
               >
-                <BosiCapitalLogo className="h-6 w-6 text-primary" />
+                <Image src="/logo.jpg" alt="BOSI CAPITAL" width={28} height={28} className="rounded-md" />
                 <span className="font-headline text-xl">BOSI CAPITAL</span>
               </Link>
                <SidebarNav />
@@ -220,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <BosiCapitalLogo className="h-6 w-6 text-primary" />
+              <Image src="/logo.jpg" alt="BOSI CAPITAL" width={28} height={28} className="rounded-md" />
               <span className="font-headline text-xl">BOSI CAPITAL</span>
             </Link>
           </div>

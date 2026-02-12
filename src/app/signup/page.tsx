@@ -1,6 +1,5 @@
 'use client';
 
-import { BosiCapitalLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -15,8 +14,9 @@ import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { doc, collection, writeBatch, getDocs, query, where } from 'firebase/firestore';
+import { doc, collection, writeBatch, getDocs, query } from 'firebase/firestore';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
+import Image from 'next/image';
 
 
 const signupSchema = z.object({
@@ -45,7 +45,6 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     setIsSubmitting(true);
     try {
-      // Check if this is the first user ever to sign up.
       const usersCol = collection(firestore, 'users');
       const allUsersSnapshot = await getDocs(query(usersCol));
       const isFirstUserEver = allUsersSnapshot.empty;
@@ -58,14 +57,12 @@ export default function SignupPage() {
       const batch = writeBatch(firestore);
       let organizationId: string;
       let roleId: AppUser['roleId'];
-      let branchIds: string[];
+      let branchIds: string[] = [];
 
       if (isFirstUserEver) {
-        // --- This is the first user ever: They become SUPERADMIN of the BOSI org. ---
-        organizationId = 'bosi_capital_org'; // A special, known ID
+        organizationId = 'bosi_capital_org'; 
         roleId = 'superadmin';
         
-        // Seed all system roles globally. This happens only once.
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
             { id: 'superadmin', name: 'Super Administrator', systemRole: true, permissions: ['*'] as any },
             { id: 'admin', name: 'Administrator', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
@@ -76,10 +73,9 @@ export default function SignupPage() {
         
         rolesToSeed.forEach(roleData => {
             const roleDocRef = doc(firestore, 'roles', roleData.id);
-            batch.set(roleDocRef, { ...roleData, organizationId: 'system' }); // System roles are global
+            batch.set(roleDocRef, { ...roleData, organizationId: 'system' });
         });
         
-        // Create the main branch for the BOSI org
         const mainBranchRef = doc(collection(firestore, 'branches'));
         const mainBranch: Branch = {
             id: mainBranchRef.id, name: 'Headquarters', location: 'Nairobi', isMain: true, organizationId,
@@ -88,14 +84,18 @@ export default function SignupPage() {
         branchIds = [mainBranch.id];
 
       } else {
-         // --- A regular user is signing up: They become a 'user' in the main BOSI org ---
-         // This assumes a single-tenant system for BOSI CAPITAL
-         organizationId = 'bosi_capital_org';
-         roleId = 'user'; // Default role, to be promoted by an admin
-         branchIds = []; // No branches assigned initially
+         const newOrgRef = doc(collection(firestore, 'organizations')); // Just a placeholder to get an ID
+         organizationId = newOrgRef.id;
+         roleId = 'admin'; 
+         
+         const mainBranchRef = doc(collection(firestore, 'branches'));
+         const mainBranch: Branch = {
+             id: mainBranchRef.id, name: 'Headquarters', location: 'Default Location', isMain: true, organizationId,
+         };
+         batch.set(mainBranchRef, mainBranch);
+         branchIds = [mainBranch.id];
       }
 
-      // Create the user profile document
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
       const newUserProfile: AppUser = {
           id: userCredential.user.uid,
@@ -145,8 +145,8 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <BosiCapitalLogo className="mx-auto h-8 w-8 text-primary" />
-          <CardTitle className="text-2xl">Create an Account</CardTitle>
+          <Image src="/logo.jpg" alt="BOSI CAPITAL" width={40} height={40} className="mx-auto rounded-md" />
+          <CardTitle className="text-2xl pt-2">Create an Account</CardTitle>
           <CardDescription>Enter your details to get started.</CardDescription>
         </CardHeader>
         <CardContent>
