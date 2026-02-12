@@ -1,8 +1,117 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper function to get user data from the users collection
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    // Helper to check if the user is an admin or superadmin
+    function isSuperAdminOrAdmin(userId) {
+      let roleId = getUserData(userId).roleId;
+      return roleId == 'superadmin' || roleId == 'admin';
+    }
+    
+    // Helper to check if user belongs to a specific organization
+    function isUserInOrg(userId, orgId) {
+        return getUserData(userId).organizationId == orgId;
+    }
+
+    // Default deny all
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Organizations: Admins can update their own org, anyone in the org can read it.
+    match /organizations/{orgId} {
+      allow read: if request.auth != null && isUserInOrg(request.auth.uid, orgId);
+      allow write: if request.auth != null && isSuperAdminOrAdmin(request.auth.uid) && isUserInOrg(request.auth.uid, orgId);
+    }
+    
+    // Roles: Superadmin can manage, everyone else can read.
+    match /roles/{roleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && getUserData(request.auth.uid).roleId == 'superadmin';
+    }
+
+    // Users: Users can read/update their own profile. Admins can manage users in their org.
+    match /users/{userId} {
+      allow get: if request.auth != null && (request.auth.uid == userId || isSuperAdminOrAdmin(request.auth.uid));
+      allow list: if request.auth != null && isSuperAdminOrAdmin(request.auth.uid);
+      allow create: if request.auth != null; // Allow user creation during signup
+      allow update: if request.auth != null && (request.auth.uid == userId || (isSuperAdminOrAdmin(request.auth.uid) && isUserInOrg(request.auth.uid, resource.data.organizationId)));
+    }
+
+    // Branches: Admins/Managers can manage branches in their own org.
+    match /branches/{branchId} {
+        let orgId = get(/databases/$(database)/documents/branches/$(branchId)).data.organizationId;
+        allow read: if request.auth != null && isUserInOrg(request.auth.uid, orgId);
+        allow write: if request.auth != null && (isSuperAdminOrAdmin(request.auth.uid) || getUserData(request.auth.uid).roleId == 'manager') && isUserInOrg(request.auth.uid, orgId);
+    }
+    
+    // Loan Products: Admins can manage loan products in their org.
+    match /loanProducts/{productId} {
+        let orgId = get(/databases/$(database)/documents/loanProducts/$(productId)).data.organizationId;
+        allow read: if request.auth != null && isUserInOrg(request.auth.uid, orgId);
+        allow write: if request.auth != null && isSuperAdminOrAdmin(request.auth.uid) && isUserInOrg(request.auth.uid, orgId);
+    }
+    
+    // Borrowers: Staff can manage borrowers in their org. Borrowers can see their own profile.
+    match /borrowers/{borrowerId} {
+        let borrowerData = get(/databases/$(database)/documents/borrowers/$(borrowerId)).data;
+        allow get: if request.auth != null && (request.auth.uid == borrowerData.userId || isUserInOrg(request.auth.uid, borrowerData.organizationId));
+        allow list: if request.auth != null && isSuperAdminOrAdmin(request.auth.uid);
+        allow create, update: if request.auth != null && (getUserData(request.auth.uid).roleId in ['admin', 'manager', 'loan_officer']);
+    }
+
+    // Loans & Installments
+    match /loans/{loanId} {
+        let loanData = get(/databases/$(database)/documents/loans/$(loanId)).data;
+        let borrowerData = get(/databases/$(database)/documents/borrowers/$(loanData.borrowerId)).data;
+
+        // Allow read if user is the borrower or a staff member of the org
+        allow read: if request.auth != null && (request.auth.uid == borrowerData.userId || isUserInOrg(request.auth.uid, loanData.organizationId));
+        allow list: if request.auth != null && isUserInOrg(request.auth.uid, getUserData(request.auth.uid).organizationId);
+
+        // Allow write access based on roles
+        allow create: if request.auth != null && (getUserData(request.auth.uid).roleId in ['loan_officer', 'manager', 'admin', 'superadmin']);
+        allow update: if request.auth != null && (getUserData(request.auth.uid).roleId in ['superadmin', 'admin', 'manager']);
+
+        match /installments/{installmentId} {
+            // Inherit read access from parent loan
+            allow read: if request.auth != null && (request.auth.uid == borrowerData.userId || isUserInOrg(request.auth.uid, loanData.organizationId));
+            // Only allow updates from higher-level staff or system processes
+            allow write: if request.auth != null && (isSuperAdminOrAdmin(request.auth.uid) || getUserData(request.auth.uid).roleId == 'manager');
+        }
+    }
+    
+    // Payments: System can create. Admins/Borrowers can read.
+    match /repayments/{repaymentId} {
+        let repaymentData = get(/databases/$(database)/documents/repayments/$(repaymentId)).data;
+        let borrowerData = get(/databases/$(database)/documents/borrowers/$(repaymentData.borrowerId)).data;
+        allow get: if request.auth != null && (request.auth.uid == borrowerData.userId || isUserInOrg(request.auth.uid, repaymentData.organizationId));
+        allow list: if request.auth != null && isUserInOrg(request.auth.uid, getUserData(request.auth.uid).organizationId);
+        allow create: if request.auth != null; // Allow system/staff to create
+    }
+    
+    match /registrationPayments/{paymentId} {
+        let paymentData = get(/databases/$(database)/documents/registrationPayments/$(paymentId)).data;
+        let borrowerData = get(/databases/$(database)/documents/borrowers/$(paymentData.borrowerId)).data;
+        allow get: if request.auth != null && (request.auth.uid == borrowerData.userId || isUserInOrg(request.auth.uid, paymentData.organizationId));
+        allow list: if request.auth != null && isUserInOrg(request.auth.uid, getUserData(request.auth.uid).organizationId);
+        allow create: if request.auth != null; // Allow staff to create
+    }
+    
+    // Cloud Function data sinks - client should not write here.
+    match /mpesa_callbacks/{docId} {
+      allow read, write: if false;
+    }
+    match /failed_mpesa_callbacks/{docId} {
+      allow read, write: if false;
+    }
+    match /auditLogs/{logId} {
+        allow read, write: if false;
     }
   }
 }
