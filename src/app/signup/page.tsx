@@ -99,11 +99,11 @@ export default function SignupPage() {
         roleId = 'superadmin';
         
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
-            { id: 'superadmin', name: 'Super Administrator', systemRole: true, permissions: ['*'] as any },
-            { id: 'admin', name: 'Administrator', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
-            { id: 'manager', name: 'Manager', systemRole: true, permissions: ['user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
-            { id: 'loan_officer', name: 'Loan Officer', systemRole: true, permissions: ['loan.create', 'loan.view', 'repayment.create'] },
-            { id: 'user', name: 'User', systemRole: true, permissions: ['borrower.view.own'] },
+            { id: 'superadmin', name: 'CEO / Business Developer', systemRole: true, permissions: ['*'] as any },
+            { id: 'admin', name: 'Head of Operations', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
+            { id: 'manager', name: 'Manager / Head of Product', systemRole: true, permissions: ['user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
+            { id: 'loan_officer', name: 'Loan Officer / Call Center', systemRole: true, permissions: ['loan.create', 'loan.view', 'repayment.create'] },
+            { id: 'user', name: 'Borrower', systemRole: true, permissions: ['borrower.view.own'] },
         ];
         
         rolesToSeed.forEach(roleData => {
@@ -262,5 +262,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    
