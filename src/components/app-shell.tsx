@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
@@ -116,6 +115,17 @@ function Header() {
       ? `${nameParts[0].charAt(0)}${nameParts[1].charAt(0)}`
       : user?.email?.charAt(0).toUpperCase() || 'U';
 
+  const displayLogoUrl = React.useMemo(() => {
+    if (organization?.logoUrl && organization.logoUrl.includes('drive.google.com/file/d/')) {
+        const parts = organization.logoUrl.split('/d/');
+        if (parts.length > 1) {
+            const fileId = parts[1].split('/')[0];
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+    }
+    return organization?.logoUrl || '/logo.jpg';
+  }, [organization]);
+
 
   return (
     <>
@@ -133,7 +143,7 @@ function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-lg font-semibold mb-4"
               >
-                <Image src={organization?.logoUrl || '/logo.jpg'} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
+                <Image src={displayLogoUrl} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
                 <span className="font-headline text-xl">{organization?.name || 'BOSI CAPITAL'}</span>
               </Link>
                <SidebarNav />
@@ -215,13 +225,25 @@ function Header() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { organization } = useUserProfile();
+
+  const displayLogoUrl = React.useMemo(() => {
+    if (organization?.logoUrl && organization.logoUrl.includes('drive.google.com/file/d/')) {
+        const parts = organization.logoUrl.split('/d/');
+        if (parts.length > 1) {
+            const fileId = parts[1].split('/')[0];
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+    }
+    return organization?.logoUrl || '/logo.jpg';
+  }, [organization]);
+
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <Image src={organization?.logoUrl || '/logo.jpg'} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
+              <Image src={displayLogoUrl} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
               <span className="font-headline text-xl">{organization?.name || 'BOSI CAPITAL'}</span>
             </Link>
           </div>

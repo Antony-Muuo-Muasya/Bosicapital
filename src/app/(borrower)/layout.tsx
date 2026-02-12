@@ -7,7 +7,7 @@ import { useAuth, useUserProfile } from '@/firebase';
 import { LogOut, Loader2, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -40,6 +40,17 @@ export default function BorrowerLayout({
     }
   }, [user, userProfile, isLoading, router]);
 
+  const displayLogoUrl = useMemo(() => {
+    if (organization?.logoUrl && organization.logoUrl.includes('drive.google.com/file/d/')) {
+        const parts = organization.logoUrl.split('/d/');
+        if (parts.length > 1) {
+            const fileId = parts[1].split('/')[0];
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+    }
+    return organization?.logoUrl || '/logo.jpg';
+  }, [organization]);
+
   if (isLoading || !userProfile) {
     return (
       <div className="flex h-screen items-center justify-center gap-4">
@@ -67,7 +78,7 @@ export default function BorrowerLayout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
             <Link href="/my-dashboard" className="mr-6 flex items-center space-x-2">
-              <Image src={organization?.logoUrl || '/logo.jpg'} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
+              <Image src={displayLogoUrl} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
               <span className="font-bold sm:inline-block font-headline">{organization?.name || 'BOSI CAPITAL'}</span>
             </Link>
              <nav className="flex items-center space-x-6 text-sm font-medium">
