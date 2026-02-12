@@ -50,13 +50,13 @@ export default function LoanDetailPage({ params }: { params: { loanId: string } 
         }
     }, [loanError, router]);
 
-    const productRef = useMemoFirebase(() => loan ? doc(firestore, 'loanProducts', loan.loanProductId) : null, [firestore, loan]);
+    const productRef = useMemoFirebase(() => loan ? doc(firestore, 'loanProducts', loan.loanProductId) : null, [firestore, loan?.loanProductId]);
     const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
 
-    const borrowerRef = useMemoFirebase(() => loan ? doc(firestore, 'borrowers', loan.borrowerId) : null, [firestore, loan]);
+    const borrowerRef = useMemoFirebase(() => loan ? doc(firestore, 'borrowers', loan.borrowerId) : null, [firestore, loan?.borrowerId]);
     const { data: borrower, isLoading: isLoadingBorrower } = useDoc<Borrower>(borrowerRef);
 
-    const installmentsQuery = useMemoFirebase(() => loan ? collection(firestore, 'loans', loan.id, 'installments') : null, [firestore, loan]);
+    const installmentsQuery = useMemoFirebase(() => loan ? collection(firestore, 'loans', loan.id, 'installments') : null, [firestore, loan?.id]);
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
     
     const sortedInstallments = useMemo(() => {

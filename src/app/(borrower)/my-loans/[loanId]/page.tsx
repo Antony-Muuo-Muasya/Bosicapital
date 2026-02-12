@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, use } from "react";
+import { useEffect, useMemo } from "react";
 import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,8 +36,7 @@ const getInstallmentStatusConfig = (status: string) => {
 };
 
 export default function MyLoanDetailPage({ params }: { params: { loanId: string } }) {
-    const resolvedParams = use(params);
-    const loanId = resolvedParams.loanId;
+    const { loanId } = params;
     const firestore = useFirestore();
     const router = useRouter();
 
@@ -58,7 +57,7 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
     const productRef = useMemoFirebase(() => {
         if (!firestore || !loan) return null;
         return doc(firestore, 'loanProducts', loan.loanProductId);
-    }, [firestore, loan]);
+    }, [firestore, loan?.loanProductId]);
 
     const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
 
@@ -68,7 +67,7 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
             return collection(firestore, 'loans', loan.id, 'installments');
         }
         return null;
-    }, [firestore, loan]);
+    }, [firestore, loan?.id, loan?.status]);
 
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
     
