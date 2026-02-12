@@ -23,7 +23,7 @@ export function AppFooter() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Wallet className="h-4 w-4" />
-                        <span>Paybill: 4159879 (Use National ID)</span>
+                        <span>Paybill: 4159879 (Account No: Client's National ID)</span>
                     </div>
                      {organization?.address && (
                         <div className="flex items-center gap-2 text-center md:text-left">

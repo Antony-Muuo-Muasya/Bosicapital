@@ -83,7 +83,7 @@ async function sendSms(to: string, message: string): Promise<void> {
       {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          apikey,
+          "apikey": apikey,
           "Accept": "application/json",
         },
       }
@@ -141,7 +141,7 @@ export const mpesaPaymentCallback = functions.https.onRequest(
         let borrowerId: string | null = null;
         let borrowerPhone: string | null = null;
 
-        // Match by BillRefNumber
+        // Match by BillRefNumber as loanId
         if (BillRefNumber) {
           const potentialLoanRef = db.collection("loans").doc(BillRefNumber);
           const loanDoc = await potentialLoanRef.get();
@@ -149,6 +149,31 @@ export const mpesaPaymentCallback = functions.https.onRequest(
             loanRef = potentialLoanRef;
             loanData = loanDoc.data() as Loan;
             borrowerId = loanData.borrowerId;
+            const borrowerDoc = await db.collection("borrowers").doc(borrowerId).get();
+            if (borrowerDoc.exists) {
+              borrowerPhone = borrowerDoc.data()?.phone;
+            }
+          }
+        }
+
+        // Match by BillRefNumber as National ID if no loanId match
+        if (!loanRef && BillRefNumber) {
+          const borrowersByNationalId = await db.collection("borrowers").where("nationalId", "==", BillRefNumber).limit(1).get();
+          if (!borrowersByNationalId.empty) {
+            const borrowerDoc = borrowersByNationalId.docs[0];
+            borrowerId = borrowerDoc.id;
+            borrowerPhone = borrowerDoc.data().phone;
+            const loansQuery = await db
+              .collection("loans")
+              .where("borrowerId", "==", borrowerId)
+              .where("status", "==", "Active")
+              .orderBy("issueDate", "desc")
+              .limit(1)
+              .get();
+            if (!loansQuery.empty) {
+              loanRef = loansQuery.docs[0].ref;
+              loanData = loansQuery.docs[0].data() as Loan;
+            }
           }
         }
 
@@ -184,7 +209,7 @@ export const mpesaPaymentCallback = functions.https.onRequest(
 
         if (loanRef && loanData && borrowerId) {
           const finalLoanStatus = await db.runTransaction(async (transaction) => {
-            const installmentsRef = loanRef!.collection("installments");
+            const installmentsRef = loanRef.collection("installments");
             const unpaidInstallmentsQuery = await transaction.get(
               installmentsRef
                 .where("status", "in", ["Unpaid", "Partial", "Overdue"])
@@ -214,16 +239,16 @@ export const mpesaPaymentCallback = functions.https.onRequest(
             }
 
             totalPaidOnLoan += paymentAmount;
-            const balanceAfterPayment = loanData!.totalPayable - totalPaidOnLoan;
+            const balanceAfterPayment = loanData.totalPayable - totalPaidOnLoan;
             const newLoanStatus = balanceAfterPayment <= 0 ? "Completed" : "Active";
 
-            transaction.update(loanRef!, {status: newLoanStatus, lastPaymentDate: new Date().toISOString()});
+            transaction.update(loanRef, {status: newLoanStatus, lastPaymentDate: new Date().toISOString()});
 
             const newRepaymentRef = db.collection("repayments").doc();
             transaction.set(newRepaymentRef, {
               id: newRepaymentRef.id,
-              organizationId: loanData!.organizationId,
-              loanId: loanRef!.id,
+              organizationId: loanData.organizationId,
+              loanId: loanRef.id,
               borrowerId,
               transId: TransID,
               amount: paymentAmount,
@@ -234,7 +259,7 @@ export const mpesaPaymentCallback = functions.https.onRequest(
               balanceAfterPayment,
             });
 
-            return {newLoanStatus, balanceAfterPayment, loanId: loanRef!.id};
+            return {newLoanStatus, balanceAfterPayment, loanId: loanRef.id};
           });
 
           if (borrowerPhone) {
