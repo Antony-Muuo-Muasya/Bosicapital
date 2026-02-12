@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { Skeleton } from '../ui/skeleton';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 const settingsSchema = z.object({
     name: z.string().min(1, 'Organization name is required.'),
@@ -42,6 +42,19 @@ export function GeneralSettings() {
             logoUrl: organization?.logoUrl || '',
         },
     });
+
+    const watchedLogoUrl = form.watch('logoUrl');
+
+    const displayLogoUrl = useMemo(() => {
+        if (watchedLogoUrl && watchedLogoUrl.includes('drive.google.com/file/d/')) {
+            const parts = watchedLogoUrl.split('/d/');
+            if (parts.length > 1) {
+                const fileId = parts[1].split('/')[0];
+                return `https://drive.google.com/uc?export=view&id=${fileId}`;
+            }
+        }
+        return watchedLogoUrl;
+    }, [watchedLogoUrl]);
 
     const onSubmit = (values: SettingsFormData) => {
         if (!orgRef) return;
@@ -98,8 +111,8 @@ export function GeneralSettings() {
                          <div>
                             <FormLabel>Current Logo Preview</FormLabel>
                             <div className="mt-2 p-4 border rounded-md flex items-center justify-center bg-muted/50 h-32">
-                                {form.watch('logoUrl') ? (
-                                    <Image src={form.watch('logoUrl')!} alt="Current Logo" width={80} height={80} className="object-contain" />
+                                {displayLogoUrl ? (
+                                    <Image src={displayLogoUrl} alt="Current Logo" width={80} height={80} className="object-contain" />
                                 ) : (
                                     <p className="text-sm text-muted-foreground">No logo URL provided</p>
                                 )}
