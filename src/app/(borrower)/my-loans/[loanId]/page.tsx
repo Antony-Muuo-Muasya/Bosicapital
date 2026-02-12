@@ -36,14 +36,13 @@ const getInstallmentStatusConfig = (status: string) => {
 };
 
 export default function MyLoanDetailPage({ params }: { params: { loanId: string } }) {
-    const { loanId } = params;
     const firestore = useFirestore();
     const router = useRouter();
 
     const loanRef = useMemoFirebase(() => {
         if (!firestore) return null;
-        return doc(firestore, 'loans', loanId);
-    }, [firestore, loanId]);
+        return doc(firestore, 'loans', params.loanId);
+    }, [firestore, params]);
     
     const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
 
@@ -57,7 +56,7 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
     const productRef = useMemoFirebase(() => {
         if (!firestore || !loan) return null;
         return doc(firestore, 'loanProducts', loan.loanProductId);
-    }, [firestore, loan?.loanProductId]);
+    }, [firestore, loan]);
 
     const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
 
@@ -67,7 +66,7 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
             return collection(firestore, 'loans', loan.id, 'installments');
         }
         return null;
-    }, [firestore, loan?.id, loan?.status]);
+    }, [firestore, loan]);
 
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
     
