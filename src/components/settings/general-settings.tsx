@@ -18,7 +18,10 @@ import { transformImageUrl } from '@/lib/utils';
 
 const settingsSchema = z.object({
     name: z.string().min(1, 'Organization name is required.'),
-    logoUrl: z.string().url('Must be a valid URL.').or(z.literal('')),
+    logoUrl: z.string().url('Must be a valid URL.').or(z.literal('')).refine(
+        (url) => !url.startsWith('gs://'),
+        { message: 'This is a storage path, not a public URL. Please use the HTTPS "Download URL" from Firebase Storage.' }
+    ),
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -96,8 +99,8 @@ export function GeneralSettings() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Logo URL</FormLabel>
-                                    <FormControl><Input placeholder="https://example.com/logo.png" {...field} /></FormControl>
-                                    <FormDescription>The application will use this image as your logo. It must be a public URL.</FormDescription>
+                                    <FormControl><Input placeholder="https://..." {...field} /></FormControl>
+                                    <FormDescription>Must be a public HTTPS link. For Firebase Storage, use the "Download URL".</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
