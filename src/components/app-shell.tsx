@@ -143,8 +143,8 @@ function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-lg font-semibold mb-4"
               >
-                <Image src={displayLogoUrl} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
-                <span className="font-headline text-xl">{organization?.name || 'BOSI CAPITAL'}</span>
+                <Image src={displayLogoUrl} alt={organization?.name || ''} width={28} height={28} className="rounded-md" />
+                <span className="font-headline text-xl">{organization?.name || ''}</span>
               </Link>
                <SidebarNav />
             </nav>
@@ -243,8 +243,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <Image src={displayLogoUrl} alt={organization?.name || 'BOSI CAPITAL'} width={28} height={28} className="rounded-md" />
-              <span className="font-headline text-xl">{organization?.name || 'BOSI CAPITAL'}</span>
+              <Image src={displayLogoUrl} alt={organization?.name || ''} width={28} height={28} className="rounded-md" />
+              <span className="font-headline text-xl">{organization?.name || ''}</span>
             </Link>
           </div>
           <div className="flex-1">

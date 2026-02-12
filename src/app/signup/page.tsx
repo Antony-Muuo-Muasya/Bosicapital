@@ -62,8 +62,8 @@ export default function SignupPage() {
       const orgCreatedAt = new Date().toISOString();
 
       if (isFirstUserEver) {
-        organizationId = 'bosi_capital_org'; 
-        orgName = 'BOSI CAPITAL LIMITED';
+        organizationId = 'default_org'; 
+        orgName = 'My Organization';
         roleId = 'superadmin';
         
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
@@ -157,7 +157,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Image src="/logo.jpg" alt="BOSI CAPITAL" width={40} height={40} className="mx-auto rounded-md" />
+          <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="mx-auto rounded-md" />
           <CardTitle className="text-2xl pt-2">Create an Account</CardTitle>
           <CardDescription>Enter your details to get started.</CardDescription>
         </CardHeader>

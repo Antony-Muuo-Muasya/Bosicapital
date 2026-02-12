@@ -5,8 +5,8 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'BOSI CAPITAL LIMITED',
-  description: 'Capital that works',
+  title: 'Lending Platform',
+  description: 'Your trusted lending partner',
 };
 
 export default function RootLayout({
