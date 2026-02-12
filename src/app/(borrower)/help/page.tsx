@@ -2,7 +2,8 @@
 import { PageHeader } from "@/components/page-header";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone, Mail, MapPin } from "lucide-react";
+import { Phone, Mail, MapPin, Loader2 } from "lucide-react";
+import { useUserProfile } from "@/firebase";
 
 const faqs = [
     {
@@ -28,6 +29,20 @@ const faqs = [
 ]
 
 export default function HelpCenterPage() {
+    const { organization, isLoading } = useUserProfile();
+
+    if (isLoading) {
+        return (
+            <div className="container max-w-5xl py-8">
+                <PageHeader title="Help Center" description="Find answers to common questions." />
+                 <div className="flex h-64 items-center justify-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Loading Contact Information...</p>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="container max-w-5xl py-8">
             <PageHeader title="Help Center" description="Find answers to common questions." />
@@ -59,13 +74,15 @@ export default function HelpCenterPage() {
                             <CardDescription>If you can't find the answer you're looking for, please get in touch.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <Phone className="h-5 w-5 text-primary" />
-                                <div className="text-sm">
-                                    <p className="font-medium">Phone Support</p>
-                                    <a href="tel:0706624577" className="text-muted-foreground hover:underline">0706624577</a>, <a href="tel:0114611857" className="text-muted-foreground hover:underline">0114611857</a>
+                             {organization?.phone && (
+                                <div className="flex items-center gap-4">
+                                    <Phone className="h-5 w-5 text-primary" />
+                                    <div className="text-sm">
+                                        <p className="font-medium">Phone Support</p>
+                                        <a href={`tel:${organization.phone}`} className="text-muted-foreground hover:underline">{organization.phone}</a>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                             <div className="flex items-center gap-4">
                                 <Mail className="h-5 w-5 text-primary" />
                                 <div className="text-sm">
@@ -73,13 +90,15 @@ export default function HelpCenterPage() {
                                     <a href="mailto:BOSILIMITED254@gmail.com" className="text-muted-foreground hover:underline">BOSILIMITED254@gmail.com</a>
                                 </div>
                             </div>
-                             <div className="flex items-start gap-4">
-                                <MapPin className="h-5 w-5 text-primary mt-1" />
-                                <div className="text-sm">
-                                    <p className="font-medium">Physical Address</p>
-                                    <p className="text-muted-foreground">Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi</p>
+                            {organization?.address && (
+                                 <div className="flex items-start gap-4">
+                                    <MapPin className="h-5 w-5 text-primary mt-1" />
+                                    <div className="text-sm">
+                                        <p className="font-medium">Physical Address</p>
+                                        <p className="text-muted-foreground">{organization.address}</p>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -87,3 +106,5 @@ export default function HelpCenterPage() {
         </div>
     )
 }
+
+    

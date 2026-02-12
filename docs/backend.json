@@ -9,6 +9,8 @@
         "name": { "type": "string" },
         "logoUrl": { "type": "string", "format": "uri" },
         "slogan": { "type": "string" },
+        "address": { "type": "string", "description": "The physical address of the organization." },
+        "phone": { "type": "string", "description": "The contact phone number for the organization." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "createdAt"]
@@ -363,3 +365,5 @@
     ]
   }
 }
+
+    

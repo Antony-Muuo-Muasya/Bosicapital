@@ -138,6 +138,8 @@ export default function SignupPage() {
         logoUrl: '',
         slogan: 'Capital that works',
         createdAt: orgCreatedAt,
+        phone: '0755595565',
+        address: 'Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi',
       };
       batch.set(orgDocRef, { ...newOrganizationData, id: orgDocRef.id });
 
@@ -191,9 +193,9 @@ export default function SignupPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           {isOrgLoading ? (
-             <Skeleton className="h-48 w-48 mx-auto rounded-md" />
+             <Skeleton className="h-24 w-24 mx-auto rounded-md" />
           ) : (
-            displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={192} height={192} className="mx-auto rounded-md object-contain" />
+            displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={96} height={96} className="mx-auto rounded-md object-contain" />
           )}
           <CardTitle className="text-2xl pt-2">{isOrgLoading ? <Skeleton className="h-8 w-48 mx-auto" /> : (org?.name || 'Create an Account')}</CardTitle>
           {org?.slogan && <p className="text-sm text-muted-foreground">{org.slogan}</p>}
@@ -260,3 +262,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    

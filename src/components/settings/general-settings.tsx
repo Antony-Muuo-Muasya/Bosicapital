@@ -23,6 +23,8 @@ const settingsSchema = z.object({
         { message: 'This is a storage path, not a public URL. Please use the HTTPS "Download URL" from Firebase Storage.' }
     ),
     slogan: z.string().optional(),
+    phone: z.string().optional(),
+    address: z.string().optional(),
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -45,7 +47,9 @@ export function GeneralSettings() {
         values: {
             name: organization?.name || '',
             logoUrl: organization?.logoUrl || '',
-            slogan: organization?.slogan || '',
+            slogan: organization?.slogan || 'Capital that works',
+            phone: organization?.phone || '0755595565',
+            address: organization?.address || 'Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi',
         },
     });
 
@@ -108,6 +112,28 @@ export function GeneralSettings() {
                         />
                         <FormField
                             control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Customer Care Number</FormLabel>
+                                    <FormControl><Input placeholder="e.g., 0712345678" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Company Address</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Wayi Plaza, Galana Road, Nairobi" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
                             name="logoUrl"
                             render={({ field }) => (
                                 <FormItem>
@@ -140,3 +166,5 @@ export function GeneralSettings() {
         </Card>
     );
 }
+
+    

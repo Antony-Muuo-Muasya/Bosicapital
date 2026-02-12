@@ -4,6 +4,8 @@ export type Organization = {
   logoUrl?: string;
   slogan?: string;
   createdAt: string;
+  address?: string;
+  phone?: string;
 };
 
 export type Permission = 
@@ -141,3 +143,5 @@ export type RegistrationPayment = {
     createdAt: string;
     status: 'confirmed';
 };
+
+    
