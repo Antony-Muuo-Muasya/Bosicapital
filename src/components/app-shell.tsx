@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { useAuth, useUserProfile } from '@/firebase';
 import { ThemeToggle } from './theme-toggle';
+import { AppFooter } from './app-footer';
 
 
 const allNavItems = [
@@ -122,7 +123,7 @@ function Header() {
 
   return (
     <>
-      <header className="flex h-16 items-center gap-4 border-b bg-background px-4 lg:px-6">
+      <header className="flex h-24 items-center gap-4 border-b bg-background px-4 lg:px-6">
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -245,6 +246,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex flex-1 flex-col gap-4 bg-background overflow-y-auto">
           {children}
         </main>
+        <AppFooter />
       </div>
     </div>
   );

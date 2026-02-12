@@ -10,6 +10,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { cn, transformImageUrl } from '@/lib/utils';
 import Image from 'next/image';
+import { AppFooter } from '@/components/app-footer';
 
 const borrowerNavItems = [
     { href: '/my-dashboard', label: 'My Dashboard' },
@@ -122,6 +123,7 @@ export default function BorrowerLayout({
         </div>
       </header>
       <main className="flex-1 bg-muted/20">{children}</main>
+      <AppFooter />
     </div>
   );
 }
