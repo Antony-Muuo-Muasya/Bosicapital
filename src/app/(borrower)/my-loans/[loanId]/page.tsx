@@ -8,7 +8,7 @@ import { Loader2, FileDown, Circle, CheckCircle, AlertCircle } from "lucide-reac
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
@@ -35,14 +35,16 @@ const getInstallmentStatusConfig = (status: string) => {
     }
 };
 
-export default function MyLoanDetailPage({ params }: { params: { loanId: string } }) {
+export default function MyLoanDetailPage() {
+    const params = useParams() as { loanId: string };
+    const loanId = params.loanId;
     const firestore = useFirestore();
     const router = useRouter();
 
     const loanRef = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return doc(firestore, 'loans', params.loanId);
-    }, [firestore, params]);
+        if (!firestore || !loanId) return null;
+        return doc(firestore, 'loans', loanId);
+    }, [firestore, loanId]);
     
     const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
 
@@ -56,17 +58,17 @@ export default function MyLoanDetailPage({ params }: { params: { loanId: string 
     const productRef = useMemoFirebase(() => {
         if (!firestore || !loan) return null;
         return doc(firestore, 'loanProducts', loan.loanProductId);
-    }, [firestore, loan]);
+    }, [firestore, loan?.loanProductId]);
 
     const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
 
     const installmentsQuery = useMemoFirebase(() => {
-        if (!firestore || !loan) return null;
+        if (!firestore || !loanId || !loan) return null;
         if (loan.status === 'Active' || loan.status === 'Completed' || loan.status === 'Pending Approval') {
-            return collection(firestore, 'loans', loan.id, 'installments');
+            return collection(firestore, 'loans', loanId, 'installments');
         }
         return null;
-    }, [firestore, loan]);
+    }, [firestore, loanId, loan?.status]);
 
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
     

@@ -8,7 +8,7 @@ import { Loader2, FileDown, Circle, CheckCircle, AlertCircle, User, Phone, Brief
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
@@ -35,11 +35,13 @@ const getInstallmentStatusConfig = (status: string) => {
     }
 };
 
-export default function LoanDetailPage({ params }: { params: { loanId: string } }) {
+export default function LoanDetailPage() {
+    const params = useParams() as { loanId: string };
+    const loanId = params.loanId;
     const firestore = useFirestore();
     const router = useRouter();
 
-    const loanRef = useMemoFirebase(() => doc(firestore, 'loans', params.loanId), [firestore, params]);
+    const loanRef = useMemoFirebase(() => doc(firestore, 'loans', loanId), [firestore, loanId]);
     const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
 
     useEffect(() => {
@@ -49,13 +51,13 @@ export default function LoanDetailPage({ params }: { params: { loanId: string } 
         }
     }, [loanError, router]);
 
-    const productRef = useMemoFirebase(() => loan ? doc(firestore, 'loanProducts', loan.loanProductId) : null, [firestore, loan]);
+    const productRef = useMemoFirebase(() => loan ? doc(firestore, 'loanProducts', loan.loanProductId) : null, [firestore, loan?.loanProductId]);
     const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
 
-    const borrowerRef = useMemoFirebase(() => loan ? doc(firestore, 'borrowers', loan.borrowerId) : null, [firestore, loan]);
+    const borrowerRef = useMemoFirebase(() => loan ? doc(firestore, 'borrowers', loan.borrowerId) : null, [firestore, loan?.borrowerId]);
     const { data: borrower, isLoading: isLoadingBorrower } = useDoc<Borrower>(borrowerRef);
 
-    const installmentsQuery = useMemoFirebase(() => loan ? collection(firestore, 'loans', loan.id, 'installments') : null, [firestore, loan]);
+    const installmentsQuery = useMemoFirebase(() => loanId ? collection(firestore, 'loans', loanId, 'installments') : null, [firestore, loanId]);
     const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
     
     const sortedInstallments = useMemo(() => {
