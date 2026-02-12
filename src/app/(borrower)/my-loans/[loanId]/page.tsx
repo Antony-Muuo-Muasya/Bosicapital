@@ -36,13 +36,14 @@ const getInstallmentStatusConfig = (status: string) => {
 };
 
 export default function MyLoanDetailPage({ params }: { params: { loanId: string } }) {
+    const { loanId } = params;
     const firestore = useFirestore();
     const router = useRouter();
 
     const loanRef = useMemoFirebase(() => {
         if (!firestore) return null;
-        return doc(firestore, 'loans', params.loanId);
-    }, [firestore, params.loanId]);
+        return doc(firestore, 'loans', loanId);
+    }, [firestore, loanId]);
     
     const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
 
