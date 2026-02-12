@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { Skeleton } from '../ui/skeleton';
 import { useState, useMemo } from 'react';
+import { transformImageUrl } from '@/lib/utils';
 
 const settingsSchema = z.object({
     name: z.string().min(1, 'Organization name is required.'),
@@ -46,14 +47,7 @@ export function GeneralSettings() {
     const watchedLogoUrl = form.watch('logoUrl');
 
     const displayLogoUrl = useMemo(() => {
-        if (watchedLogoUrl && watchedLogoUrl.includes('drive.google.com/file/d/')) {
-            const parts = watchedLogoUrl.split('/d/');
-            if (parts.length > 1) {
-                const fileId = parts[1].split('/')[0];
-                return `https://drive.google.com/uc?export=view&id=${fileId}`;
-            }
-        }
-        return watchedLogoUrl;
+        return transformImageUrl(watchedLogoUrl);
     }, [watchedLogoUrl]);
 
     const onSubmit = (values: SettingsFormData) => {

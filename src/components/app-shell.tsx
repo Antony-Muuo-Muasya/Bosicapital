@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
+import { cn, transformImageUrl } from '@/lib/utils';
 import {
   CircleDollarSign,
   FileText,
@@ -116,14 +116,7 @@ function Header() {
       : user?.email?.charAt(0).toUpperCase() || 'U';
 
   const displayLogoUrl = React.useMemo(() => {
-    if (organization?.logoUrl && organization.logoUrl.includes('drive.google.com/file/d/')) {
-        const parts = organization.logoUrl.split('/d/');
-        if (parts.length > 1) {
-            const fileId = parts[1].split('/')[0];
-            return `https://drive.google.com/uc?export=view&id=${fileId}`;
-        }
-    }
-    return organization?.logoUrl || '/logo.jpg';
+    return transformImageUrl(organization?.logoUrl) || '/logo.jpg';
   }, [organization]);
 
 
@@ -227,14 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { organization } = useUserProfile();
 
   const displayLogoUrl = React.useMemo(() => {
-    if (organization?.logoUrl && organization.logoUrl.includes('drive.google.com/file/d/')) {
-        const parts = organization.logoUrl.split('/d/');
-        if (parts.length > 1) {
-            const fileId = parts[1].split('/')[0];
-            return `https://drive.google.com/uc?export=view&id=${fileId}`;
-        }
-    }
-    return organization?.logoUrl || '/logo.jpg';
+    return transformImageUrl(organization?.logoUrl) || '/logo.jpg';
   }, [organization]);
 
   return (
