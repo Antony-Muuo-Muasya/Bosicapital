@@ -92,6 +92,7 @@ export type Loan = {
   status: 'Draft' | 'Pending Approval' | 'Approved' | 'Active' | 'Completed' | 'Rejected';
   loanOfficerId: string;
   branchId: string;
+  lastPaymentDate?: string;
 };
 
 export type Installment = {
@@ -110,10 +111,14 @@ export type Repayment = {
   id:string;
   organizationId: string;
   loanId: string;
+  borrowerId: string;
+  transId: string;
   amount: number;
   paymentDate: string;
   collectedById: string;
   method: 'Cash' | 'Bank Transfer' | 'Mobile Money';
+  phone: string;
+  balanceAfterPayment: number;
 };
 
 export type RegistrationPayment = {

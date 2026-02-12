@@ -137,7 +137,7 @@ export default function MyDashboardPage() {
 
         return {
             nextDueDate: nextInstallment ? new Date(nextInstallment.dueDate) : null,
-            nextInstallmentAmount: nextInstallment ? nextInstallment.expectedAmount / 4 : 0,
+            nextInstallmentAmount: nextInstallment ? nextInstallment.expectedAmount : 0,
             totalPaid: totalPaid,
             totalOutstanding: activeLoan.totalPayable - totalPaid,
             progress: progress,
@@ -215,7 +215,7 @@ export default function MyDashboardPage() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <StatCard title="Next Payment Due" value={nextDueDate ? format(nextDueDate, 'MMM dd, yyyy') : 'N/A'} icon={CalendarDays} description={nextDueDate ? formatDistanceToNow(nextDueDate, { addSuffix: true }) : 'Fully Paid'} />
-                            <StatCard title="Next Payment Amount" value={formatCurrency(nextInstallmentAmount)} icon={Wallet} description="Suggested partial payment" />
+                            <StatCard title="Next Payment Amount" value={formatCurrency(nextInstallmentAmount)} icon={Wallet} description="Full installment amount" />
                             <StatCard title="Outstanding Balance" value={formatCurrency(totalOutstanding)} icon={Hourglass} description="Total remaining on loan" />
                         </div>
 

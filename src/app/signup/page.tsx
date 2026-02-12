@@ -56,10 +56,14 @@ export default function SignupPage() {
       });
 
       const batch = writeBatch(firestore);
+      let organizationId: string;
+      let roleId: AppUser['roleId'];
+      let branchIds: string[];
 
       if (isFirstUserEver) {
-        // --- This is the first user ever: They become SUPERADMIN. ---
-        const organizationId = 'bosi_capital_super_org'; // A special, known ID for the super admin org
+        // --- This is the first user ever: They become SUPERADMIN of the BOSI org. ---
+        organizationId = 'bosi_capital_org'; // A special, known ID
+        roleId = 'superadmin';
         
         // Seed all system roles globally. This happens only once.
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
@@ -72,53 +76,38 @@ export default function SignupPage() {
         
         rolesToSeed.forEach(roleData => {
             const roleDocRef = doc(firestore, 'roles', roleData.id);
-            batch.set(roleDocRef, { ...roleData, organizationId: 'system' }); // Roles are global
+            batch.set(roleDocRef, { ...roleData, organizationId: 'system' }); // System roles are global
         });
         
-        // Create a special branch for the superadmin org
+        // Create the main branch for the BOSI org
         const mainBranchRef = doc(collection(firestore, 'branches'));
         const mainBranch: Branch = {
-            id: mainBranchRef.id, name: 'Global', location: 'Cloud', isMain: true, organizationId,
+            id: mainBranchRef.id, name: 'Headquarters', location: 'Nairobi', isMain: true, organizationId,
         };
         batch.set(mainBranchRef, mainBranch);
-        
-        // Create the superadmin user profile
-        const userDocRef = doc(firestore, 'users', userCredential.user.uid);
-        const newUserProfile: AppUser = {
-            id: userCredential.user.uid,
-            organizationId,
-            fullName: values.fullName,
-            email: values.email,
-            roleId: 'superadmin',
-            branchIds: [mainBranch.id],
-            status: 'active',
-            createdAt: new Date().toISOString(),
-        };
-        batch.set(userDocRef, newUserProfile);
+        branchIds = [mainBranch.id];
 
       } else {
-         // --- A regular user is signing up: Create a new organization for them. ---
-         const organizationId = doc(collection(firestore, 'organizations')).id;
-
-         const mainBranchRef = doc(collection(firestore, 'branches'));
-         const mainBranch: Branch = {
-             id: mainBranchRef.id, name: 'Headquarters', location: 'Main City', isMain: true, organizationId,
-         };
-         batch.set(mainBranchRef, mainBranch);
-         
-         const userDocRef = doc(firestore, 'users', userCredential.user.uid);
-         const newUserProfile: AppUser = {
-             id: userCredential.user.uid,
-             organizationId,
-             fullName: values.fullName,
-             email: values.email,
-             roleId: 'admin', // First user of a new org is an Admin
-             branchIds: [mainBranch.id],
-             status: 'active',
-             createdAt: new Date().toISOString(),
-         };
-         batch.set(userDocRef, newUserProfile);
+         // --- A regular user is signing up: They become a 'user' in the main BOSI org ---
+         // This assumes a single-tenant system for BOSI CAPITAL
+         organizationId = 'bosi_capital_org';
+         roleId = 'user'; // Default role, to be promoted by an admin
+         branchIds = []; // No branches assigned initially
       }
+
+      // Create the user profile document
+      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+      const newUserProfile: AppUser = {
+          id: userCredential.user.uid,
+          organizationId,
+          fullName: values.fullName,
+          email: values.email,
+          roleId: roleId,
+          branchIds: branchIds,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+      };
+      batch.set(userDocRef, newUserProfile);
 
       await batch.commit();
 
