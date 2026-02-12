@@ -4,17 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
+import type { Organization } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { transformImageUrl } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -27,6 +31,36 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [org, setOrg] = useState<{name: string, logoUrl: string} | null>(null);
+  const [isOrgLoading, setIsOrgLoading] = useState(true);
+  const firestore = useFirestore();
+
+  useEffect(() => {
+    const fetchOrg = async () => {
+      if (!firestore) {
+        setIsOrgLoading(false);
+        return;
+      };
+      try {
+        const orgsQuery = query(collection(firestore, 'organizations'), limit(1));
+        const orgsSnapshot = await getDocs(orgsQuery);
+        if (!orgsSnapshot.empty) {
+          const orgData = orgsSnapshot.docs[0].data() as Organization;
+          setOrg({
+            name: orgData.name || 'Lending Platform',
+            logoUrl: orgData.logoUrl || ''
+          });
+        }
+      } catch (error) {
+        console.error("Could not fetch organization for login page:", error);
+      } finally {
+        setIsOrgLoading(false);
+      }
+    };
+    fetchOrg();
+  }, [firestore]);
+
+  const displayLogoUrl = useMemo(() => transformImageUrl(org?.logoUrl), [org]);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -70,8 +104,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Image src="/logo.jpg" alt="Logo" width={56} height={56} className="mx-auto rounded-md" />
-          <CardTitle className="text-2xl pt-2">Welcome Back</CardTitle>
+          {isOrgLoading ? (
+             <Skeleton className="h-24 w-24 mx-auto rounded-md" />
+          ) : (
+            displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={96} height={96} className="mx-auto rounded-md object-contain" />
+          )}
+          <CardTitle className="text-2xl pt-2">{isOrgLoading ? <Skeleton className="h-8 w-48 mx-auto" /> : (org?.name || 'Welcome Back')}</CardTitle>
           <CardDescription>Enter your credentials to access your account.</CardDescription>
         </CardHeader>
         <CardContent>
