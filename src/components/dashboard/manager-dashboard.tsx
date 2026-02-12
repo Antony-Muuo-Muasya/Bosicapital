@@ -57,7 +57,7 @@ export function ManagerDashboard() {
   const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
 
-  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || installmentsLoading || regPaymentsLoading;
+  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || regPaymentsLoading;
 
   const dueInstallmentsWithDetails = useMemo(() => {
     if (!installments || !borrowers) return [];
