@@ -41,7 +41,7 @@ export default function BorrowerLayout({
   }, [user, userProfile, isLoading, router]);
 
   const displayLogoUrl = useMemo(() => {
-    return transformImageUrl(organization?.logoUrl) || '/logo.jpg';
+    return transformImageUrl(organization?.logoUrl);
   }, [organization]);
 
   if (isLoading || !userProfile) {
@@ -69,9 +69,9 @@ export default function BorrowerLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
+        <div className="container flex h-24 items-center">
             <Link href="/my-dashboard" className="mr-6 flex items-center space-x-2">
-              <Image src={displayLogoUrl} alt={organization?.name || ''} width={40} height={40} className="rounded-md" />
+              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={80} height={80} className="rounded-md" />}
               <span className="font-bold sm:inline-block font-headline">{organization?.name || ''}</span>
             </Link>
              <nav className="flex items-center space-x-6 text-sm font-medium">

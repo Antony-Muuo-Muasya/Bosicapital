@@ -47,7 +47,7 @@ export default function LoginPage() {
         if (!orgsSnapshot.empty) {
           const orgData = orgsSnapshot.docs[0].data() as Organization;
           setOrg({
-            name: orgData.name || 'Lending Platform',
+            name: orgData.name,
             logoUrl: orgData.logoUrl || ''
           });
         }
@@ -105,9 +105,9 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           {isOrgLoading ? (
-             <Skeleton className="h-24 w-24 mx-auto rounded-md" />
+             <Skeleton className="h-48 w-48 mx-auto rounded-md" />
           ) : (
-            displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={96} height={96} className="mx-auto rounded-md object-contain" />
+            displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={192} height={192} className="mx-auto rounded-md object-contain" />
           )}
           <CardTitle className="text-2xl pt-2">{isOrgLoading ? <Skeleton className="h-8 w-48 mx-auto" /> : (org?.name || 'Welcome Back')}</CardTitle>
           <CardDescription>Enter your credentials to access your account.</CardDescription>

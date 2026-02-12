@@ -107,9 +107,9 @@ export function GeneralSettings() {
                         />
                          <div>
                             <FormLabel>Current Logo Preview</FormLabel>
-                            <div className="mt-2 p-4 border rounded-md flex items-center justify-center bg-muted/50 h-32">
+                            <div className="mt-2 p-4 border rounded-md flex items-center justify-center bg-muted/50 h-48">
                                 {displayLogoUrl ? (
-                                    <Image src={displayLogoUrl} alt="Current Logo" width={80} height={80} className="object-contain" />
+                                    <Image src={displayLogoUrl} alt="Current Logo" width={160} height={160} className="object-contain" />
                                 ) : (
                                     <p className="text-sm text-muted-foreground">No logo URL provided</p>
                                 )}

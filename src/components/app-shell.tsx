@@ -116,13 +116,13 @@ function Header() {
       : user?.email?.charAt(0).toUpperCase() || 'U';
 
   const displayLogoUrl = React.useMemo(() => {
-    return transformImageUrl(organization?.logoUrl) || '/logo.jpg';
+    return transformImageUrl(organization?.logoUrl);
   }, [organization]);
 
 
   return (
     <>
-      <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+      <header className="flex h-24 items-center gap-4 border-b bg-background px-4 lg:h-[100px] lg:px-6">
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -136,7 +136,7 @@ function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-lg font-semibold mb-4"
               >
-                <Image src={displayLogoUrl} alt={organization?.name || ''} width={40} height={40} className="rounded-md" />
+                {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={80} height={80} className="rounded-md" />}
                 <span className="font-headline text-xl">{organization?.name || ''}</span>
               </Link>
                <SidebarNav />
@@ -220,16 +220,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { organization } = useUserProfile();
 
   const displayLogoUrl = React.useMemo(() => {
-    return transformImageUrl(organization?.logoUrl) || '/logo.jpg';
+    return transformImageUrl(organization?.logoUrl);
   }, [organization]);
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
-          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+          <div className="flex h-24 items-center border-b px-4 lg:h-[100px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <Image src={displayLogoUrl} alt={organization?.name || ''} width={40} height={40} className="rounded-md" />
+              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={80} height={80} className="rounded-md" />}
               <span className="font-headline text-xl">{organization?.name || ''}</span>
             </Link>
           </div>
