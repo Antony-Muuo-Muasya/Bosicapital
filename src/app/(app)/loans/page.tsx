@@ -23,12 +23,16 @@ export default function LoansPage() {
   const firestore = useFirestore();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<LoanWithDetails | null>(null);
+  
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
+  const roleId = userProfile?.roleId;
+  const branchIds = userProfile?.branchIds;
+  const organizationId = userProfile?.organizationId;
+  const userId = user?.uid;
 
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile || !user) return null;
+    if (!firestore || !roleId) return null;
 
-    const { roleId, branchIds, organizationId } = userProfile;
     const loansCol = collection(firestore, 'loans');
 
     if (isSuperAdmin) {
@@ -43,16 +47,15 @@ export default function LoansPage() {
       return query(loansCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
 
-    if (roleId === 'loan_officer') {
-        return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', user.uid));
+    if (roleId === 'loan_officer' && userId) {
+        return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', userId));
     }
 
     return null;
-  }, [firestore, user, userProfile, isSuperAdmin]);
+  }, [firestore, userId, roleId, JSON.stringify(branchIds), organizationId, isSuperAdmin]);
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    const { roleId, branchIds, organizationId } = userProfile;
+    if (!firestore || !roleId) return null;
     const borrowersCol = collection(firestore, 'borrowers');
 
     if (isSuperAdmin) {
@@ -65,14 +68,14 @@ export default function LoansPage() {
         return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
     return null;
-  }, [firestore, userProfile, isSuperAdmin]);
+  }, [firestore, roleId, JSON.stringify(branchIds), organizationId, isSuperAdmin]);
 
   const loanProductsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     if (isSuperAdmin) return collection(firestore, 'loanProducts');
-    if (!userProfile) return null;
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId));
-  }, [firestore, userProfile, isSuperAdmin]);
+    if (!organizationId) return null;
+    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);

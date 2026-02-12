@@ -41,8 +41,13 @@ export default function RepaymentsPage() {
       return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', user.uid));
     }
     return null;
-  }, [firestore, user, userProfile, isSuperAdmin]);
+  }, [firestore, user?.uid, userProfile?.organizationId, userProfile?.roleId, JSON.stringify(userProfile?.branchIds), isSuperAdmin]);
   const { data: visibleLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
+
+  const visibleLoanIds = useMemo(() => {
+    if (!visibleLoans) return null;
+    return visibleLoans.map(l => l.id);
+  }, [visibleLoans]);
 
   // Query for repayments related to the visible loans
   const repaymentsQuery = useMemoFirebase(() => {
@@ -55,20 +60,19 @@ export default function RepaymentsPage() {
         return query(collection(firestore, 'repayments'), where('organizationId', '==', userProfile.organizationId));
     }
 
-    if (isLoadingLoans) return null; // Wait for loans to load
-    if (!visibleLoans || visibleLoans.length === 0) {
+    if (isLoadingLoans || !visibleLoanIds) return null; // Wait for loans to load
+    if (visibleLoanIds.length === 0) {
         // No loans, so no repayments to fetch. Query a non-existent path to return empty.
         return query(collection(firestore, 'repayments'), where('loanId', '==', 'no-loans-found'));
     }
 
-    const loanIds = visibleLoans.map(l => l.id);
     // Firestore 'in' query is limited to 30 items in new SDK versions
-    if (loanIds.length > 30) {
+    if (visibleLoanIds.length > 30) {
         console.warn(`Repayment query limited to 30 loans due to Firestore limitations.`);
-        return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds.slice(0, 30)));
+        return query(collection(firestore, 'repayments'), where('loanId', 'in', visibleLoanIds.slice(0, 30)));
     }
-    return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds));
-  }, [firestore, userProfile, visibleLoans, isLoadingLoans, isSuperAdmin]);
+    return query(collection(firestore, 'repayments'), where('loanId', 'in', visibleLoanIds));
+  }, [firestore, userProfile?.organizationId, userProfile?.roleId, isSuperAdmin, isLoadingLoans, JSON.stringify(visibleLoanIds)]);
   const { data: repayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
 
   // Query for borrowers visible to the current user
@@ -85,7 +89,7 @@ export default function RepaymentsPage() {
       return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
     }
     return null;
-  }, [firestore, userProfile, isSuperAdmin]);
+  }, [firestore, userProfile?.organizationId, userProfile?.roleId, JSON.stringify(userProfile?.branchIds), isSuperAdmin]);
   const { data: visibleBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
 
   // All users can see all loan products
@@ -96,7 +100,7 @@ export default function RepaymentsPage() {
         return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId));
     }
     return null;
-  }, [firestore, isSuperAdmin, userProfile]);
+  }, [firestore, isSuperAdmin, userProfile?.organizationId]);
   const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingRepayments || isLoadingBorrowers || isLoadingProducts;

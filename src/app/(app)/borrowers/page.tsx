@@ -20,11 +20,13 @@ export default function BorrowersPage() {
   const [selectedBorrower, setSelectedBorrower] = useState<Borrower | null>(null);
 
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
+  const roleId = userProfile?.roleId;
+  const branchIds = userProfile?.branchIds;
+  const organizationId = userProfile?.organizationId;
 
   const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
+    if (!firestore || !roleId) return null;
 
-    const { roleId, branchIds, organizationId } = userProfile;
     const borrowersCol = collection(firestore, 'borrowers');
 
     if (isSuperAdmin) {
@@ -40,7 +42,7 @@ export default function BorrowersPage() {
     }
 
     return null;
-  }, [firestore, userProfile, isSuperAdmin]);
+  }, [firestore, roleId, organizationId, JSON.stringify(branchIds), isSuperAdmin]);
 
   const { data: borrowers, isLoading: isBorrowersLoading } = useCollection<Borrower>(borrowersQuery);
   const isLoading = isProfileLoading || isBorrowersLoading;

@@ -1,4 +1,3 @@
-
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
@@ -30,7 +29,7 @@ export default function ApprovalsPage() {
             where('branchId', 'in', branchIds),
             where('status', '==', 'Pending Approval')
         );
-    }, [firestore, branchIds, userProfile, isSuperAdmin]);
+    }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
 
     const borrowersQuery = useMemoFirebase(() => {
         if (!firestore) return null;

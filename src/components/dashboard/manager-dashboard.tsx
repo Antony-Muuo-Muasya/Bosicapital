@@ -24,14 +24,14 @@ export function ManagerDashboard() {
     if (isSuperAdmin) return collection(firestore, 'loans');
     if (branchIds.length === 0) return null;
     return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
-  }, [firestore, branchIds, isSuperAdmin]);
+  }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
   
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     if (isSuperAdmin) return collection(firestore, 'borrowers');
     if (branchIds.length === 0) return null;
     return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
-  }, [firestore, branchIds, isSuperAdmin]);
+  }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
 
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore) return null;
@@ -42,7 +42,7 @@ export function ManagerDashboard() {
         where('branchId', 'in', branchIds), 
         where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
       );
-  }, [firestore, branchIds, isSuperAdmin]);
+  }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
 
   const regPaymentsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -52,12 +52,12 @@ export function ManagerDashboard() {
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId, isSuperAdmin]);
 
-  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
+  const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
+  const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || installmentsLoading || regPaymentsLoading;
+  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || installmentsLoading || regPaymentsLoading;
 
   const dueInstallmentsWithDetails = useMemo(() => {
     if (!installments || !borrowers) return [];
