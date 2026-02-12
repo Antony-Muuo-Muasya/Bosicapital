@@ -70,7 +70,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="mx-auto rounded-md" />
+          <Image src="/logo.jpg" alt="Logo" width={56} height={56} className="mx-auto rounded-md" />
           <CardTitle className="text-2xl pt-2">Welcome Back</CardTitle>
           <CardDescription>Enter your credentials to access your account.</CardDescription>
         </CardHeader>

@@ -71,7 +71,7 @@ export default function BorrowerLayout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
             <Link href="/my-dashboard" className="mr-6 flex items-center space-x-2">
-              <Image src={displayLogoUrl} alt={organization?.name || ''} width={28} height={28} className="rounded-md" />
+              <Image src={displayLogoUrl} alt={organization?.name || ''} width={36} height={36} className="rounded-md" />
               <span className="font-bold sm:inline-block font-headline">{organization?.name || ''}</span>
             </Link>
              <nav className="flex items-center space-x-6 text-sm font-medium">
