@@ -7,14 +7,22 @@ import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/
 import { collection, query, where } from 'firebase/firestore';
 import type { Loan, Borrower, LoanProduct } from '@/lib/types';
 import { LoansDataTable } from '@/components/loans/loans-data-table';
-import { columns } from '@/components/loans/columns';
+import { getColumns } from '@/components/loans/columns';
 import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { EditLoanDialog } from '@/components/loans/edit-loan-dialog';
+
+type LoanWithDetails = Loan & {
+  borrowerName: string;
+  borrowerPhotoUrl?: string;
+  loanProductName: string;
+};
 
 export default function LoansPage() {
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const firestore = useFirestore();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingLoan, setEditingLoan] = useState<LoanWithDetails | null>(null);
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
   const loansQuery = useMemoFirebase(() => {
@@ -71,7 +79,7 @@ export default function LoansPage() {
   const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
 
 
-  const loansWithDetails = useMemo(() => {
+  const loansWithDetails: LoanWithDetails[] = useMemo(() => {
     if (!loans || !borrowers || !loanProducts) return [];
     
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
@@ -85,6 +93,12 @@ export default function LoansPage() {
     }));
 
   }, [loans, borrowers, loanProducts]);
+  
+  const handleEdit = useCallback((loan: LoanWithDetails) => {
+    setEditingLoan(loan);
+  }, []);
+  
+  const columns = useMemo(() => getColumns(handleEdit), [handleEdit]);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
 
@@ -108,6 +122,13 @@ export default function LoansPage() {
         loanProducts={loanProducts || []}
         isLoading={isLoading}
        />
+       {editingLoan && (
+        <EditLoanDialog 
+            loan={editingLoan}
+            open={!!editingLoan}
+            onOpenChange={(open) => !open && setEditingLoan(null)}
+        />
+       )}
     </>
   );
 }

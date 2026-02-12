@@ -1,6 +1,6 @@
 'use client';
 
-import type { Loan, Borrower, LoanProduct } from '@/lib/types';
+import type { Loan } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -13,10 +13,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { useRouter } from 'next/navigation';
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
@@ -35,8 +35,9 @@ const getStatusVariant = (status: string) => {
     }
   };
 
-const LoanActions = ({ loan }: { loan: LoanWithDetails }) => {
+const LoanActions = ({ loan, onEdit }: { loan: LoanWithDetails, onEdit: (loan: LoanWithDetails) => void }) => {
   const { userRole } = useUserProfile();
+  const router = useRouter();
 
   const handleDelete = () => {
     alert('For data integrity, loans cannot be deleted. Consider rejecting or archiving instead.');
@@ -58,8 +59,10 @@ const LoanActions = ({ loan }: { loan: LoanWithDetails }) => {
           Copy loan ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>View Details</DropdownMenuItem>
-        {canManage && <DropdownMenuItem>Edit Loan</DropdownMenuItem>}
+        <DropdownMenuItem onClick={() => router.push(`/loans/${loan.id}`)}>
+            View Details
+        </DropdownMenuItem>
+        {canManage && <DropdownMenuItem onClick={() => onEdit(loan)}>Edit Loan</DropdownMenuItem>}
         {userRole?.id === 'admin' && (
              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
                 Delete Loan
@@ -70,7 +73,7 @@ const LoanActions = ({ loan }: { loan: LoanWithDetails }) => {
   );
 };
 
-export const columns: ColumnDef<LoanWithDetails>[] = [
+export const getColumns = (onEdit: (loan: LoanWithDetails) => void): ColumnDef<LoanWithDetails>[] => [
   {
     accessorKey: 'borrowerName',
     header: 'Borrower',
@@ -126,7 +129,7 @@ export const columns: ColumnDef<LoanWithDetails>[] = [
     id: 'actions',
     cell: ({ row }) => {
       const loan = row.original;
-      return <LoanActions loan={loan} />;
+      return <LoanActions loan={loan} onEdit={onEdit} />;
     },
   },
 ];
