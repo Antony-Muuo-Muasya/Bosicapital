@@ -34,7 +34,7 @@ export default function SignupPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [org, setOrg] = useState<{name: string, logoUrl: string} | null>(null);
+  const [org, setOrg] = useState<{name: string, logoUrl: string, slogan?: string} | null>(null);
   const [isOrgLoading, setIsOrgLoading] = useState(true);
 
   useEffect(() => {
@@ -50,7 +50,8 @@ export default function SignupPage() {
           const orgData = orgsSnapshot.docs[0].data() as Organization;
           setOrg({
             name: orgData.name,
-            logoUrl: orgData.logoUrl || ''
+            logoUrl: orgData.logoUrl || '',
+            slogan: orgData.slogan,
           });
         }
       } catch (error) {
@@ -135,6 +136,7 @@ export default function SignupPage() {
       const newOrganizationData: Omit<Organization, 'id'> = {
         name: orgName,
         logoUrl: '',
+        slogan: 'Capital that works',
         createdAt: orgCreatedAt,
       };
       batch.set(orgDocRef, { ...newOrganizationData, id: orgDocRef.id });
@@ -194,7 +196,8 @@ export default function SignupPage() {
             displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={192} height={192} className="mx-auto rounded-md object-contain" />
           )}
           <CardTitle className="text-2xl pt-2">{isOrgLoading ? <Skeleton className="h-8 w-48 mx-auto" /> : (org?.name || 'Create an Account')}</CardTitle>
-          <CardDescription>Enter your details to get started.</CardDescription>
+          {org?.slogan && <p className="text-sm text-muted-foreground">{org.slogan}</p>}
+          <CardDescription className="!mt-4">Enter your details to get started.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

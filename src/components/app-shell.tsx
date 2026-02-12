@@ -134,10 +134,11 @@ function Header() {
             <nav className="grid gap-2 text-lg font-medium">
               <Link
                 href="/dashboard"
-                className="flex flex-col items-center gap-4 text-lg font-semibold mb-4 text-center"
+                className="flex flex-col items-center gap-1 text-lg font-semibold mb-4 text-center"
               >
                 {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" />}
                 <span className="font-headline text-xl">{organization?.name || ''}</span>
+                {organization?.slogan && <p className="text-xs text-muted-foreground -mt-1 font-normal">{organization.slogan}</p>}
               </Link>
                <SidebarNav />
             </nav>
@@ -227,10 +228,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
-          <div className="flex flex-col items-center justify-center gap-4 border-b p-6">
-            <Link href="/dashboard" className="flex flex-col items-center gap-2 font-semibold text-center">
+          <div className="flex flex-col items-center justify-center gap-1 border-b p-6">
+            <Link href="/dashboard" className="flex flex-col items-center gap-1 font-semibold text-center">
               {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" />}
               <span className="font-headline text-xl">{organization?.name || ''}</span>
+              {organization?.slogan && <p className="text-xs text-muted-foreground -mt-1 font-normal">{organization.slogan}</p>}
             </Link>
           </div>
           <div className="flex-1">

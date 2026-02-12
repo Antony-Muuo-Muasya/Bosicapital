@@ -31,7 +31,7 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [org, setOrg] = useState<{name: string, logoUrl: string} | null>(null);
+  const [org, setOrg] = useState<{name: string, logoUrl: string, slogan?: string} | null>(null);
   const [isOrgLoading, setIsOrgLoading] = useState(true);
   const firestore = useFirestore();
 
@@ -48,7 +48,8 @@ export default function LoginPage() {
           const orgData = orgsSnapshot.docs[0].data() as Organization;
           setOrg({
             name: orgData.name,
-            logoUrl: orgData.logoUrl || ''
+            logoUrl: orgData.logoUrl || '',
+            slogan: orgData.slogan
           });
         }
       } catch (error) {
@@ -110,7 +111,8 @@ export default function LoginPage() {
             displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={192} height={192} className="mx-auto rounded-md object-contain" />
           )}
           <CardTitle className="text-2xl pt-2">{isOrgLoading ? <Skeleton className="h-8 w-48 mx-auto" /> : (org?.name || 'Welcome Back')}</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
+          {org?.slogan && <p className="text-sm text-muted-foreground">{org.slogan}</p>}
+          <CardDescription className="!mt-4">Enter your credentials to access your account.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

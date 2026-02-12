@@ -22,6 +22,7 @@ const settingsSchema = z.object({
         (url) => !url.startsWith('gs://'),
         { message: 'This is a storage path, not a public URL. Please use the HTTPS "Download URL" from Firebase Storage.' }
     ),
+    slogan: z.string().optional(),
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -44,6 +45,7 @@ export function GeneralSettings() {
         values: {
             name: organization?.name || '',
             logoUrl: organization?.logoUrl || '',
+            slogan: organization?.slogan || '',
         },
     });
 
@@ -56,7 +58,7 @@ export function GeneralSettings() {
     const onSubmit = (values: SettingsFormData) => {
         if (!orgRef) return;
         setIsSubmitting(true);
-        updateDocumentNonBlocking(orgRef, values)
+        setDoc(orgRef, values, { merge: true })
             .then(() => {
                 toast({ title: 'Success', description: 'Organization settings updated.' });
             })
@@ -89,6 +91,17 @@ export function GeneralSettings() {
                                 <FormItem>
                                     <FormLabel>Organization Name</FormLabel>
                                     <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="slogan"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Slogan</FormLabel>
+                                    <FormControl><Input placeholder="Your company slogan" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}

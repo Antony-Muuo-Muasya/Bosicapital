@@ -2,6 +2,7 @@ export type Organization = {
   id: string;
   name: string;
   logoUrl?: string;
+  slogan?: string;
   createdAt: string;
 };
 
