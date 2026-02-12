@@ -6,19 +6,23 @@ service cloud.firestore {
     // Helper Functions
     // =================================
     function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
+      return get(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function userExists(userId) {
+      return getUserData(userId).data != null;
     }
 
     function isUserRole(userId, role) {
-      return getUserData(userId).roleId == role;
+      return userExists(userId) && getUserData(userId).data.roleId == role;
     }
     
     function isUserInOrg(userId, orgId) {
-      return getUserData(userId).organizationId == orgId;
+      return userExists(userId) && getUserData(userId).data.organizationId == orgId;
     }
 
     function isStaff(userId) {
-      return getUserData(userId).roleId != 'user';
+      return userExists(userId) && getUserData(userId).data.roleId != 'user';
     }
 
     // =================================
