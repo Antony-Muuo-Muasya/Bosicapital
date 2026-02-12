@@ -19,10 +19,8 @@ const productSchema = z.object({
   category: z.string().min(3, 'Category is required.'),
   minAmount: z.coerce.number().positive('Must be a positive number.'),
   maxAmount: z.coerce.number().positive('Must be a positive number.'),
-  interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
   duration: z.coerce.number().int().positive('Duration must be a positive integer.'),
   repaymentCycle: z.enum(['Weekly', 'Monthly']),
-  processingFee: z.coerce.number().min(0, 'Processing fee cannot be negative.').optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -42,8 +40,6 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
     resolver: zodResolver(productSchema),
     defaultValues: product,
   });
-
-  const repaymentCycle = form.watch('repaymentCycle');
 
   const onSubmit = (values: ProductFormData) => {
     setIsSubmitting(true);
@@ -67,7 +63,7 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
         <DialogHeader>
           <DialogTitle>Edit Loan Product</DialogTitle>
           <DialogDescription>
-            Update the details for the "{product.name}" loan product.
+            Update the details for the "{product.name}" loan product. Interest is fixed at 25%.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -105,25 +101,9 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
               )} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="interestRate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Interest Rate (%)</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-               <FormField control={form.control} name="processingFee" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Processing Fee (KES)</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>
+                  <FormLabel>Duration (installments)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

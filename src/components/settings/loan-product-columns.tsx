@@ -65,17 +65,11 @@ export const getLoanProductColumns = (onEdit: (product: LoanProduct) => void): C
     cell: ({ row }) => formatCurrency(row.original.maxAmount, 'KES'),
   },
   {
-    accessorKey: 'interestRate',
-    header: 'Interest Rate',
-    cell: ({ row }) => `${row.original.interestRate}%`,
-  },
-  {
     accessorKey: 'duration',
-    header: 'Duration',
+    header: 'Duration (Installments)',
     cell: ({ row }) => {
         const product = row.original;
-        const unit = product.repaymentCycle === 'Weekly' ? 'weeks' : 'months';
-        return `${product.duration} ${unit}`;
+        return `${product.duration}`;
     }
   },
   {

@@ -18,10 +18,8 @@ const productSchema = z.object({
   category: z.string().min(3, 'Category is required.'),
   minAmount: z.coerce.number().positive('Must be a positive number.'),
   maxAmount: z.coerce.number().positive('Must be a positive number.'),
-  interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
   duration: z.coerce.number().int().positive('Duration must be a positive integer.'),
   repaymentCycle: z.enum(['Weekly', 'Monthly']),
-  processingFee: z.coerce.number().min(0, 'Processing fee cannot be negative.').optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -44,14 +42,10 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
       category: '',
       minAmount: 5000,
       maxAmount: 30000,
-      interestRate: 25,
       duration: 1,
       repaymentCycle: 'Monthly',
-      processingFee: 500,
     },
   });
-
-  const repaymentCycle = form.watch('repaymentCycle');
 
   const onSubmit = (values: ProductFormData) => {
     if (!userProfile || !firestore) return;
@@ -62,6 +56,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
       ...values,
       id: newProductRef.id,
       organizationId: userProfile.organizationId,
+      interestRate: 25, // Always 25%
     };
 
     setDocumentNonBlocking(newProductRef, newProductData, { merge: false })
@@ -82,7 +77,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
         <DialogHeader>
           <DialogTitle>Add New Loan Product</DialogTitle>
           <DialogDescription>
-            Define a new loan product that can be assigned to borrowers.
+            Define a new loan product that can be assigned to borrowers. Interest is fixed at 25%.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -120,25 +115,9 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
               )} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="interestRate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Interest Rate (%)</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-               <FormField control={form.control} name="processingFee" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Processing Fee (KES)</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration ({repaymentCycle === 'Weekly' ? 'Weeks' : 'Months'})</FormLabel>
+                  <FormLabel>Duration (installments)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

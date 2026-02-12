@@ -196,7 +196,6 @@
         "category": { "type": "string" },
         "minAmount": { "type": "number" },
         "maxAmount": { "type": "number" },
-        "interestRate": { "type": "number" },
         "duration": { "type": "number" },
         "repaymentCycle": { "type": "string", "enum": ["Weekly", "Monthly"] },
         "processingFee": { "type": "number" }
@@ -205,7 +204,6 @@
         "id",
         "organizationId",
         "name",
-        "interestRate",
         "duration",
         "minAmount",
         "maxAmount",

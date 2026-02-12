@@ -77,14 +77,13 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
     return borrowers.filter(b => b.registrationFeePaid);
   }, [borrowers]);
 
-  const { totalPayable, interest, processingFee } = useMemo(() => {
+  const { totalPayable, interest } = useMemo(() => {
     if (!selectedProduct || !principalValue || principalValue <= 0) {
-        return { totalPayable: 0, interest: 0, processingFee: 0 };
+        return { totalPayable: 0, interest: 0 };
     }
-    const interest = principalValue * (selectedProduct.interestRate / 100);
-    const processingFee = selectedProduct.processingFee || 0;
-    const totalPayable = principalValue + interest + processingFee;
-    return { totalPayable, interest, processingFee };
+    const interest = principalValue * 0.25;
+    const totalPayable = principalValue * 1.25;
+    return { totalPayable, interest };
   }, [selectedProduct, principalValue]);
 
 
@@ -111,6 +110,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
 
     const loanRef = doc(collection(firestore, 'loans'));
     
+    const totalPayable = values.principal * 1.25;
     const numberOfInstallments = selectedProduct.duration;
     const installmentAmount = totalPayable / numberOfInstallments;
 
@@ -120,7 +120,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       borrowerId: values.borrowerId,
       loanProductId: values.loanProductId,
       principal: values.principal,
-      interestRate: selectedProduct.interestRate,
+      interestRate: 25,
       duration: numberOfInstallments,
       totalPayable: totalPayable,
       installmentAmount: installmentAmount,
@@ -213,8 +213,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 {selectedProduct && principalValue > 0 && !form.formState.errors.principal && (
                     <div className="text-sm text-muted-foreground space-y-2 rounded-md bg-muted p-3">
                         <div className="flex justify-between items-center"><span>Principal</span> <strong>{formatCurrency(principalValue, 'KES')}</strong></div>
-                        <div className="flex justify-between items-center"><span>Interest ({selectedProduct.interestRate}%)</span> <strong>{formatCurrency(interest, 'KES')}</strong></div>
-                        {processingFee > 0 && <div className="flex justify-between items-center"><span>Processing Fee</span> <strong>{formatCurrency(processingFee, 'KES')}</strong></div>}
+                        <div className="flex justify-between items-center"><span>Interest (25%)</span> <strong>{formatCurrency(interest, 'KES')}</strong></div>
                         <div className="flex justify-between items-center font-semibold border-t pt-2 mt-2"><span>Total Payable</span> <strong className="text-base">{formatCurrency(totalPayable, 'KES')}</strong></div>
                     </div>
                 )}
