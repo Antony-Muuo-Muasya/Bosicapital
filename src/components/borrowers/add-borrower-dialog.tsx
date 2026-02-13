@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useUserProfile } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
-import { Loader2, AlertTriangle, Camera, Image as ImageIcon } from 'lucide-react';
+import { Loader2, AlertTriangle, Camera, Image as LucideImage } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,
@@ -370,11 +371,11 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label className="text-xs">Business Photo</Label>
-                                    <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                    <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
                                         {businessPhoto ? (
-                                            <img src={businessPhoto} alt="Business Preview" className="w-full h-full object-contain rounded-md" />
+                                            <Image src={businessPhoto} alt="Business Preview" fill style={{ objectFit: 'contain' }} />
                                         ) : (
-                                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                            <LucideImage className="h-8 w-8 text-muted-foreground" />
                                         )}
                                     </div>
                                     <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('business')}>
@@ -384,11 +385,11 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-xs">Home Assets Photo</Label>
-                                    <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                    <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
                                         {homeAssetsPhoto ? (
-                                            <img src={homeAssetsPhoto} alt="Home Assets Preview" className="w-full h-full object-contain rounded-md" />
+                                            <Image src={homeAssetsPhoto} alt="Home Assets Preview" fill style={{ objectFit: 'contain' }} />
                                         ) : (
-                                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                            <LucideImage className="h-8 w-8 text-muted-foreground" />
                                         )}
                                     </div>
                                     <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('homeAssets')}>
