@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useUserProfile } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Camera, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,
@@ -36,6 +36,7 @@ import {
 import type { User as AppUser, Borrower } from '@/lib/types';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { Label } from '../ui/label';
 
 
 const borrowerSchema = z.object({
@@ -49,8 +50,6 @@ const borrowerSchema = z.object({
     gender: z.enum(['Male', 'Female', 'Other']),
     employmentStatus: z.enum(['Employed', 'Self-employed', 'Unemployed']),
     monthlyIncome: z.coerce.number().min(0, 'Monthly income must be a positive number.'),
-    businessPhotoUrl: z.string().url().optional().or(z.literal('')),
-    homeAssetsPhotoUrl: z.string().url().optional().or(z.literal('')),
 });
 
 type BorrowerFormData = z.infer<typeof borrowerSchema>;
@@ -66,6 +65,73 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   const { userProfile: staffProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [businessPhoto, setBusinessPhoto] = useState<string | null>(null);
+  const [homeAssetsPhoto, setHomeAssetsPhoto] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    if (open) {
+      setBusinessPhoto(null);
+      setHomeAssetsPhoto(null);
+
+      const getCameraPermission = async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasCameraPermission(true);
+  
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to use this app.',
+          });
+        }
+      };
+      
+      getCameraPermission();
+    }
+  
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [open, toast]);
+
+  const handleCapture = (target: 'business' | 'homeAssets') => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+
+    if (context) {
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        if (target === 'business') {
+            setBusinessPhoto(dataUrl);
+        } else {
+            setHomeAssetsPhoto(dataUrl);
+        }
+        toast({ title: 'Success', description: `${target === 'business' ? 'Business' : 'Home assets'} photo captured.` });
+    }
+  };
 
   const form = useForm<BorrowerFormData>({
     resolver: zodResolver(borrowerSchema),
@@ -80,8 +146,6 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
       gender: 'Male',
       employmentStatus: 'Employed',
       monthlyIncome: 0,
-      businessPhotoUrl: '',
-      homeAssetsPhotoUrl: ''
     },
   });
 
@@ -93,7 +157,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     setIsSubmitting(true);
 
     try {
-        // 1. Create Auth user
+        // In a real app, these base64 images should be uploaded to Firebase Storage first,
+        // and the storage URLs should be saved in Firestore. For this prototype, we save the data URIs directly.
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         await updateProfile(userCredential.user, { displayName: values.fullName });
 
@@ -103,21 +168,19 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
         const batch = writeBatch(firestore);
 
-        // 2. Create User document
         const userDocRef = doc(firestore, 'users', newUserId);
         const newUserProfile: AppUser = {
             id: newUserId,
             organizationId: staffProfile.organizationId,
             fullName: values.fullName,
             email: values.email,
-            roleId: 'user', // Borrowers are always 'user' role
+            roleId: 'user',
             branchIds: [assignedBranchId],
             status: 'active',
             createdAt: createdAt,
         };
         batch.set(userDocRef, newUserProfile);
 
-        // 3. Create Borrower document
         const newBorrowerRef = doc(collection(firestore, 'borrowers'));
         const newBorrowerData: Borrower = {
             id: newBorrowerRef.id,
@@ -131,8 +194,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             gender: values.gender,
             employmentStatus: values.employmentStatus,
             monthlyIncome: values.monthlyIncome,
-            businessPhotoUrl: values.businessPhotoUrl,
-            homeAssetsPhotoUrl: values.homeAssetsPhotoUrl,
+            businessPhotoUrl: businessPhoto || '',
+            homeAssetsPhotoUrl: homeAssetsPhoto || '',
             photoUrl: `https://picsum.photos/seed/${newBorrowerRef.id}/400/400`,
             branchId: assignedBranchId,
             organizationId: staffProfile.organizationId,
@@ -144,7 +207,6 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
         };
         batch.set(newBorrowerRef, newBorrowerData);
 
-        // 4. Commit batch
         await batch.commit();
 
         toast({ title: 'Success', description: 'Borrower account created successfully.' });
@@ -181,7 +243,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             </Alert>
         )}
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto pr-4">
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="fullName" render={({ field }) => (
                         <FormItem>
@@ -278,25 +340,62 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                         </FormItem>
                     )}/>
                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="businessPhotoUrl" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Business Photo URL (Optional)</FormLabel>
-                            <FormControl><Input placeholder="https://example.com/photo.jpg" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}/>
-                    <FormField control={form.control} name="homeAssetsPhotoUrl" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Home Assets Photo URL (Optional)</FormLabel>
-                            <FormControl><Input placeholder="https://example.com/photo.jpg" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}/>
+                
+                 <div className="space-y-2">
+                    <Label>Supporting Photos</Label>
+                    <div className="p-4 border rounded-md bg-muted/50">
+                        {hasCameraPermission === false && (
+                            <Alert variant="destructive">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Camera Access Required</AlertTitle>
+                                <AlertDescription>Please enable camera permissions in your browser to take photos.</AlertDescription>
+                            </Alert>
+                        )}
+                         {hasCameraPermission === true && (
+                             <div className="space-y-4">
+                                <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
+                                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                                    <canvas ref={canvasRef} className="hidden" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Button type="button" variant="outline" onClick={() => handleCapture('business')}>
+                                        <Camera className="mr-2" />
+                                        Take Business Photo
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={() => handleCapture('homeAssets')}>
+                                        <Camera className="mr-2" />
+                                        Take Home Assets Photo
+                                    </Button>
+                                </div>
+                            </div>
+                         )}
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs">Business Photo Preview</Label>
+                                <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                    {businessPhoto ? (
+                                        <img src={businessPhoto} alt="Business Preview" className="w-full h-full object-contain rounded-md" />
+                                    ) : (
+                                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                    )}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs">Home Assets Photo Preview</Label>
+                                <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                    {homeAssetsPhoto ? (
+                                        <img src={homeAssetsPhoto} alt="Home Assets Preview" className="w-full h-full object-contain rounded-md" />
+                                    ) : (
+                                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
 
-                <DialogFooter>
+                <DialogFooter className="sticky bottom-0 bg-background pt-4 pb-0 -mb-6">
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" disabled={isSubmitting || !staffProfile?.branchIds?.length}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
