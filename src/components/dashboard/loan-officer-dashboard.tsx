@@ -103,7 +103,13 @@ export function LoanOfficerDashboard() {
     };
 
     const activeLoans = loans.filter(l => l.status === 'Active');
-    const portfolioValue = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
+    
+    const portfolioValue = activeLoans.reduce((sum, loan) => {
+        const loanInstallments = installments.filter(i => i.loanId === loan.id);
+        const totalPaid = loanInstallments.reduce((acc, inst) => acc + inst.paidAmount, 0);
+        const outstandingBalance = loan.totalPayable - totalPaid;
+        return sum + (outstandingBalance > 0 ? outstandingBalance : 0);
+    }, 0);
 
     const today = startOfToday();
     const overdueInstallments = installments.filter(i => {
@@ -129,7 +135,12 @@ export function LoanOfficerDashboard() {
       const monthKey = format(monthDate, 'MMM yyyy');
       
       const disbursed = loans
-        .filter(l => l.status === 'Active' && format(new Date(l.issueDate.replace(/-/g, '/')), 'MMM yyyy') === monthKey)
+        .filter(l => {
+          if (l.status !== 'Active') return false;
+          const [year, month, day] = l.issueDate.split('-').map(Number);
+          const issueDate = new Date(year, month - 1, day);
+          return format(issueDate, 'MMM yyyy') === monthKey;
+        })
         .reduce((sum, l) => sum + l.principal, 0);
 
       const collected = repayments
