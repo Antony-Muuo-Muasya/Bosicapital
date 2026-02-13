@@ -52,9 +52,10 @@ interface AddLoanDialogProps {
   borrowers: Borrower[];
   loanProducts: LoanProduct[];
   isLoading: boolean;
+  preselectedBorrower?: Borrower | null;
 }
 
-export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading }: AddLoanDialogProps) {
+export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading, preselectedBorrower = null }: AddLoanDialogProps) {
   const firestore = useFirestore();
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
@@ -63,7 +64,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
   const form = useForm<LoanFormData>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
-      borrowerId: '',
+      borrowerId: preselectedBorrower?.id || '',
       loanProductId: '',
       principal: 0,
     }
@@ -74,8 +75,11 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
   const selectedProduct = useMemo(() => loanProducts.find(p => p.id === selectedProductId), [loanProducts, selectedProductId]);
   
   const eligibleBorrowers = useMemo(() => {
+    if (preselectedBorrower) {
+        return preselectedBorrower.registrationFeePaid ? [preselectedBorrower] : [];
+    }
     return borrowers.filter(b => b.registrationFeePaid);
-  }, [borrowers]);
+  }, [borrowers, preselectedBorrower]);
 
   const { totalPayable, interest } = useMemo(() => {
     if (!selectedProduct || !principalValue || principalValue <= 0) {
@@ -99,6 +103,17 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       }
     }
   }, [principalValue, selectedProduct, form]);
+
+  useEffect(() => {
+    // When the dialog opens with a preselected borrower, reset the form.
+    if(open && preselectedBorrower) {
+        form.reset({
+            borrowerId: preselectedBorrower.id,
+            loanProductId: '',
+            principal: 0
+        });
+    }
+  }, [open, preselectedBorrower, form]);
 
 
   const onSubmit = async (values: LoanFormData) => {
@@ -177,7 +192,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
                 <FormField control={form.control} name="borrowerId" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Borrower</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading || eligibleBorrowers.length === 0}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading || !!preselectedBorrower || eligibleBorrowers.length === 0}>
                             <FormControl>
                                 <SelectTrigger><SelectValue placeholder="Select a registered borrower" /></SelectTrigger>
                             </FormControl>

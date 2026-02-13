@@ -17,10 +17,12 @@ import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/fireb
 import { doc } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { useRouter } from 'next/navigation';
 
 const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void }) => {
   const firestore = useFirestore();
   const { userRole } = useUserProfile();
+  const router = useRouter();
   const canDelete = userRole?.id === 'admin';
   const canEdit = userRole?.id === 'admin' || userRole?.id === 'manager' || userRole?.id === 'loan_officer';
 
@@ -42,6 +44,9 @@ const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrow
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => router.push(`/borrowers/${borrower.id}`)}>
+            View History
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(borrower.id)}>
           Copy borrower ID
         </DropdownMenuItem>
