@@ -68,55 +68,46 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [businessPhoto, setBusinessPhoto] = useState<string | null>(null);
   const [homeAssetsPhoto, setHomeAssetsPhoto] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [photoTarget, setPhotoTarget] = useState<'business' | 'homeAssets' | null>(null);
 
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
 
   useEffect(() => {
-    // This function runs when the `open` prop changes.
-    if (open) {
-      // Reset state every time the dialog opens.
-      setBusinessPhoto(null);
-      setHomeAssetsPhoto(null);
-      setHasCameraPermission(null); // Indicates that we are requesting permission.
-
-      const getCameraPermission = async () => {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          console.error("Camera API not supported.");
-          setHasCameraPermission(false); // Explicitly set to false if not supported.
-          return;
-        }
-
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          setHasCameraPermission(true);
-  
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        } catch (error) {
-          console.error('Error accessing camera:', error);
-          setHasCameraPermission(false); // Set to false if permission is denied.
-        }
-      };
-      
-      getCameraPermission();
-    }
-    
-    // This is the cleanup function. It runs when the dialog is closed (`open` becomes false)
-    // or when the component unmounts.
+    // Cleanup function to stop camera when dialog is closed or component unmounts
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-      }
+      stopCamera();
     };
-  }, [open]);
+  }, []);
 
-  const handleCapture = (target: 'business' | 'homeAssets') => {
-    if (!videoRef.current || !canvasRef.current || hasCameraPermission !== true) return;
+  const handleEnableCamera = async (target: 'business' | 'homeAssets') => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Camera not supported on this device.' });
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setPhotoTarget(target);
+      setIsCameraOpen(true);
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser.' });
+    }
+  };
+
+  const handleCapture = () => {
+    if (!videoRef.current || !canvasRef.current || !photoTarget) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -128,13 +119,24 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     if (context) {
         context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
         const dataUrl = canvas.toDataURL('image/jpeg');
-        if (target === 'business') {
+        if (photoTarget === 'business') {
             setBusinessPhoto(dataUrl);
         } else {
             setHomeAssetsPhoto(dataUrl);
         }
-        toast({ title: 'Success', description: `${target === 'business' ? 'Business' : 'Home assets'} photo captured.` });
+        toast({ title: 'Success', description: `${photoTarget === 'business' ? 'Business' : 'Home assets'} photo captured.` });
+        
+        // Stop camera and close view
+        stopCamera();
+        setIsCameraOpen(false);
+        setPhotoTarget(null);
     }
+  };
+
+  const handleCancelCapture = () => {
+    stopCamera();
+    setIsCameraOpen(false);
+    setPhotoTarget(null);
   };
 
   const form = useForm<BorrowerFormData>({
@@ -229,7 +231,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleCancelCapture(); onOpenChange(isOpen); }}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Add New Borrower</DialogTitle>
@@ -345,64 +347,59 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                     )}/>
                 </div>
                 
-                 <div className="space-y-2">
+                <div className="space-y-2">
                     <Label>Supporting Photos</Label>
                     <div className="p-4 border rounded-md bg-muted/50">
-                        <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
-                            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                            <canvas ref={canvasRef} className="hidden" />
-
-                            {hasCameraPermission === false && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                                    <div className="text-center text-white p-4 rounded-lg bg-destructive/50">
-                                        <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-                                        <p className="font-semibold">Camera Access Denied</p>
+                        {isCameraOpen ? (
+                            <div className="space-y-4">
+                                <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
+                                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                                    <canvas ref={canvasRef} className="hidden" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Button type="button" onClick={handleCapture}>
+                                        <Camera className="mr-2" />
+                                        Capture
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={handleCancelCapture}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs">Business Photo</Label>
+                                    <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                        {businessPhoto ? (
+                                            <img src={businessPhoto} alt="Business Preview" className="w-full h-full object-contain rounded-md" />
+                                        ) : (
+                                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                        )}
                                     </div>
+                                    <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('business')}>
+                                        <Camera className="mr-2" />
+                                        {businessPhoto ? 'Retake' : 'Take'} Photo
+                                    </Button>
                                 </div>
-                             )}
-                             {hasCameraPermission === null && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                                    <Loader2 className="h-8 w-8 animate-spin text-white"/>
-                                </div>
-                             )}
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-2 gap-4">
-                            <Button type="button" variant="outline" onClick={() => handleCapture('business')} disabled={hasCameraPermission !== true}>
-                                <Camera className="mr-2" />
-                                Take Business Photo
-                            </Button>
-                            <Button type="button" variant="outline" onClick={() => handleCapture('homeAssets')} disabled={hasCameraPermission !== true}>
-                                <Camera className="mr-2" />
-                                Take Home Assets Photo
-                            </Button>
-                        </div>
-                        
-                        <div className="mt-4 grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs">Business Photo Preview</Label>
-                                <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
-                                    {businessPhoto ? (
-                                        <img src={businessPhoto} alt="Business Preview" className="w-full h-full object-contain rounded-md" />
-                                    ) : (
-                                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                                    )}
+                                <div className="space-y-2">
+                                    <Label className="text-xs">Home Assets Photo</Label>
+                                    <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                        {homeAssetsPhoto ? (
+                                            <img src={homeAssetsPhoto} alt="Home Assets Preview" className="w-full h-full object-contain rounded-md" />
+                                        ) : (
+                                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                        )}
+                                    </div>
+                                    <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('homeAssets')}>
+                                        <Camera className="mr-2" />
+                                        {homeAssetsPhoto ? 'Retake' : 'Take'} Photo
+                                    </Button>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs">Home Assets Photo Preview</Label>
-                                <div className="aspect-video w-full rounded-md border flex items-center justify-center bg-background">
-                                    {homeAssetsPhoto ? (
-                                        <img src={homeAssetsPhoto} alt="Home Assets Preview" className="w-full h-full object-contain rounded-md" />
-                                    ) : (
-                                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
-
 
                 <DialogFooter className="sticky bottom-0 bg-background pt-4 pb-0 -mb-6">
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
