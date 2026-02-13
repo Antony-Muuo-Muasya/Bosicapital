@@ -42,7 +42,12 @@ service cloud.firestore {
       );
       
       // CREATE: A user can create their own profile during signup.
-      allow create: if request.auth != null && isOwner(userId);
+      // Staff can create new users. Loan officers/managers can only create 'user' (borrower) accounts.
+      allow create: if request.auth != null && (
+        isOwner(userId) || // for self-signup
+        (isUserInRole(['loan_officer', 'manager']) && request.resource.data.roleId == 'user') || // officers/managers can create borrowers
+        isPrivilegedUser() // admins can create any staff
+      );
 
       // UPDATE: A user can update their own profile. Admins can update any user in their org, except a superadmin.
       allow update: if request.auth != null && (
