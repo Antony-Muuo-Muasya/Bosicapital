@@ -112,6 +112,15 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+        toast({
+            variant: "destructive",
+            title: "Camera Not Ready",
+            description: "The camera feed is not available yet. Please wait a moment and try again.",
+        });
+        return;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -373,7 +382,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                                     <Label className="text-xs">Business Photo</Label>
                                     <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
                                         {businessPhoto ? (
-                                            <Image src={businessPhoto} alt="Business Preview" fill style={{ objectFit: 'contain' }} />
+                                            <Image src={businessPhoto} alt="Business Preview" fill className="object-contain" />
                                         ) : (
                                             <LucideImage className="h-8 w-8 text-muted-foreground" />
                                         )}
@@ -387,7 +396,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                                     <Label className="text-xs">Home Assets Photo</Label>
                                     <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
                                         {homeAssetsPhoto ? (
-                                            <Image src={homeAssetsPhoto} alt="Home Assets Preview" fill style={{ objectFit: 'contain' }} />
+                                            <Image src={homeAssetsPhoto} alt="Home Assets Preview" fill className="object-contain" />
                                         ) : (
                                             <LucideImage className="h-8 w-8 text-muted-foreground" />
                                         )}
