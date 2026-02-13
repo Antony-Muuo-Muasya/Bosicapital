@@ -74,14 +74,22 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
 
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
+    // This function runs when the `open` prop changes.
     if (open) {
+      // Reset state every time the dialog opens.
       setBusinessPhoto(null);
       setHomeAssetsPhoto(null);
+      setHasCameraPermission(null); // Indicates that we are requesting permission.
 
       const getCameraPermission = async () => {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          console.error("Camera API not supported.");
+          setHasCameraPermission(false); // Explicitly set to false if not supported.
+          return;
+        }
+
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           setHasCameraPermission(true);
   
           if (videoRef.current) {
@@ -89,30 +97,26 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
           }
         } catch (error) {
           console.error('Error accessing camera:', error);
-          setHasCameraPermission(false);
-          toast({
-            variant: 'destructive',
-            title: 'Camera Access Denied',
-            description: 'Please enable camera permissions in your browser settings to use this app.',
-          });
+          setHasCameraPermission(false); // Set to false if permission is denied.
         }
       };
       
       getCameraPermission();
     }
-  
+    
+    // This is the cleanup function. It runs when the dialog is closed (`open` becomes false)
+    // or when the component unmounts.
     return () => {
-      if (stream) {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
-      }
-      if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
     };
-  }, [open, toast]);
+  }, [open]);
 
   const handleCapture = (target: 'business' | 'homeAssets') => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current || hasCameraPermission !== true) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -344,31 +348,36 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                  <div className="space-y-2">
                     <Label>Supporting Photos</Label>
                     <div className="p-4 border rounded-md bg-muted/50">
-                        {hasCameraPermission === false && (
-                            <Alert variant="destructive">
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>Camera Access Required</AlertTitle>
-                                <AlertDescription>Please enable camera permissions in your browser to take photos.</AlertDescription>
-                            </Alert>
-                        )}
-                         {hasCameraPermission === true && (
-                             <div className="space-y-4">
-                                <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
-                                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                                    <canvas ref={canvasRef} className="hidden" />
+                        <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
+                            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                            <canvas ref={canvasRef} className="hidden" />
+
+                            {hasCameraPermission === false && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                                    <div className="text-center text-white p-4 rounded-lg bg-destructive/50">
+                                        <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                                        <p className="font-semibold">Camera Access Denied</p>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Button type="button" variant="outline" onClick={() => handleCapture('business')}>
-                                        <Camera className="mr-2" />
-                                        Take Business Photo
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => handleCapture('homeAssets')}>
-                                        <Camera className="mr-2" />
-                                        Take Home Assets Photo
-                                    </Button>
+                             )}
+                             {hasCameraPermission === null && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                                    <Loader2 className="h-8 w-8 animate-spin text-white"/>
                                 </div>
-                            </div>
-                         )}
+                             )}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            <Button type="button" variant="outline" onClick={() => handleCapture('business')} disabled={hasCameraPermission !== true}>
+                                <Camera className="mr-2" />
+                                Take Business Photo
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => handleCapture('homeAssets')} disabled={hasCameraPermission !== true}>
+                                <Camera className="mr-2" />
+                                Take Home Assets Photo
+                            </Button>
+                        </div>
+                        
                         <div className="mt-4 grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-xs">Business Photo Preview</Label>
