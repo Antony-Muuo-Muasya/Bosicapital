@@ -20,6 +20,7 @@ import { TopBorrowers } from './loan-officer/TopBorrowers';
 import { PerformanceTracker } from './loan-officer/PerformanceTracker';
 import { LifetimeStats } from './loan-officer/LifetimeStats';
 import { CollectionEfficiencyGauge } from './loan-officer/CollectionEfficiencyGauge';
+import { CreateIndexCard } from './loan-officer/CreateIndexCard';
 
 
 export function LoanOfficerDashboard() {
@@ -89,7 +90,7 @@ export function LoanOfficerDashboard() {
     if (!firestore || !user) return null;
     return query(collectionGroup(firestore, 'installments'), where('loanOfficerId', '==', user.uid));
   }, [firestore, user]);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+  const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
 
   const isLoading = isProfileLoading || loansLoading || borrowersLoading || myBorrowersLoading || allLoanProductsLoading || repaymentsLoading || installmentsLoading;
   
@@ -97,11 +98,6 @@ export function LoanOfficerDashboard() {
   const dashboardStats = useMemo(() => {
     if (isLoading || !loans || !installments || !myBorrowers) return { portfolioValue: 0, activeLoansCount: 0, totalBorrowers: 0, overdueLoansCount: 0 };
     
-    const parseDate = (dateString: string) => {
-        const [year, month, day] = dateString.split('-').map(Number);
-        return new Date(year, month - 1, day);
-    };
-
     const activeLoans = loans.filter(l => l.status === 'Active');
     
     const portfolioValue = activeLoans.reduce((sum, loan) => {
@@ -114,7 +110,9 @@ export function LoanOfficerDashboard() {
     const today = startOfToday();
     const overdueInstallments = installments.filter(i => {
         if (i.status === 'Paid') return false;
-        return parseDate(i.dueDate) < today;
+        const [year, month, day] = i.dueDate.split('-').map(Number);
+        const dueDate = new Date(year, month - 1, day);
+        return dueDate < today;
     });
     const overdueLoansCount = new Set(overdueInstallments.map(i => i.loanId)).size;
 
@@ -211,6 +209,7 @@ export function LoanOfficerDashboard() {
       </PageHeader>
       
       <div className="p-4 md:p-6 grid gap-6">
+        {installmentsError && <CreateIndexCard />}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="My Portfolio Value" value={formatCurrency(dashboardStats.portfolioValue, 'KES')} icon={Landmark} featured isLoading={isLoading} />
             <StatCard title="My Active Loans" value={dashboardStats.activeLoansCount} icon={Scale} isLoading={isLoading} />
