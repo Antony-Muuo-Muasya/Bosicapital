@@ -12,11 +12,15 @@ import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { StatCard } from './loan-officer/StatCard';
 import { Landmark, Users, Scale, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { startOfToday } from 'date-fns';
+import { startOfToday, subMonths, format } from 'date-fns';
+import { DualTrendChart } from './loan-officer/DualTrendChart';
 import { LoanPipeline } from './loan-officer/LoanPipeline';
 import { RecentActivity } from './loan-officer/RecentActivity';
-import { ActionCenter } from './loan-officer/ActionCenter';
-import { CreateIndexCard } from './loan-officer/CreateIndexCard';
+import { TopBorrowers } from './loan-officer/TopBorrowers';
+import { PerformanceTracker } from './loan-officer/PerformanceTracker';
+import { LifetimeStats } from './loan-officer/LifetimeStats';
+import { CollectionEfficiencyGauge } from './loan-officer/CollectionEfficiencyGauge';
+
 
 export function LoanOfficerDashboard() {
   const firestore = useFirestore();
@@ -27,16 +31,13 @@ export function LoanOfficerDashboard() {
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
 
   // --- DATA QUERIES ---
-
-  // 1. Get loans for the current officer
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'loans'), where('loanOfficerId', '==', user.uid));
   }, [firestore, user]);
   const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
 
-  // 2. Get all borrowers in the officer's branch(es).
-  const borrowersQuery = useMemoFirebase(() => {
+  const borrowersInBranchQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile?.branchIds || userProfile.branchIds.length === 0) {
       return query(collection(firestore, 'borrowers'), where(documentId(), '==', 'no-borrowers-found'));
     };
@@ -45,37 +46,56 @@ export function LoanOfficerDashboard() {
         where('branchId', 'in', userProfile.branchIds)
     );
   }, [firestore, JSON.stringify(userProfile?.branchIds)]);
-  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
+  const { data: borrowersInBranch, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersInBranchQuery);
+  
+  const myBorrowerIds = useMemo(() => {
+      if (!loans) return [];
+      return [...new Set(loans.map(l => l.borrowerId))];
+  }, [loans]);
+
+  const myBorrowersQuery = useMemoFirebase(() => {
+      if (!firestore || myBorrowerIds.length === 0) return null;
+      if (myBorrowerIds.length > 30) {
+          // This is a fallback if there are too many borrowers for one 'in' query.
+          return null;
+      }
+      return query(collection(firestore, 'borrowers'), where(documentId(), 'in', myBorrowerIds));
+  }, [firestore, JSON.stringify(myBorrowerIds)]);
+  const { data: myBorrowersData, isLoading: myBorrowersLoading } = useCollection<Borrower>(myBorrowersQuery);
+
+  const myBorrowers = useMemo(() => {
+      if (myBorrowersData) return myBorrowersData;
+      if (borrowersInBranch) {
+          const idSet = new Set(myBorrowerIds);
+          return borrowersInBranch.filter(b => idSet.has(b.id));
+      }
+      return [];
+  }, [myBorrowersData, borrowersInBranch, myBorrowerIds]);
 
 
-  // 3. Get all loan products (for dialogs)
   const allLoanProductsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId))
   }, [firestore, userProfile]);
   const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
   
-  // 4. Get repayments for the officer's loans
   const repaymentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'repayments'), where('loanOfficerId', '==', user.uid));
   }, [firestore, user]);
   const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
 
-  // 5. Get installments for the officer's loans (This is the query that might be failing)
   const installmentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collectionGroup(firestore, 'installments'), where('loanOfficerId', '==', user.uid));
   }, [firestore, user]);
-  const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
+  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
 
-
-  // Overall loading state
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading || repaymentsLoading || installmentsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || myBorrowersLoading || allLoanProductsLoading || repaymentsLoading || installmentsLoading;
   
   // --- DATA PROCESSING FOR DASHBOARD ---
   const dashboardStats = useMemo(() => {
-    if (!loans || !installments || !borrowers) return { portfolioValue: 0, activeLoansCount: 0, totalBorrowers: 0, overdueLoansCount: 0 };
+    if (isLoading || !loans || !installments || !myBorrowers) return { portfolioValue: 0, activeLoansCount: 0, totalBorrowers: 0, overdueLoansCount: 0 };
     
     const parseDate = (dateString: string) => {
         const [year, month, day] = dateString.split('-').map(Number);
@@ -95,10 +115,66 @@ export function LoanOfficerDashboard() {
     return {
         portfolioValue,
         activeLoansCount: activeLoans.length,
-        totalBorrowers: borrowers.length,
+        totalBorrowers: myBorrowers.length,
         overdueLoansCount: overdueLoansCount,
     };
-  }, [loans, installments, borrowers]);
+  }, [isLoading, loans, installments, myBorrowers]);
+  
+  const monthlyTrends = useMemo(() => {
+    if (!loans || !repayments) return [];
+
+    const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), i)).reverse();
+    
+    const trends = last6Months.map(monthDate => {
+      const monthKey = format(monthDate, 'MMM yyyy');
+      
+      const disbursed = loans
+        .filter(l => l.status === 'Active' && format(new Date(l.issueDate.replace(/-/g, '/')), 'MMM yyyy') === monthKey)
+        .reduce((sum, l) => sum + l.principal, 0);
+
+      const collected = repayments
+        .filter(r => format(new Date(r.paymentDate), 'MMM yyyy') === monthKey)
+        .reduce((sum, r) => sum + r.amount, 0);
+
+      return { name: format(monthDate, 'MMM'), disbursed, collected };
+    });
+
+    return trends;
+  }, [loans, repayments]);
+  
+    const lifetimeStats = useMemo(() => {
+        if (!loans || !repayments) return { totalLoans: 0, totalPrincipal: 0, totalCollected: 0 };
+        return {
+            totalLoans: loans.length,
+            totalPrincipal: loans.reduce((sum, l) => sum + l.principal, 0),
+            totalCollected: repayments.reduce((sum, r) => sum + r.amount, 0),
+        }
+    }, [loans, repayments]);
+
+    const topBorrowers = useMemo(() => {
+        if (!loans || !myBorrowers) return [];
+        const borrowersMap = new Map(myBorrowers.map(b => [b.id, b]));
+        const principalByBorrower = loans.reduce((acc, loan) => {
+            acc[loan.borrowerId] = (acc[loan.borrowerId] || 0) + loan.principal;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return Object.entries(principalByBorrower)
+            .map(([id, amount]) => ({
+                id,
+                name: borrowersMap.get(id)?.fullName || 'Unknown',
+                avatar: borrowersMap.get(id)?.photoUrl || `https://picsum.photos/seed/${id}/400/400`,
+                amount
+            }))
+            .sort((a,b) => b.amount - a.amount)
+            .slice(0, 3);
+            
+    }, [loans, myBorrowers]);
+
+    const collectionEfficiency = useMemo(() => {
+        if (!lifetimeStats.totalPrincipal || lifetimeStats.totalPrincipal === 0) return 0;
+        return (lifetimeStats.totalCollected / lifetimeStats.totalPrincipal) * 100;
+    }, [lifetimeStats]);
 
 
   return (
@@ -133,20 +209,24 @@ export function LoanOfficerDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className='lg:col-span-2'>
-              {installmentsError ? (
-                  <CreateIndexCard />
-              ) : (
-                  <ActionCenter 
-                      installments={installments}
-                      loans={loans}
-                      borrowers={borrowers}
-                      isLoading={isLoading}
-                  />
-              )}
+              <DualTrendChart data={monthlyTrends} isLoading={isLoading} />
             </div>
+            <div className='space-y-6'>
+                <PerformanceTracker loans={loans} borrowers={myBorrowers} isLoading={isLoading} />
+                <LoanPipeline loans={loans} borrowers={myBorrowers} isLoading={isLoading} />
+            </div>
+        </div>
+
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className='lg:col-span-1 space-y-6'>
-                <LoanPipeline loans={loans} borrowers={borrowers} isLoading={isLoading} />
-                <RecentActivity loans={loans} borrowers={borrowers} repayments={repayments} isLoading={isLoading} />
+                <LifetimeStats {...lifetimeStats} isLoading={isLoading} />
+                <CollectionEfficiencyGauge value={collectionEfficiency} isLoading={isLoading} />
+            </div>
+             <div className='lg:col-span-1'>
+                 <TopBorrowers data={topBorrowers} isLoading={isLoading} />
+            </div>
+             <div className='lg:col-span-1'>
+                <RecentActivity loans={loans} borrowers={myBorrowers} repayments={repayments} isLoading={isLoading} />
             </div>
         </div>
       </div>
@@ -155,7 +235,7 @@ export function LoanOfficerDashboard() {
       <AddLoanDialog 
         open={isAddLoanOpen} 
         onOpenChange={setIsAddLoanOpen}
-        borrowers={borrowers || []}
+        borrowers={borrowersInBranch || []}
         loanProducts={allLoanProducts || []}
         isLoading={isLoading}
        />
