@@ -100,26 +100,26 @@ export function LoanOfficerDashboard() {
     // For Dual Trend Chart
     const today = new Date();
     const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
-    const monthKeys = last6Months.map(d => format(d, 'yyyy-MM'));
+    const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
     
     const disbursalByMonth = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const [year, monthNum, day] = loan.issueDate.split('-').map(Number);
-        const issueDateObj = new Date(year, monthNum - 1, day);
-        const monthKey = format(issueDateObj, 'yyyy-MM');
-        acc[monthKey] = (acc[monthKey] || 0) + loan.principal;
+        const issueDateObj = new Date(loan.issueDate.replace(/-/g, '/'));
+        const month = format(issueDateObj, 'MMM yy');
+        acc[month] = (acc[month] || 0) + loan.principal;
         return acc;
     }, {} as Record<string, number>);
 
     const collectionsByMonth = repayments.reduce((acc, repayment) => {
-        const monthKey = format(new Date(repayment.paymentDate), 'yyyy-MM');
-        acc[monthKey] = (acc[monthKey] || 0) + repayment.amount;
+        const paymentDateObj = new Date(repayment.paymentDate);
+        const month = format(paymentDateObj, 'MMM yy');
+        acc[month] = (acc[month] || 0) + repayment.amount;
         return acc;
     }, {} as Record<string, number>);
 
-    const dualTrendData = monthKeys.map(monthKey => ({
-        name: format(new Date(`${monthKey}-02`), 'MMM yy'), // Use a neutral day to avoid timezone issues
-        disbursed: disbursalByMonth[monthKey] || 0,
-        collected: collectionsByMonth[monthKey] || 0,
+    const dualTrendData = monthLabels.map(month => ({
+        name: month,
+        disbursed: disbursalByMonth[month] || 0,
+        collected: collectionsByMonth[month] || 0,
     }));
 
     // For Lifetime Stats & Collection Gauge
