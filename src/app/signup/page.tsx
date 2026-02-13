@@ -8,21 +8,19 @@ import { useAuth, useUser, useFirestore } from '@/firebase';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { doc, collection, writeBatch, getDocs, query, limit, where } from 'firebase/firestore';
+import { doc, collection, writeBatch, getDocs, query, limit } from 'firebase/firestore';
 import type { User as AppUser, Role, Branch, Organization } from '@/lib/types';
-import Image from 'next/image';
-import { Skeleton } from '@/components/ui/skeleton';
-import { transformImageUrl } from '@/lib/utils';
 
 
 const signupSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
+  organizationName: z.string().min(1, 'Organization name is required'),
   email: z.string().email(),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
 });
@@ -34,41 +32,12 @@ export default function SignupPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [org, setOrg] = useState<{name: string, logoUrl: string, slogan?: string} | null>(null);
-  const [isOrgLoading, setIsOrgLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchOrg = async () => {
-      if (!firestore) {
-        setIsOrgLoading(false);
-        return;
-      };
-      try {
-        const orgsQuery = query(collection(firestore, 'organizations'), limit(1));
-        const orgsSnapshot = await getDocs(orgsQuery);
-        if (!orgsSnapshot.empty) {
-          const orgData = orgsSnapshot.docs[0].data() as Organization;
-          setOrg({
-            name: orgData.name,
-            logoUrl: orgData.logoUrl || '',
-            slogan: orgData.slogan,
-          });
-        }
-      } catch (error) {
-        console.error("Could not fetch organization for signup page:", error);
-      } finally {
-        setIsOrgLoading(false);
-      }
-    };
-    fetchOrg();
-  }, [firestore]);
-
-  const displayLogoUrl = useMemo(() => transformImageUrl(org?.logoUrl), [org]);
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
       fullName: '',
+      organizationName: '',
       email: '',
       password: '',
     },
@@ -77,39 +46,18 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     setIsSubmitting(true);
     try {
-      // Check if an organization already exists.
-      const orgsQuery = query(collection(firestore, 'organizations'), limit(1));
-      const orgsSnapshot = await getDocs(orgsQuery);
-      const isFirstUserEver = orgsSnapshot.empty;
-
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       await updateProfile(userCredential.user, {
         displayName: values.fullName,
       });
 
       const batch = writeBatch(firestore);
-      let organizationId: string;
-      let roleId: AppUser['roleId'];
-      let branchIds: string[] = [];
       const createdAt = new Date().toISOString();
 
-      if (isFirstUserEver) {
-        // First user setup: creates the organization, roles, and main branch
-        const orgRef = doc(collection(firestore, 'organizations'));
-        organizationId = orgRef.id;
-        roleId = 'superadmin';
-        
-        const orgData: Organization = {
-            id: organizationId,
-            name: "Bosi Capital Limited",
-            logoUrl: '',
-            slogan: 'Capital that works',
-            createdAt,
-            phone: '0755595565',
-            address: 'Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi',
-        };
-        batch.set(orgRef, orgData);
-        
+      // Seed roles only if they don't exist yet (one-time setup for the entire platform)
+      const rolesQuery = query(collection(firestore, 'roles'), limit(1));
+      const rolesSnapshot = await getDocs(rolesQuery);
+      if (rolesSnapshot.empty) {
         const rolesToSeed: (Omit<Role, 'organizationId' | 'id'> & { id: Role['id'] })[] = [
             { id: 'superadmin', name: 'CEO / Business Developer', systemRole: true, permissions: ['*'] as any },
             { id: 'admin', name: 'Head of Operations', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'] },
@@ -122,41 +70,38 @@ export default function SignupPage() {
             const roleDocRef = doc(firestore, 'roles', roleData.id);
             batch.set(roleDocRef, { ...roleData, organizationId: 'system' });
         });
-        
-        const mainBranchRef = doc(collection(firestore, 'branches'));
-        const mainBranch: Branch = {
-            id: mainBranchRef.id, name: 'Headquarters', location: 'Nairobi', isMain: true, organizationId,
-        };
-        batch.set(mainBranchRef, mainBranch);
-        branchIds = [mainBranch.id];
-
-      } else {
-        // Subsequent user setup: join the existing organization
-        const existingOrg = orgsSnapshot.docs[0].data() as Organization;
-        organizationId = existingOrg.id;
-        roleId = 'user'; // Default new users to the 'Borrower' role.
-        
-        // Find the main branch of the existing organization to assign the user
-        const branchesQuery = query(
-            collection(firestore, 'branches'), 
-            where('organizationId', '==', organizationId), 
-            where('isMain', '==', true),
-            limit(1)
-        );
-        const branchSnapshot = await getDocs(branchesQuery);
-        if (!branchSnapshot.empty) {
-            branchIds = [branchSnapshot.docs[0].id];
-        }
       }
+      
+      // Create a new independent organization for this user
+      const orgRef = doc(collection(firestore, 'organizations'));
+      const organizationId = orgRef.id;
+      const orgData: Organization = {
+          id: organizationId,
+          name: values.organizationName,
+          logoUrl: '',
+          slogan: '',
+          createdAt,
+          phone: '',
+          address: '',
+      };
+      batch.set(orgRef, orgData);
+      
+      // Create a main branch for this new organization
+      const mainBranchRef = doc(collection(firestore, 'branches'));
+      const mainBranch: Branch = {
+          id: mainBranchRef.id, name: 'Headquarters', location: 'Main Office', isMain: true, organizationId,
+      };
+      batch.set(mainBranchRef, mainBranch);
+      const branchIds = [mainBranch.id];
 
-      // Create the user document in Firestore
+      // Create the user document, making them the superadmin of their new organization
       const userDocRef = doc(firestore, 'users', userCredential.user.uid);
       const newUserProfile: AppUser = {
           id: userCredential.user.uid,
           organizationId,
           fullName: values.fullName,
           email: values.email,
-          roleId: roleId,
+          roleId: 'superadmin',
           branchIds: branchIds,
           status: 'active',
           createdAt: createdAt,
@@ -166,8 +111,8 @@ export default function SignupPage() {
       await batch.commit();
 
       toast({
-        title: 'Account Created!',
-        description: "You're now being redirected to your dashboard.",
+        title: 'Account & Organization Created!',
+        description: "You're now being redirected to your new dashboard.",
       });
 
     } catch (error: any) {
@@ -183,9 +128,6 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!isUserLoading && user) {
-      // The redirect should depend on the user's role, which is set during signup.
-      // A fresh user might not have their profile immediately, so a simple push is okay.
-      // The layout for the destination will handle role-based redirection if needed.
       router.push('/dashboard');
     }
   }, [user, isUserLoading, router]);
@@ -202,24 +144,31 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          {isOrgLoading ? (
-             <Skeleton className="h-24 w-24 mx-auto rounded-md" />
-          ) : (
-            displayLogoUrl && <Image src={displayLogoUrl} alt={org?.name || 'Logo'} width={96} height={96} className="mx-auto rounded-md object-contain" />
-          )}
-          <CardTitle className="text-2xl pt-2">{isOrgLoading ? <Skeleton className="h-8 w-48 mx-auto" /> : (org?.name || 'Create an Account')}</CardTitle>
-          {org?.slogan && <p className="text-sm text-muted-foreground">{org.slogan}</p>}
-          <CardDescription className="!mt-4">Enter your details to get started.</CardDescription>
+          <CardTitle className="text-2xl">Create an Account</CardTitle>
+          <CardDescription className="!mt-4">Sign up to create your own organization.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
+                name="organizationName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organization Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Your Company, Inc." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="fullName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>Your Full Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Jane Doe" {...field} />
                     </FormControl>
@@ -232,7 +181,7 @@ export default function SignupPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Your Email</FormLabel>
                     <FormControl>
                       <Input placeholder="m@example.com" {...field} />
                     </FormControl>
