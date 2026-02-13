@@ -60,16 +60,25 @@ export function LoanOfficerDashboard() {
   }, [firestore, userProfile]);
   const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
 
-  // 4. Get repayments collected by the current officer
+  const loanIds = useMemo(() => loans?.map(l => l.id), [loans]);
+
+  // 4. Get repayments for the officer's loans
   const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'repayments'), where('collectedById', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore || !loanIds) return null; // Wait for loans to load
+    if (loanIds.length === 0) {
+      // No loans, so no repayments to fetch.
+      return query(collection(firestore, 'repayments'), where('loanId', '==', 'no-loans-found'));
+    }
+    // Firestore 'in' query is limited to 30 items in new SDK versions
+    if (loanIds.length > 30) {
+        console.warn(`Repayment query is limited to the first 30 loans for this officer due to Firestore limitations.`);
+        return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds.slice(0, 30)));
+    }
+    return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds));
+  }, [firestore, JSON.stringify(loanIds)]);
   const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
 
   // 5. Get installments for the officer's loans
-  const loanIds = useMemo(() => loans?.map(l => l.id), [loans]);
-  
   const installmentsQuery = useMemoFirebase(() => {
     if (!firestore || !loanIds) return null;
     if (loanIds.length === 0) {
