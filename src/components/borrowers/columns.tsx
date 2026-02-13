@@ -18,10 +18,11 @@ import { doc } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 
-const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void }) => {
+const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void }) => {
   const firestore = useFirestore();
   const { userRole } = useUserProfile();
-  const canPerformActions = userRole?.id === 'admin' || userRole?.id === 'manager';
+  const canDelete = userRole?.id === 'admin';
+  const canEdit = userRole?.id === 'admin' || userRole?.id === 'manager' || userRole?.id === 'loan_officer';
 
 
   const handleDelete = () => {
@@ -50,8 +51,8 @@ const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, on
             Record Payment
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem disabled={!canPerformActions}>Edit Borrower</DropdownMenuItem>
-        <DropdownMenuItem onClick={handleDelete} className="text-destructive" disabled={!canPerformActions}>
+        <DropdownMenuItem onClick={() => onEditBorrower(borrower)} disabled={!canEdit}>Edit Borrower</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleDelete} className="text-destructive" disabled={!canDelete}>
           Delete Borrower
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -59,7 +60,7 @@ const BorrowerActions = ({ borrower, onRecordPayment }: { borrower: Borrower, on
   );
 };
 
-export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void): ColumnDef<Borrower>[] => [
+export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void): ColumnDef<Borrower>[] => [
   {
     accessorKey: 'fullName',
     header: 'Name',
@@ -113,7 +114,7 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
     id: 'actions',
     cell: ({ row }) => {
       const borrower = row.original;
-      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} />;
+      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} onEditBorrower={onEditBorrower} />;
     },
   },
 ];

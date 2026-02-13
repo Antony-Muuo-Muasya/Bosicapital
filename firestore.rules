@@ -49,10 +49,18 @@ service cloud.firestore {
         isPrivilegedUser() // admins can create any staff
       );
 
-      // UPDATE: A user can update their own profile. Admins can update any user in their org, except a superadmin.
+      // UPDATE: A user can update their own profile. Admins can update any user in their org.
+      // Loan officers/managers can update borrower accounts in their branch.
       allow update: if request.auth != null && (
         isOwner(userId) || 
-        (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId && resource.data.roleId != 'superadmin')
+        (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId && resource.data.roleId != 'superadmin') ||
+        (
+          (isUserInRole(['loan_officer', 'manager'])) &&
+          resource.data.roleId == 'user' &&
+          isAssignedToBranch(resource.data.branchIds[0]) &&
+          request.resource.data.roleId == resource.data.roleId &&
+          request.resource.data.branchIds == resource.data.branchIds
+        )
       );
       
       // DELETE: Admin can delete any user except superadmins and themselves. Superadmin can delete any user except themselves.
