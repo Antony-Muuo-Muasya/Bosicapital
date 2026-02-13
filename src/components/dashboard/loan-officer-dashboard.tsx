@@ -60,35 +60,18 @@ export function LoanOfficerDashboard() {
   }, [firestore, userProfile]);
   const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
 
-  const loanIds = useMemo(() => loans?.map(l => l.id), [loans]);
-
   // 4. Get repayments for the officer's loans
   const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !loanIds) return null; // Wait for loans to load
-    if (loanIds.length === 0) {
-      // No loans, so no repayments to fetch.
-      return query(collection(firestore, 'repayments'), where('loanId', '==', 'no-loans-found'));
-    }
-    // Firestore 'in' query is limited to 30 items in new SDK versions
-    if (loanIds.length > 30) {
-        console.warn(`Repayment query is limited to the first 30 loans for this officer due to Firestore limitations.`);
-        return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds.slice(0, 30)));
-    }
-    return query(collection(firestore, 'repayments'), where('loanId', 'in', loanIds));
-  }, [firestore, JSON.stringify(loanIds)]);
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'repayments'), where('loanOfficerId', '==', user.uid));
+  }, [firestore, user]);
   const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
 
   // 5. Get installments for the officer's loans
   const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !loanIds) return null;
-    if (loanIds.length === 0) {
-      return query(collectionGroup(firestore, 'installments'), where('loanId', '==', 'no-loans-found'));
-    }
-    if (loanIds.length > 30) {
-      console.warn('Installment query is limited to the first 30 loans for this officer.');
-    }
-    return query(collectionGroup(firestore, 'installments'), where('loanId', 'in', loanIds.slice(0, 30)));
-  }, [firestore, JSON.stringify(loanIds)]);
+    if (!firestore || !user) return null;
+    return query(collectionGroup(firestore, 'installments'), where('loanOfficerId', '==', user.uid));
+  }, [firestore, user]);
 
   const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
 
@@ -239,3 +222,5 @@ export function LoanOfficerDashboard() {
     </>
   );
 }
+
+    

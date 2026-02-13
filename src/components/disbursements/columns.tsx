@@ -77,6 +77,7 @@ const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
                   loanId: loan.id,
                   organizationId: loan.organizationId,
                   branchId: loan.branchId,
+                  loanOfficerId: loan.loanOfficerId,
                   installmentNumber: i,
                   dueDate: currentDueDate.toISOString().split('T')[0],
                   expectedAmount: loan.installmentAmount,
@@ -188,4 +189,6 @@ export const getDisbursementColumns = (): ColumnDef<LoanWithDetails>[] => [
     },
   },
 ];
+    
+
     

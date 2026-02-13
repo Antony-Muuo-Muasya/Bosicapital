@@ -34,6 +34,7 @@ interface Loan {
   id: string;
   organizationId: string;
   borrowerId: string;
+  loanOfficerId: string;
   totalPayable: number;
 }
 
@@ -249,6 +250,7 @@ export const mpesaPaymentCallback = functions.https.onRequest(
               id: newRepaymentRef.id,
               organizationId: loanData.organizationId,
               loanId: loanRef.id,
+              loanOfficerId: loanData.loanOfficerId,
               borrowerId,
               transId: TransID,
               amount: paymentAmount,
@@ -280,3 +282,5 @@ export const mpesaPaymentCallback = functions.https.onRequest(
     });
   }
 );
+
+    

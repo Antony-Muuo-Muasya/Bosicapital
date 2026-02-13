@@ -217,6 +217,7 @@
       "properties": {
         "id": { "type": "string" },
         "loanId": { "type": "string" },
+        "loanOfficerId": { "type": "string" },
         "organizationId": { "type": "string" },
         "branchId": { "type": "string" },
         "installmentNumber": { "type": "number" },
@@ -225,7 +226,7 @@
         "paidAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["Paid", "Unpaid", "Partial", "Overdue"] }
       },
-      "required": ["id", "loanId", "organizationId", "branchId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
+      "required": ["id", "loanId", "loanOfficerId", "organizationId", "branchId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
     },
     "Repayment": {
       "title": "Repayment",
@@ -235,6 +236,7 @@
         "id": { "type": "string" },
         "organizationId": { "type": "string" },
         "loanId": { "type": "string" },
+        "loanOfficerId": { "type": "string" },
         "borrowerId": { "type": "string" },
         "transId": { "type": "string" },
         "amount": { "type": "number" },
@@ -244,7 +246,7 @@
         "phone": { "type": "string" },
         "balanceAfterPayment": { "type": "number" }
       },
-      "required": ["id", "organizationId", "loanId", "borrowerId", "amount", "paymentDate", "collectedById", "transId"]
+      "required": ["id", "organizationId", "loanId", "borrowerId", "loanOfficerId", "amount", "paymentDate", "collectedById", "transId"]
     },
     "RegistrationPayment": {
       "title": "Registration Payment",
