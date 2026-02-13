@@ -103,16 +103,17 @@ export function LoanOfficerDashboard() {
     const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
     
     const disbursalByMonth = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const issueDateObj = new Date(loan.issueDate.replace(/-/g, '/'));
-        const month = format(issueDateObj, 'MMM yy');
-        acc[month] = (acc[month] || 0) + loan.principal;
+        const [year, month, day] = loan.issueDate.split('-').map(Number);
+        const issueDateObj = new Date(year, month - 1, day);
+        const monthKey = format(issueDateObj, 'MMM yy');
+        acc[monthKey] = (acc[monthKey] || 0) + loan.principal;
         return acc;
     }, {} as Record<string, number>);
 
     const collectionsByMonth = repayments.reduce((acc, repayment) => {
         const paymentDateObj = new Date(repayment.paymentDate);
-        const month = format(paymentDateObj, 'MMM yy');
-        acc[month] = (acc[month] || 0) + repayment.amount;
+        const monthKey = format(paymentDateObj, 'MMM yy');
+        acc[monthKey] = (acc[monthKey] || 0) + repayment.amount;
         return acc;
     }, {} as Record<string, number>);
 
