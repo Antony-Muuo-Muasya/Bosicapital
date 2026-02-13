@@ -10,12 +10,12 @@ import { useState, useMemo } from 'react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
 import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { StatCard } from './loan-officer/StatCard';
-import { Landmark, Users, Scale, AlertTriangle, Coins, CalendarCheck, CalendarClock } from 'lucide-react';
+import { Landmark, Users, Scale, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PerformanceTracker } from './loan-officer/PerformanceTracker';
 import { LoanPipeline } from './loan-officer/LoanPipeline';
 import { RecentActivity } from './loan-officer/RecentActivity';
-import { subMonths, format } from 'date-fns';
+import { subMonths, format, startOfToday } from 'date-fns';
 import { DualTrendChart } from './loan-officer/DualTrendChart';
 import { LifetimeStats } from './loan-officer/LifetimeStats';
 import { CollectionEfficiencyGauge } from './loan-officer/CollectionEfficiencyGauge';
@@ -83,34 +83,36 @@ export function LoanOfficerDashboard() {
   const dashboardData = useMemo(() => {
     if (isLoading || !loans || !borrowers || !repayments || !allLoanProducts || !installments) return null;
     
-    // Top-level stats
+    // --- Helper function for robust date parsing ---
+    const parseDate = (dateString: string) => {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    };
+
+    // --- Top-level stats (Reverted and improved) ---
     const activeLoans = loans.filter(l => l.status === 'Active');
     const portfolioValue = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
 
-    const todayISO = new Date().toISOString().split('T')[0];
+    const today = startOfToday();
+    const overdueInstallments = installments.filter(i => {
+        if (i.status === 'Paid') return false;
+        return parseDate(i.dueDate) < today;
+    });
+    const overdueLoansCount = new Set(overdueInstallments.map(i => i.loanId)).size;
 
-    const paymentsCollectedToday = repayments
-      .filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISO)
-      .reduce((sum, r) => sum + r.amount, 0);
-    
-    const loansDisbursedToday = loans.filter(l => l.issueDate === todayISO && l.status === 'Active').length;
-    
-    const installmentsDueToday = installments.filter(i => i.dueDate === todayISO).length;
-    
-    // For Dual Trend Chart
-    const today = new Date();
-    const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
+    // --- For Dual Trend Chart (Monthly Trends) ---
+    const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), i)).reverse();
     const monthLabels = last6Months.map(d => format(d, 'MMM yy'));
     
     const disbursalByMonth = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const dateParts = loan.issueDate.split('-').map(Number);
-        const issueDateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        const issueDateObj = parseDate(loan.issueDate);
         const monthKey = format(issueDateObj, 'MMM yy');
         acc[monthKey] = (acc[monthKey] || 0) + loan.principal;
         return acc;
     }, {} as Record<string, number>);
 
     const collectionsByMonth = repayments.reduce((acc, repayment) => {
+        // repayment.paymentDate is an ISO string, new Date() is fine here
         const paymentDateObj = new Date(repayment.paymentDate);
         const monthKey = format(paymentDateObj, 'MMM yy');
         acc[monthKey] = (acc[monthKey] || 0) + repayment.amount;
@@ -123,12 +125,12 @@ export function LoanOfficerDashboard() {
         collected: collectionsByMonth[month] || 0,
     }));
 
-    // For Lifetime Stats & Collection Gauge
+    // --- For Lifetime Stats & Collection Gauge ---
     const totalPrincipalDisbursed = loans.reduce((sum, l) => sum + l.principal, 0);
     const totalRepaymentsCollected = repayments.reduce((sum, r) => sum + r.amount, 0);
     const collectionEfficiency = totalPrincipalDisbursed > 0 ? (totalRepaymentsCollected / totalPrincipalDisbursed) * 100 : 0;
 
-    // For Top Borrowers
+    // --- For Top Borrowers ---
     const borrowersMap = new Map(borrowers.map(b => [b.id, { name: b.fullName, avatar: b.photoUrl }]));
     const principalByBorrower = loans.reduce((acc, loan) => {
         acc[loan.borrowerId] = (acc[loan.borrowerId] || 0) + loan.principal;
@@ -148,9 +150,9 @@ export function LoanOfficerDashboard() {
     return {
         statCards: {
             portfolioValue,
-            paymentsCollectedToday,
-            loansDisbursedToday,
-            installmentsDueToday
+            activeLoansCount: activeLoans.length,
+            totalBorrowers: borrowers.length,
+            overdueLoansCount: overdueLoansCount,
         },
         dualTrendData,
         lifetimeStats: {
@@ -160,7 +162,7 @@ export function LoanOfficerDashboard() {
         },
         collectionEfficiency,
         topBorrowersData
-    }
+    };
   }, [loans, borrowers, repayments, allLoanProducts, installments, isLoading]);
 
 
@@ -189,9 +191,9 @@ export function LoanOfficerDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="My Portfolio Value" value={formatCurrency(dashboardData?.statCards.portfolioValue || 0, 'KES')} icon={Landmark} featured isLoading={isLoading} />
-            <StatCard title="Collected Today" value={formatCurrency(dashboardData?.statCards.paymentsCollectedToday || 0, 'KES')} icon={Coins} isLoading={isLoading} />
-            <StatCard title="Disbursed Today" value={dashboardData?.statCards.loansDisbursedToday || 0} icon={CalendarCheck} isLoading={isLoading} />
-            <StatCard title="Due Today" value={dashboardData?.statCards.installmentsDueToday || 0} icon={CalendarClock} isLoading={isLoading} />
+            <StatCard title="My Active Loans" value={dashboardData?.statCards.activeLoansCount ?? 0} icon={Scale} isLoading={isLoading} />
+            <StatCard title="My Borrowers" value={dashboardData?.statCards.totalBorrowers ?? 0} icon={Users} isLoading={isLoading} />
+            <StatCard title="Overdue Loans" value={dashboardData?.statCards.overdueLoansCount ?? 0} icon={AlertTriangle} isLoading={isLoading} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
