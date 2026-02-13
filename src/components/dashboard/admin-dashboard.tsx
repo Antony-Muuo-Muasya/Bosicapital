@@ -7,7 +7,7 @@ import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role, Installment } from '@/lib/types';
+import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role, Installment, Repayment } from '@/lib/types';
 import { OverviewCards } from './overview-cards';
 import { PortfolioStatusChart } from './admin/portfolio-status-chart';
 import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
@@ -73,6 +73,13 @@ export function AdminDashboard() {
     if (!organizationId) return null;
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId, isSuperAdmin]);
+  
+  const repaymentsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'repayments');
+    if (!organizationId) return null;
+    return query(collection(firestore, 'repayments'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId, isSuperAdmin]);
 
   const rolesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -94,10 +101,11 @@ export function AdminDashboard() {
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
+  const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
   const { data: roles, isLoading: rolesLoading } = useCollection<Role>(rolesQuery);
   const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
 
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || productsLoading || usersLoading || branchesLoading || regPaymentsLoading || rolesLoading || installmentsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || productsLoading || usersLoading || branchesLoading || regPaymentsLoading || rolesLoading || installmentsLoading || repaymentsLoading;
 
   const dashboardData = useMemo(() => {
     if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
@@ -191,6 +199,7 @@ export function AdminDashboard() {
             installments={installments}
             borrowers={borrowers}
             regPayments={regPayments}
+            repayments={repayments}
             isLoading={isLoading}
         />
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

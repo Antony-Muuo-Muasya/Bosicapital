@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/page-header';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Loan, Borrower, Installment, RegistrationPayment } from '@/lib/types';
+import type { Loan, Borrower, Installment, RegistrationPayment, Repayment } from '@/lib/types';
 import { DueLoansTable } from './due-loans-table';
 import { useMemo } from 'react';
 import { DueDateMonitor } from './due-date-monitor';
@@ -52,12 +52,20 @@ export function ManagerDashboard() {
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId, isSuperAdmin]);
 
+  const repaymentsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    if (isSuperAdmin) return collection(firestore, 'repayments');
+    if (!organizationId) return null;
+    return query(collection(firestore, 'repayments'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId, isSuperAdmin]);
+
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
   const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
+  const { data: repayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
 
-  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || regPaymentsLoading;
+  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || regPaymentsLoading || isLoadingRepayments;
 
   const dueInstallmentsWithDetails = useMemo(() => {
     if (!installments || !borrowers) return [];
@@ -112,6 +120,7 @@ export function ManagerDashboard() {
           installments={installments}
           borrowers={borrowers}
           regPayments={regPayments}
+          repayments={repayments}
           isLoading={isLoading}
         />
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">

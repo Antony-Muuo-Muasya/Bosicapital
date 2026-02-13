@@ -1,8 +1,8 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, documentId } from 'firebase/firestore';
-import type { Loan, Borrower, LoanProduct, Repayment } from '@/lib/types';
+import { collection, query, where, documentId, collectionGroup } from 'firebase/firestore';
+import type { Loan, Borrower, LoanProduct, Repayment, Installment } from '@/lib/types';
 import { Button } from '../ui/button';
 import { HandCoins, PlusCircle, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,7 @@ import { useState, useMemo } from 'react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
 import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { StatCard } from './loan-officer/StatCard';
-import { Landmark, Users, Scale, AlertTriangle } from 'lucide-react';
+import { Landmark, Users, Scale, AlertTriangle, Coins, CalendarCheck, CalendarClock } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PerformanceTracker } from './loan-officer/PerformanceTracker';
 import { LoanPipeline } from './loan-officer/LoanPipeline';
@@ -67,17 +67,43 @@ export function LoanOfficerDashboard() {
   }, [firestore, user]);
   const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
 
+  // 5. Get installments for the officer's loans
+  const loanIds = useMemo(() => loans?.map(l => l.id), [loans]);
+  
+  const installmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !loanIds) return null;
+    if (loanIds.length === 0) {
+      return query(collectionGroup(firestore, 'installments'), where('loanId', '==', 'no-loans-found'));
+    }
+    if (loanIds.length > 30) {
+      console.warn('Installment query is limited to the first 30 loans for this officer.');
+    }
+    return query(collectionGroup(firestore, 'installments'), where('loanId', 'in', loanIds.slice(0, 30)));
+  }, [firestore, JSON.stringify(loanIds)]);
+
+  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
+
+
   // Overall loading state
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading || repaymentsLoading;
+  const isLoading = isProfileLoading || loansLoading || borrowersLoading || allLoanProductsLoading || repaymentsLoading || installmentsLoading;
   
   // --- DATA PROCESSING FOR DASHBOARD ---
   const dashboardData = useMemo(() => {
-    if (isLoading || !loans || !borrowers || !repayments || !allLoanProducts) return null;
+    if (isLoading || !loans || !borrowers || !repayments || !allLoanProducts || !installments) return null;
     
     // Top-level stats
     const activeLoans = loans.filter(l => l.status === 'Active');
     const portfolioValue = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
-    const avgLoanSize = activeLoans.length > 0 ? portfolioValue / activeLoans.length : 0;
+
+    const todayISO = new Date().toISOString().split('T')[0];
+
+    const paymentsCollectedToday = repayments
+      .filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISO)
+      .reduce((sum, r) => sum + r.amount, 0);
+    
+    const loansDisbursedToday = loans.filter(l => l.issueDate === todayISO && l.status === 'Active').length;
+    
+    const installmentsDueToday = installments.filter(i => i.dueDate === todayISO).length;
     
     // For Dual Trend Chart
     const today = new Date();
@@ -126,10 +152,10 @@ export function LoanOfficerDashboard() {
         
     return {
         statCards: {
-            activeLoans: activeLoans.length,
             portfolioValue,
-            avgLoanSize,
-            borrowerCount: borrowers.length,
+            paymentsCollectedToday,
+            loansDisbursedToday,
+            installmentsDueToday
         },
         dualTrendData,
         lifetimeStats: {
@@ -140,7 +166,7 @@ export function LoanOfficerDashboard() {
         collectionEfficiency,
         topBorrowersData
     }
-  }, [loans, borrowers, repayments, allLoanProducts, isLoading]);
+  }, [loans, borrowers, repayments, allLoanProducts, installments, isLoading]);
 
 
   return (
@@ -168,9 +194,9 @@ export function LoanOfficerDashboard() {
       <div className="p-4 md:p-6 grid gap-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="My Portfolio Value" value={formatCurrency(dashboardData?.statCards.portfolioValue || 0, 'KES')} icon={Landmark} featured isLoading={isLoading} />
-            <StatCard title="My Active Loans" value={dashboardData?.statCards.activeLoans || 0} icon={AlertTriangle} isLoading={isLoading} />
-            <StatCard title="My Borrowers" value={dashboardData?.statCards.borrowerCount || 0} icon={Users} isLoading={isLoading} />
-            <StatCard title="Avg. Loan Size" value={formatCurrency(dashboardData?.statCards.avgLoanSize || 0, 'KES')} icon={Scale} isLoading={isLoading} />
+            <StatCard title="Collected Today" value={formatCurrency(dashboardData?.statCards.paymentsCollectedToday || 0, 'KES')} icon={Coins} isLoading={isLoading} />
+            <StatCard title="Disbursed Today" value={dashboardData?.statCards.loansDisbursedToday || 0} icon={CalendarCheck} isLoading={isLoading} />
+            <StatCard title="Due Today" value={dashboardData?.statCards.installmentsDueToday || 0} icon={CalendarClock} isLoading={isLoading} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -6,8 +6,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { Landmark, Users, AlertTriangle, HandCoins, UserCheck, Hourglass } from 'lucide-react';
-import type { Loan, Installment, Borrower, RegistrationPayment } from '@/lib/types';
+import { Landmark, AlertTriangle, Hourglass, Coins, CalendarCheck, CalendarClock } from 'lucide-react';
+import type { Loan, Installment, Borrower, RegistrationPayment, Repayment } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { startOfToday } from 'date-fns';
 
@@ -16,6 +16,7 @@ interface OverviewCardsProps {
   installments: Installment[] | null;
   borrowers: Borrower[] | null;
   regPayments: RegistrationPayment[] | null;
+  repayments: Repayment[] | null;
   isLoading: boolean;
   title?: string;
 }
@@ -43,42 +44,60 @@ const StatCard = ({ title, value, icon: Icon, description, className, isLoading 
 );
 
 
-export function OverviewCards({ loans, installments, borrowers, regPayments, isLoading, title = 'Portfolio Overview' }: OverviewCardsProps) {
+export function OverviewCards({ loans, installments, borrowers, regPayments, repayments, isLoading, title = 'Portfolio Overview' }: OverviewCardsProps) {
 
+  // --- Existing Calculations ---
   const activeLoans = loans ? loans.filter(l => l.status === 'Active') : [];
   const totalPortfolio = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
   const activeLoansCount = activeLoans.length;
-
+  const pendingApprovalsCount = loans ? loans.filter(l => l.status === 'Pending Approval').length : 0;
+  
   const today = startOfToday();
 
   const overdueInstallments = installments ? installments.filter(i => {
     if (i.status === 'Paid') return false;
-    // Create date in local timezone from 'YYYY-MM-DD' string to avoid timezone issues
     const [year, month, day] = i.dueDate.split('-').map(Number);
     const dueDate = new Date(year, month - 1, day);
     return dueDate < today;
   }) : [];
-
   const overdueAmount = overdueInstallments.reduce((sum, inst) => sum + (inst.expectedAmount - inst.paidAmount), 0);
   const overdueLoansCount = new Set(overdueInstallments.map(i => i.loanId)).size;
+
+  // --- New Daily Stats Calculations ---
+  const todayISO = new Date().toISOString().split('T')[0];
+
+  const paymentsCollectedToday = repayments ? repayments
+    .filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISO)
+    .reduce((sum, r) => sum + r.amount, 0) : 0;
+
+  const loansDisbursedToday = loans ? loans.filter(l => l.issueDate === todayISO && l.status === 'Active').length : 0;
   
-  const totalRegFees = regPayments ? regPayments.reduce((sum, p) => sum + p.amount, 0) : 0;
-  const registeredBorrowers = borrowers ? borrowers.filter(b => b.registrationFeePaid).length : 0;
-
-  const pendingApprovalsCount = loans ? loans.filter(l => l.status === 'Pending Approval').length : 0;
-
+  const installmentsDueToday = installments ? installments.filter(i => i.dueDate === todayISO).length : 0;
+  
   const stats = [
+    {
+      title: 'Collected Today',
+      value: formatCurrency(paymentsCollectedToday, 'KES'),
+      icon: Coins,
+      description: `Total payments received`,
+    },
+    {
+      title: 'Disbursed Today',
+      value: loansDisbursedToday,
+      icon: CalendarCheck,
+      description: 'Newly activated loans',
+    },
+     {
+      title: 'Due Today',
+      value: installmentsDueToday,
+      icon: CalendarClock,
+      description: 'Installments due for payment',
+    },
     {
       title: 'Total Portfolio',
       value: formatCurrency(totalPortfolio, 'KES'),
       icon: Landmark,
       description: `${activeLoansCount} active loans`,
-    },
-    {
-      title: 'Active Borrowers',
-      value: borrowers?.length ?? 0,
-      icon: Users,
-      description: 'Across all branches',
     },
     {
       title: 'Pending Approvals',
@@ -93,18 +112,6 @@ export function OverviewCards({ loans, installments, borrowers, regPayments, isL
       icon: AlertTriangle,
       description: `${overdueLoansCount} loans with overdue payments`,
       className: 'text-destructive',
-    },
-    {
-      title: 'Registered Borrowers',
-      value: registeredBorrowers,
-      icon: UserCheck,
-      description: `${(borrowers?.length || 0) - registeredBorrowers} pending fee`,
-    },
-    {
-      title: 'Registration Fees',
-      value: formatCurrency(totalRegFees, 'KES'),
-      icon: HandCoins,
-      description: 'Total collected',
     },
   ];
 
