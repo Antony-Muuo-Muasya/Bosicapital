@@ -13,7 +13,7 @@ export function CreateIndexCard() {
         <div>
           <CardTitle>Database Index Required</CardTitle>
           <CardDescription className="text-amber-800 dark:text-amber-300">
-            Collection Overview is disabled.
+            Real-time table is disabled.
           </CardDescription>
         </div>
       </CardHeader>
@@ -22,8 +22,16 @@ export function CreateIndexCard() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Action Needed</AlertTitle>
             <AlertDescription>
-                To enable the real-time collection overview, a composite index must be created in Firestore.
-                The original error in your browser's developer console contains a link to create this index automatically. This is a one-time setup.
+                <p className="mb-2">To enable real-time features like the Due Loans table, a specific database index needs to be created. The Firestore SDK provides a direct link to do this automatically.</p>
+                <p className="font-semibold">Please follow these steps:</p>
+                <ol className="list-decimal list-inside space-y-1 mt-1">
+                    <li>Open your browser's developer tools (usually F12 or right-click &rarr; "Inspect").</li>
+                    <li>Go to the "Console" tab.</li>
+                    <li>Look for an error message from Firestore starting with 'FAILED_PRECONDITION'.</li>
+                    <li>Click the link within that error message. This will open the Firebase Console with everything pre-filled.</li>
+                    <li>Click "Create Index".</li>
+                </ol>
+                <p className="mt-2 text-xs">The index may take a few minutes to build. Please refresh this page after it's complete.</p>
             </AlertDescription>
         </Alert>
       </CardContent>
