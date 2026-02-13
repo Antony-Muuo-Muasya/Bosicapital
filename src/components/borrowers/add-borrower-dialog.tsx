@@ -83,28 +83,41 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   };
 
   useEffect(() => {
-    // Cleanup function to stop camera when dialog is closed or component unmounts
+    if (!isCameraOpen || !photoTarget) {
+      stopCamera();
+      return;
+    }
+
+    const startCamera = async () => {
+        if (!navigator.mediaDevices?.getUserMedia) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Camera not supported on this device.' });
+            setIsCameraOpen(false);
+            setPhotoTarget(null);
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        } catch (error) {
+            console.error('Error accessing camera:', error);
+            toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser.' });
+            setIsCameraOpen(false);
+            setPhotoTarget(null);
+        }
+    };
+
+    startCamera();
+
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [isCameraOpen, photoTarget, toast]);
 
-  const handleEnableCamera = async (target: 'business' | 'homeAssets') => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Camera not supported on this device.' });
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setPhotoTarget(target);
-      setIsCameraOpen(true);
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions in your browser.' });
-    }
+  const handleEnableCamera = (target: 'business' | 'homeAssets') => {
+    setPhotoTarget(target);
+    setIsCameraOpen(true);
   };
 
   const handleCapture = () => {
@@ -136,15 +149,12 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
         }
         toast({ title: 'Success', description: `${photoTarget === 'business' ? 'Business' : 'Home assets'} photo captured.` });
         
-        // Stop camera and close view
-        stopCamera();
         setIsCameraOpen(false);
         setPhotoTarget(null);
     }
   };
 
   const handleCancelCapture = () => {
-    stopCamera();
     setIsCameraOpen(false);
     setPhotoTarget(null);
   };
@@ -173,8 +183,6 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
     setIsSubmitting(true);
 
     try {
-        // In a real app, these base64 images should be uploaded to Firebase Storage first,
-        // and the storage URLs should be saved in Firestore. For this prototype, we save the data URIs directly.
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         await updateProfile(userCredential.user, { displayName: values.fullName });
 
@@ -360,54 +368,58 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
                 <div className="space-y-2">
                     <Label>Supporting Photos</Label>
                     <div className="p-4 border rounded-md bg-muted/50">
-                        {isCameraOpen ? (
-                            <div className="space-y-4">
-                                <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
-                                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                                    <canvas ref={canvasRef} className="hidden" />
+                        <div className="grid grid-cols-2 gap-4">
+                             {/* Business Photo Box */}
+                            <div className="space-y-2">
+                                <Label className="text-xs">Business Photo</Label>
+                                <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                    {isCameraOpen && photoTarget === 'business' ? (
+                                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                                    ) : businessPhoto ? (
+                                        <Image src={businessPhoto} alt="Business Preview" fill className="object-contain" />
+                                    ) : (
+                                        <LucideImage className="h-8 w-8 text-muted-foreground" />
+                                    )}
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Button type="button" onClick={handleCapture}>
-                                        <Camera className="mr-2" />
-                                        Capture
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={handleCancelCapture}>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs">Business Photo</Label>
-                                    <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
-                                        {businessPhoto ? (
-                                            <Image src={businessPhoto} alt="Business Preview" fill className="object-contain" />
-                                        ) : (
-                                            <LucideImage className="h-8 w-8 text-muted-foreground" />
-                                        )}
+                                {isCameraOpen && photoTarget === 'business' ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button type="button" size="sm" onClick={handleCapture}><Camera className="mr-2 h-4 w-4" />Capture</Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={handleCancelCapture}>Cancel</Button>
                                     </div>
-                                    <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('business')}>
-                                        <Camera className="mr-2" />
+                                ) : (
+                                    <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('business')} disabled={isCameraOpen}>
+                                        <Camera className="mr-2 h-4 w-4" />
                                         {businessPhoto ? 'Retake' : 'Take'} Photo
                                     </Button>
+                                )}
+                            </div>
+
+                            {/* Home Assets Photo Box */}
+                            <div className="space-y-2">
+                                <Label className="text-xs">Home Assets Photo</Label>
+                                <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
+                                    {isCameraOpen && photoTarget === 'homeAssets' ? (
+                                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                                    ) : homeAssetsPhoto ? (
+                                        <Image src={homeAssetsPhoto} alt="Home Assets Preview" fill className="object-contain" />
+                                    ) : (
+                                        <LucideImage className="h-8 w-8 text-muted-foreground" />
+                                    )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs">Home Assets Photo</Label>
-                                    <div className="relative overflow-hidden aspect-video w-full rounded-md border flex items-center justify-center bg-background">
-                                        {homeAssetsPhoto ? (
-                                            <Image src={homeAssetsPhoto} alt="Home Assets Preview" fill className="object-contain" />
-                                        ) : (
-                                            <LucideImage className="h-8 w-8 text-muted-foreground" />
-                                        )}
+                                {isCameraOpen && photoTarget === 'homeAssets' ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button type="button" size="sm" onClick={handleCapture}><Camera className="mr-2 h-4 w-4" />Capture</Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={handleCancelCapture}>Cancel</Button>
                                     </div>
-                                    <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('homeAssets')}>
-                                        <Camera className="mr-2" />
+                                ) : (
+                                    <Button type="button" variant="outline" className="w-full" onClick={() => handleEnableCamera('homeAssets')} disabled={isCameraOpen}>
+                                        <Camera className="mr-2 h-4 w-4" />
                                         {homeAssetsPhoto ? 'Retake' : 'Take'} Photo
                                     </Button>
-                                </div>
+                                )}
                             </div>
-                        )}
+                        </div>
+                        <canvas ref={canvasRef} className="hidden" />
                     </div>
                 </div>
 
