@@ -202,7 +202,7 @@ export function LoanOfficerDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className='lg:col-span-2 space-y-6'>
                 <DualTrendChart data={dashboardData?.dualTrendData} isLoading={isLoading} />
-                <LoanPipeline loans={loans} isLoading={isLoading} />
+                <LoanPipeline loans={loans} borrowers={borrowers} isLoading={isLoading} />
             </div>
             <div className='lg:col-span-1 space-y-6'>
                 <PerformanceTracker loans={loans} borrowers={borrowers} isLoading={isLoading} />
