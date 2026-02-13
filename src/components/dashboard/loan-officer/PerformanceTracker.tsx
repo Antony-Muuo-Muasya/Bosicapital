@@ -26,7 +26,12 @@ export function PerformanceTracker({ loans, borrowers, isLoading }: PerformanceT
         const start = startOfMonth(new Date());
 
         const disbursedThisMonth = loans
-            .filter(l => new Date(l.issueDate) >= start && l.status === 'Active')
+            .filter(l => {
+                if (l.status !== 'Active') return false;
+                const [year, month, day] = l.issueDate.split('-').map(Number);
+                const issueDate = new Date(year, month - 1, day);
+                return issueDate >= start;
+            })
             .reduce((sum, l) => sum + l.principal, 0);
 
         const newBorrowersThisMonth = borrowers
