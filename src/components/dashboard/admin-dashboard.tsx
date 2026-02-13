@@ -125,7 +125,9 @@ export function AdminDashboard() {
     const monthLabels = last6Months.map(d => format(d, 'MMM yyyy'));
     
     const disbursalData = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const month = format(new Date(loan.issueDate), 'MMM yyyy');
+        const [year, monthNum, day] = loan.issueDate.split('-').map(Number);
+        const issueDateObj = new Date(year, monthNum - 1, day);
+        const month = format(issueDateObj, 'MMM yyyy');
         acc[month] = (acc[month] || 0) + loan.principal;
         return acc;
     }, {} as Record<string, number>);
