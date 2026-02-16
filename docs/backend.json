@@ -183,7 +183,8 @@
         "status": { "type": "string", "enum": ["Draft", "Pending Approval", "Approved", "Active", "Completed", "Rejected"] },
         "loanOfficerId": { "type": "string" },
         "branchId": { "type": "string" },
-        "lastPaymentDate": { "type": "string", "format": "date-time" }
+        "lastPaymentDate": { "type": "string", "format": "date-time" },
+        "approvedById": { "type": "string", "description": "The ID of the user who approved the loan." }
       },
       "required": [
         "id",
