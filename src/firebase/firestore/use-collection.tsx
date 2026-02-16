@@ -85,23 +85,34 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // This logic extracts the path from either a ref or a query
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+        // Specifically check for the missing index error code.
+        if (error.code === 'failed-precondition') {
+          // Log the original error to the console. This error contains the link to create the index.
+          console.error(
+            "Firestore Error: A required index is missing. Please check the browser console for an error message from Firestore containing a link to create it.",
+            error
+          );
+          // Set a generic but informative error for the UI.
+          setError(new Error("A required database index is missing. Please check the browser console for a link to create it."));
+        } else {
+          // For all other errors (like permission denied), use the existing contextual error logic.
+          const path: string =
+            memoizedTargetRefOrQuery.type === 'collection'
+              ? (memoizedTargetRefOrQuery as CollectionReference).path
+              : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
+          
+          const contextualError = new FirestorePermissionError({
+            operation: 'list',
+            path,
+          });
+          setError(contextualError);
 
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        })
+          // We can also emit this for global handling if needed elsewhere
+          // errorEmitter.emit('permission-error', contextualError);
+        }
 
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
-
-        // Removing global error propagation to allow local component handling of missing-index errors.
-        // errorEmitter.emit('permission-error', contextualError);
+        setData(null);
+        setIsLoading(false);
       }
     );
 
