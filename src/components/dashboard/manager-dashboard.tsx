@@ -21,16 +21,16 @@ export function ManagerDashboard() {
   const firestore = useFirestore();
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const organizationId = userProfile?.organizationId;
+  const branchIds = userProfile?.branchIds || [];
 
-  // This dashboard is for managers. The queries are filtered by the loans they have personally approved.
+  // This dashboard is for managers. The queries are filtered by the branches they manage.
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    // Query for loans where the 'approvedById' field matches the current manager's UID.
-    // This requires a simple index on 'approvedById' in the 'loans' collection.
-    return query(collection(firestore, 'loans'), where('approvedById', '==', user.uid));
-  }, [firestore, user]);
+    if (!firestore || branchIds.length === 0) return null;
+    // Query for loans within the manager's assigned branches.
+    return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
+  }, [firestore, JSON.stringify(branchIds)]);
 
-  // To ensure we have all necessary related data for the manager's approved loans (which might span
+  // To ensure we have all necessary related data for the manager's loans (which might span
   // multiple branches), we query for all borrowers and installments within the manager's organization.
   // The data is then filtered and aggregated on the client-side.
   const allBorrowersQuery = useMemoFirebase(() => {
@@ -95,7 +95,7 @@ export function ManagerDashboard() {
           return defaultState;
       }
       
-      // Filter all data to only include records relevant to the manager's approved loans.
+      // Filter all data to only include records relevant to the manager's loans from their branches.
       const managerLoanIds = new Set(loans.map(l => l.id));
       const managerBorrowerIds = new Set(loans.map(l => l.borrowerId));
       const borrowers = allBorrowers.filter(b => managerBorrowerIds.has(b.id));
