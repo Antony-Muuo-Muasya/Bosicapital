@@ -217,6 +217,7 @@
       "properties": {
         "id": { "type": "string" },
         "loanId": { "type": "string" },
+        "borrowerId": { "type": "string" },
         "loanOfficerId": { "type": "string" },
         "organizationId": { "type": "string" },
         "branchId": { "type": "string" },
@@ -226,7 +227,7 @@
         "paidAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["Paid", "Unpaid", "Partial", "Overdue"] }
       },
-      "required": ["id", "loanId", "loanOfficerId", "organizationId", "branchId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
+      "required": ["id", "loanId", "borrowerId", "loanOfficerId", "organizationId", "branchId", "dueDate", "expectedAmount", "installmentNumber", "paidAmount", "status"]
     },
     "Repayment": {
       "title": "Repayment",
@@ -365,5 +366,3 @@
     ]
   }
 }
-
-    

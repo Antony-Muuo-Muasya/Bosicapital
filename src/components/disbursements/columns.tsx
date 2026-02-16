@@ -75,6 +75,7 @@ const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
               const newInstallmentData = {
                   id: installmentRef.id,
                   loanId: loan.id,
+                  borrowerId: loan.borrowerId,
                   organizationId: loan.organizationId,
                   branchId: loan.branchId,
                   loanOfficerId: loan.loanOfficerId,

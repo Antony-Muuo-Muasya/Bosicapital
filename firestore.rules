@@ -153,14 +153,14 @@ service cloud.firestore {
 
       // INSTALLMENTS: Sub-collection for loan repayments
       match /installments/{installmentId} {
-        // READ: If you can read the loan, you can read its installments.
+        // This rule supports both direct subcollection access and collection group queries
         allow read: if request.auth != null && (
-          (
-            exists(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)) &&
-            get(/databases/$(database)/documents/borrowers/$(get(/databases/$(database)/documents/loans/$(loanId)).data.borrowerId)).data.userId == request.auth.uid
-          ) ||
-          (isPrivilegedUser() && getUserData().organizationId == get(/databases/$(database)/documents/loans/$(loanId)).data.organizationId) ||
-          (isUserInRole(['manager', 'loan_officer']) && isAssignedToBranch(get(/databases/$(database)/documents/loans/$(loanId)).data.branchId))
+            // Borrower can read their own installments by checking through the borrower document
+            (get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid) ||
+            // Staff access based on role and scope
+            (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId) ||
+            (isUserInRole(['manager']) && isAssignedToBranch(resource.data.branchId)) ||
+            (isUserInRole(['loan_officer']) && request.auth.uid == resource.data.loanOfficerId)
         );
         
         // WRITE: Only Admins can create/update installments (as part of loan disbursement)
