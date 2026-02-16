@@ -1,6 +1,5 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Loan, Borrower, Installment, RegistrationPayment, Repayment } from '@/lib/types';
@@ -9,7 +8,11 @@ import { useMemo } from 'react';
 import { DueDateMonitor } from './due-date-monitor';
 import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
 import { formatCurrency } from '@/lib/utils';
-import { startOfToday } from 'date-fns';
+import { startOfToday, startOfMonth } from 'date-fns';
+import { ManagerStatsCards } from './manager/stats-cards';
+import { LoansOverview } from './manager/loans-overview';
+import { CustomerOverview } from './manager/customer-overview';
+import { CollectionOverview } from './manager/collection-overview';
 
 export function ManagerDashboard() {
   const firestore = useFirestore();
@@ -35,12 +38,11 @@ export function ManagerDashboard() {
 
   const installmentsQuery = useMemoFirebase(() => {
       if (!firestore) return null;
-      if (isSuperAdmin) return query(collectionGroup(firestore, 'installments'), where('status', 'in', ['Overdue', 'Unpaid', 'Partial']));
+      if (isSuperAdmin) return query(collectionGroup(firestore, 'installments'));
       if (branchIds.length === 0) return null;
       return query(
         collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds), 
-        where('status', 'in', ['Overdue', 'Unpaid', 'Partial'])
+        where('branchId', 'in', branchIds)
       );
   }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
 
@@ -48,7 +50,6 @@ export function ManagerDashboard() {
     if (!firestore) return null;
     if (isSuperAdmin) return collection(firestore, 'registrationPayments');
     if (!organizationId) return null;
-    // Registration payments may not have branchIds, so query by org
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId, isSuperAdmin]);
 
@@ -67,25 +68,131 @@ export function ManagerDashboard() {
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || regPaymentsLoading || isLoadingRepayments;
 
+  const {
+      outstandingLoanBalance,
+      performingLoanBalance,
+      totalCustomers,
+      disbursedLoans,
+      loansDueToday,
+      monthToDateArrears,
+      outstandingTotalLoanArrears,
+      activeCustomers,
+      inactiveCustomers,
+      todaysCollectionRate,
+      monthlyCollectionRate,
+  } = useMemo(() => {
+      if (isLoading || !loans || !borrowers || !installments || !repayments) {
+          return {
+              outstandingLoanBalance: 0, performingLoanBalance: 0, totalCustomers: 0,
+              disbursedLoans: 0, loansDueToday: 0, monthToDateArrears: 0, outstandingTotalLoanArrears: 0,
+              activeCustomers: 0, inactiveCustomers: 0, todaysCollectionRate: 0, monthlyCollectionRate: 0
+          };
+      }
+      
+      const today = startOfToday();
+      const startOfMonthDate = startOfMonth(today);
+  
+      // --- High level stats ---
+      const totalCustomers = borrowers.length;
+      let outstandingLoanBalance = 0;
+      const activeLoanIds = new Set<string>();
+
+      loans.forEach(loan => {
+          if (loan.status === 'Active') {
+              const paidAmount = installments.filter(i => i.loanId === loan.id).reduce((sum, i) => sum + i.paidAmount, 0);
+              const outstanding = loan.totalPayable - paidAmount;
+              if (outstanding > 0) {
+                  outstandingLoanBalance += outstanding;
+                  activeLoanIds.add(loan.id);
+              }
+          }
+      });
+  
+      const overdueLoanIds = new Set(installments.filter(i => new Date(i.dueDate) < today && i.status !== 'Paid').map(i => i.loanId));
+      let performingLoanBalance = 0;
+      activeLoanIds.forEach(loanId => {
+          if (!overdueLoanIds.has(loanId)) {
+              const loan = loans.find(l => l.id === loanId);
+              if (loan) {
+                   const paidAmount = installments.filter(i => i.loanId === loan.id).reduce((sum, i) => sum + i.paidAmount, 0);
+                   const outstanding = loan.totalPayable - paidAmount;
+                   if (outstanding > 0) {
+                      performingLoanBalance += outstanding;
+                   }
+              }
+          }
+      });
+  
+      // --- Loans Overview stats ---
+      const disbursedLoans = loans.filter(l => l.status === 'Active' || l.status === 'Completed').length;
+      const todayISOString = today.toISOString().split('T')[0];
+      const loansDueToday = installments.filter(i => i.dueDate === todayISOString).length;
+      
+      let monthToDateArrears = 0;
+      let outstandingTotalLoanArrears = 0;
+  
+      installments.forEach(inst => {
+          if (inst.status !== 'Paid') {
+              const dueDate = new Date(inst.dueDate);
+              if (dueDate < today) {
+                  const arrear = inst.expectedAmount - inst.paidAmount;
+                  outstandingTotalLoanArrears += arrear;
+                  if (dueDate >= startOfMonthDate) {
+                      monthToDateArrears += arrear;
+                  }
+              }
+          }
+      });
+  
+      // --- Customer Overview stats ---
+      const allLoanBorrowerIds = new Set(loans.map(l => l.borrowerId));
+      const activeLoanBorrowerIds = new Set(loans.filter(l => l.status === 'Active').map(l => l.borrowerId));
+      const activeCustomers = activeLoanBorrowerIds.size;
+      const inactiveCustomers = allLoanBorrowerIds.size - activeLoanBorrowerIds.size;
+      
+      // --- Collection Overview stats ---
+      const installmentsDueTodayList = installments.filter(i => i.dueDate === todayISOString);
+      const expectedToday = installmentsDueTodayList.reduce((sum, i) => sum + i.expectedAmount, 0);
+      const paidTodayForDues = repayments.filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISOString && installmentsDueTodayList.some(i => i.loanId === r.loanId)).reduce((sum, r) => sum + r.amount, 0);
+      const todaysCollectionRate = expectedToday > 0 ? (paidTodayForDues / expectedToday) * 100 : 0;
+      
+      const installmentsDueThisMonth = installments.filter(i => {
+        const dueDate = new Date(i.dueDate);
+        return dueDate >= startOfMonthDate && dueDate <= today
+      });
+      const expectedThisMonth = installmentsDueThisMonth.reduce((sum, i) => sum + i.expectedAmount, 0);
+      const paidThisMonthForDues = repayments.filter(r => {
+        const paymentDate = new Date(r.paymentDate);
+        return paymentDate >= startOfMonthDate && installmentsDueThisMonth.some(i => i.loanId === r.loanId)
+      }).reduce((sum, r) => sum + r.amount, 0);
+      const monthlyCollectionRate = expectedThisMonth > 0 ? (paidThisMonthForDues / expectedThisMonth) * 100 : 0;
+  
+      return {
+          outstandingLoanBalance, performingLoanBalance, totalCustomers,
+          disbursedLoans, loansDueToday, monthToDateArrears, outstandingTotalLoanArrears,
+          activeCustomers, inactiveCustomers, todaysCollectionRate, monthlyCollectionRate
+      };
+  }, [isLoading, loans, borrowers, installments, repayments]);
+
+
   const dueInstallmentsWithDetails = useMemo(() => {
     if (!installments || !borrowers) return [];
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
-    const today = startOfToday();
 
     return installments
+      .filter(inst => inst.status !== 'Paid')
       .map(inst => {
         const loan = loans?.find(l => l.id === inst.loanId);
         const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
         
-        // Dynamically determine overdue status
         const [year, month, day] = inst.dueDate.split('-').map(Number);
         const dueDate = new Date(year, month - 1, day);
-        const isOverdue = dueDate < today && inst.status !== 'Paid';
+        const isOverdue = dueDate < startOfToday() && inst.status !== 'Paid';
         const currentStatus = isOverdue ? 'Overdue' : inst.status;
 
         return {
           ...inst,
-          status: currentStatus, // Override status
+          status: currentStatus,
           borrowerName: borrower?.fullName || 'Unknown Borrower',
           borrowerPhotoUrl: borrower?.photoUrl || `https://picsum.photos/seed/${inst.id}/400/400`,
         };
@@ -115,14 +222,31 @@ export function ManagerDashboard() {
         description="Overview of your assigned branches."
       />
       <div className="p-4 md:p-6 grid gap-6">
-        <OverviewCards
-          loans={loans}
-          installments={installments}
-          borrowers={borrowers}
-          regPayments={regPayments}
-          repayments={repayments}
-          isLoading={isLoading}
+        <ManagerStatsCards 
+            outstandingLoanBalance={outstandingLoanBalance}
+            performingLoanBalance={performingLoanBalance}
+            totalCustomers={totalCustomers}
+            isLoading={isLoading}
         />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <LoansOverview 
+                disbursedLoans={disbursedLoans}
+                loansDueToday={loansDueToday}
+                monthToDateArrears={monthToDateArrears}
+                outstandingTotalLoanArrears={outstandingTotalLoanArrears}
+                isLoading={isLoading}
+            />
+            <CustomerOverview 
+                activeCustomers={activeCustomers}
+                inactiveCustomers={inactiveCustomers}
+                isLoading={isLoading}
+            />
+            <CollectionOverview
+                todaysCollectionRate={todaysCollectionRate}
+                monthlyCollectionRate={monthlyCollectionRate}
+                isLoading={isLoading}
+            />
+        </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
             <div className="lg:col-span-4">
               <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />

@@ -32,28 +32,6 @@ export function CollectionOverview({ todaysCollectionRate, monthlyCollectionRate
       )
   }
 
-  // A check to see if this feature is actually implemented.
-  const isImplemented = true; 
-
-  if (!isImplemented) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Collection Overview</CardTitle>
-                <CardDescription>Performance on collecting loan repayments.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center justify-center text-center h-full min-h-[150px]">
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Info className="h-8 w-8" />
-                    <p className="text-sm max-w-xs">
-                        Collection rate tracking requires further data model enhancements to be implemented efficiently.
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
-    );
-  }
-
   return (
     <Card>
         <CardHeader>
