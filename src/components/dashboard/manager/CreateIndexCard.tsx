@@ -13,7 +13,7 @@ export function CreateIndexCard() {
         <div>
           <CardTitle>Database Index Required</CardTitle>
           <CardDescription className="text-amber-800 dark:text-amber-300">
-            Real-time table is disabled.
+            Real-time dashboard features are disabled.
           </CardDescription>
         </div>
       </CardHeader>

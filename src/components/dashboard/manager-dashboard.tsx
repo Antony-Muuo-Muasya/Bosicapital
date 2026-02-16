@@ -13,6 +13,7 @@ import { ManagerStatsCards } from './manager/stats-cards';
 import { LoansOverview } from './manager/loans-overview';
 import { CustomerOverview } from './manager/customer-overview';
 import { CollectionOverview } from './manager/collection-overview';
+import { CreateIndexCard } from './manager/CreateIndexCard';
 
 export function ManagerDashboard() {
   const firestore = useFirestore();
@@ -58,11 +59,13 @@ export function ManagerDashboard() {
 
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: allBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(allBorrowersQuery);
-  const { data: allInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(allInstallmentsQuery);
+  const { data: allInstallments, isLoading: isLoadingInstallments, error: installmentsError } = useCollection<Installment>(allInstallmentsQuery);
   const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(allRegPaymentsQuery);
   const { data: allRepayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(allRepaymentsQuery);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || regPaymentsLoading || isLoadingRepayments;
+
+  const needsIndex = installmentsError && installmentsError.message.includes('index');
 
   const {
       outstandingLoanBalance,
@@ -230,39 +233,45 @@ export function ManagerDashboard() {
         description="Overview of your approved loan portfolio."
       />
       <div className="p-4 md:p-6 grid gap-6">
-        <ManagerStatsCards 
-            outstandingLoanBalance={outstandingLoanBalance}
-            performingLoanBalance={performingLoanBalance}
-            totalCustomers={totalCustomers}
-            isLoading={isLoading}
-        />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <LoansOverview 
-                disbursedLoans={disbursedLoans}
-                loansDueToday={loansDueToday}
-                monthToDateArrears={monthToDateArrears}
-                outstandingTotalLoanArrears={outstandingTotalLoanArrears}
+        {needsIndex ? (
+          <CreateIndexCard />
+        ) : (
+          <>
+            <ManagerStatsCards 
+                outstandingLoanBalance={outstandingLoanBalance}
+                performingLoanBalance={performingLoanBalance}
+                totalCustomers={totalCustomers}
                 isLoading={isLoading}
             />
-            <CustomerOverview 
-                activeCustomers={activeCustomers}
-                inactiveCustomers={inactiveCustomers}
-                isLoading={isLoading}
-            />
-            <CollectionOverview
-                todaysCollectionRate={todaysCollectionRate}
-                monthlyCollectionRate={monthlyCollectionRate}
-                isLoading={isLoading}
-            />
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-            <div className="lg:col-span-4">
-              <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <LoansOverview 
+                    disbursedLoans={disbursedLoans}
+                    loansDueToday={loansDueToday}
+                    monthToDateArrears={monthToDateArrears}
+                    outstandingTotalLoanArrears={outstandingTotalLoanArrears}
+                    isLoading={isLoading}
+                />
+                <CustomerOverview 
+                    activeCustomers={activeCustomers}
+                    inactiveCustomers={inactiveCustomers}
+                    isLoading={isLoading}
+                />
+                <CollectionOverview
+                    todaysCollectionRate={todaysCollectionRate}
+                    monthlyCollectionRate={monthlyCollectionRate}
+                    isLoading={isLoading}
+                />
             </div>
-            <div className="lg:col-span-3">
-              <DueDateMonitor aiInput={aiInput} />
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+                <div className="lg:col-span-4">
+                  <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
+                </div>
+                <div className="lg:col-span-3">
+                  <DueDateMonitor aiInput={aiInput} />
+                </div>
             </div>
-        </div>
+          </>
+        )}
       </div>
     </>
   );
