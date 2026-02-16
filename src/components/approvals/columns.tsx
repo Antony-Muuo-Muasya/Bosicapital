@@ -31,7 +31,7 @@ type LoanWithDetails = Loan & {
 const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { userRole } = useUserProfile();
+    const { user, userRole } = useUserProfile();
 
     const [isUpdating, setIsUpdating] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -45,7 +45,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     };
   
     const handleUpdateStatus = async () => {
-      if(isUpdating || !actionToConfirm || !canApprove) return;
+      if(isUpdating || !actionToConfirm || !canApprove || !user) return;
 
       setIsUpdating(true);
       const loanDocRef = doc(firestore, 'loans', loan.id);
@@ -69,7 +69,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
       }
 
       if (actionToConfirm === 'Approved') {
-          updateDocumentNonBlocking(loanDocRef, { status: 'Approved' })
+          updateDocumentNonBlocking(loanDocRef, { status: 'Approved', approvedById: user.uid })
             .then(() => {
               toast({ title: 'Success', description: 'Loan approved and sent for disbursement.' });
             })
