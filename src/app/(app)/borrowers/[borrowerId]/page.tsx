@@ -15,6 +15,7 @@ import { PlusCircle, Loader2, Phone, Mail, Fingerprint, Home as HomeIcon } from 
 import type { Borrower, Loan, LoanProduct } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { InteractionHistory } from '@/components/borrowers/interaction-history';
 
 const getStatusVariant = (status: string) => {
     switch (status) {
@@ -96,8 +97,8 @@ export default function BorrowerDetailPage() {
         </Button>
       </PageHeader>
       
-      <div className="p-4 md:p-6 grid gap-6 grid-cols-1 lg:grid-cols-3">
-        <div className="lg:col-span-1 flex flex-col gap-6">
+      <div className="p-4 md:p-6 grid gap-6 grid-cols-1 lg:grid-cols-5">
+        <div className="lg:col-span-2 flex flex-col gap-6">
             <Card>
                 <CardHeader className="flex flex-row items-center gap-4">
                     <Avatar className="h-16 w-16 border">
@@ -115,8 +116,9 @@ export default function BorrowerDetailPage() {
                     <div className="flex items-start gap-3"><HomeIcon className="h-4 w-4 text-muted-foreground mt-0.5" /><span>{borrower.address}</span></div>
                 </CardContent>
             </Card>
+            <InteractionHistory borrowerId={borrowerId} />
         </div>
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
             <Card>
                 <CardHeader>
                     <CardTitle>Loan History</CardTitle>

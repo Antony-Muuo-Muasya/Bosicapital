@@ -149,6 +149,22 @@
         "registrationFeePaid"
       ]
     },
+    "Interaction": {
+      "title": "Interaction",
+      "description": "Represents a logged interaction or follow-up with a borrower.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "borrowerId": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "branchId": { "type": "string" },
+        "recordedById": { "type": "string", "description": "UID of the staff member who recorded the interaction." },
+        "recordedByName": { "type": "string", "description": "Full name of the staff member." },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string", "description": "The content of the interaction note." }
+      },
+      "required": ["id", "borrowerId", "organizationId", "branchId", "recordedById", "recordedByName", "timestamp", "notes"]
+    },
     "Loan": {
       "title": "Loan",
       "description": "Represents a loan in the microfinancing system.",
@@ -196,6 +212,7 @@
         "category": { "type": "string" },
         "minAmount": { "type": "number" },
         "maxAmount": { "type": "number" },
+        "interestRate": { "type": "number" },
         "duration": { "type": "number" },
         "repaymentCycle": { "type": "string", "enum": ["Weekly", "Monthly"] },
         "processingFee": { "type": "number" }
@@ -207,7 +224,8 @@
         "duration",
         "minAmount",
         "maxAmount",
-        "repaymentCycle"
+        "repaymentCycle",
+        "interestRate"
       ]
     },
     "Installment": {
@@ -321,6 +339,14 @@
           "entityName": "Borrower",
           "schema": { "$ref": "#/backend/entities/Borrower" },
           "description": "Stores information about individual borrowers."
+        }
+      },
+      {
+        "path": "/borrowers/{borrowerId}/interactions/{interactionId}",
+        "definition": {
+            "entityName": "Interaction",
+            "schema": { "$ref": "#/backend/entities/Interaction" },
+            "description": "Stores follow-up notes and interactions with a borrower."
         }
       },
       {

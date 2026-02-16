@@ -103,6 +103,22 @@ service cloud.firestore {
         isPrivilegedUser() ||
         (isUserInRole(['manager', 'loan_officer']) && isAssignedToBranch(request.resource.data.branchId))
       );
+
+      // INTERACTIONS: Sub-collection for follow-up notes
+      match /interactions/{interactionId} {
+        // READ: Staff can read interactions for borrowers in their scope.
+        allow read: if request.auth != null && (
+            (isPrivilegedUser() && getUserData().organizationId == get(/databases/$(database)/documents/borrowers/$(borrowerId)).data.organizationId) ||
+            (isUserInRole(['manager', 'loan_officer']) && isAssignedToBranch(get(/databases/$(database)/documents/borrowers/$(borrowerId)).data.branchId))
+        );
+
+        // CREATE: Loan officers and managers can add notes for borrowers in their branch.
+        allow create: if request.auth != null && (
+            isUserInRole(['manager', 'loan_officer']) &&
+            isAssignedToBranch(get(/databases/$(database)/documents/borrowers/$(borrowerId)).data.branchId) &&
+            request.resource.data.recordedById == request.auth.uid
+        );
+      }
     }
     
     // LOAN PRODUCTS: Definitions for loan types
