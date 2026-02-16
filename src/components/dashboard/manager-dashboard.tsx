@@ -16,55 +16,51 @@ import { CollectionOverview } from './manager/collection-overview';
 
 export function ManagerDashboard() {
   const firestore = useFirestore();
-  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
+  const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const organizationId = userProfile?.organizationId;
-  const branchIds = userProfile?.branchIds || [];
-  const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
-  // Branch-specific queries
+  // This dashboard is for managers. The queries are filtered by the loans they have personally approved.
   const loansQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'loans');
-    if (branchIds.length === 0) return null;
-    return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
-  }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
-  
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'borrowers');
-    if (branchIds.length === 0) return null;
-    return query(collection(firestore, 'borrowers'), where('branchId', 'in', branchIds));
-  }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
+    if (!firestore || !user) return null;
+    // Query for loans where the 'approvedById' field matches the current manager's UID.
+    // This requires a simple index on 'approvedById' in the 'loans' collection.
+    return query(collection(firestore, 'loans'), where('approvedById', '==', user.uid));
+  }, [firestore, user]);
 
-  const installmentsQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
-      if (isSuperAdmin) return query(collectionGroup(firestore, 'installments'));
-      if (branchIds.length === 0) return null;
-      return query(
-        collectionGroup(firestore, 'installments'), 
-        where('branchId', 'in', branchIds)
-      );
-  }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
+  // To ensure we have all necessary related data for the manager's approved loans (which might span
+  // multiple branches), we query for all borrowers and installments within the manager's organization.
+  // The data is then filtered and aggregated on the client-side.
+  const allBorrowersQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
+    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
+  }, [firestore, organizationId]);
 
-  const regPaymentsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'registrationPayments');
-    if (!organizationId) return null;
+  const allInstallmentsQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
+    // This collection group query may require a composite index on `organizationId`.
+    // The useCollection hook will log an error with a creation link if needed.
+    return query(
+      collectionGroup(firestore, 'installments'),
+      where('organizationId', '==', organizationId)
+    );
+  }, [firestore, organizationId]);
+
+  // These queries were already org-wide and remain unchanged.
+  const allRegPaymentsQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
     return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
+  }, [firestore, organizationId]);
 
-  const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'repayments');
-    if (!organizationId) return null;
+  const allRepaymentsQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
     return query(collection(firestore, 'repayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
+  }, [firestore, organizationId]);
 
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
-  const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
-  const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
-  const { data: repayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
+  const { data: allBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(allBorrowersQuery);
+  const { data: allInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(allInstallmentsQuery);
+  const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(allRegPaymentsQuery);
+  const { data: allRepayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(allRepaymentsQuery);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || regPaymentsLoading || isLoadingRepayments;
 
@@ -81,7 +77,7 @@ export function ManagerDashboard() {
       todaysCollectionRate,
       monthlyCollectionRate,
   } = useMemo(() => {
-      if (isLoading || !loans || !borrowers || !installments || !repayments) {
+      if (isLoading || !loans || !allBorrowers || !allInstallments || !allRepayments) {
           return {
               outstandingLoanBalance: 0, performingLoanBalance: 0, totalCustomers: 0,
               disbursedLoans: 0, loansDueToday: 0, monthToDateArrears: 0, outstandingTotalLoanArrears: 0,
@@ -89,6 +85,13 @@ export function ManagerDashboard() {
           };
       }
       
+      // Filter all data to only include records relevant to the manager's approved loans.
+      const managerLoanIds = new Set(loans.map(l => l.id));
+      const managerBorrowerIds = new Set(loans.map(l => l.borrowerId));
+      const borrowers = allBorrowers.filter(b => managerBorrowerIds.has(b.id));
+      const installments = allInstallments.filter(i => managerLoanIds.has(i.loanId));
+      const repayments = allRepayments.filter(r => managerLoanIds.has(r.loanId));
+
       const today = startOfToday();
       const startOfMonthDate = startOfMonth(today);
   
@@ -172,14 +175,19 @@ export function ManagerDashboard() {
           disbursedLoans, loansDueToday, monthToDateArrears, outstandingTotalLoanArrears,
           activeCustomers, inactiveCustomers, todaysCollectionRate, monthlyCollectionRate
       };
-  }, [isLoading, loans, borrowers, installments, repayments]);
+  }, [isLoading, loans, allBorrowers, allInstallments, allRepayments]);
 
 
   const dueInstallmentsWithDetails = useMemo(() => {
-    if (!installments || !borrowers) return [];
-    const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
+    if (!allInstallments || !allBorrowers) return [];
+    
+    // Use the already filtered `loans` for this manager as the source of truth
+    const managerLoanIds = new Set(loans?.map(l => l.id));
+    const managerInstallments = allInstallments.filter(i => managerLoanIds.has(i.loanId));
+    
+    const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
 
-    return installments
+    return managerInstallments
       .filter(inst => inst.status !== 'Paid')
       .map(inst => {
         const loan = loans?.find(l => l.id === inst.loanId);
@@ -198,7 +206,7 @@ export function ManagerDashboard() {
         };
       })
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [installments, borrowers, loans]);
+  }, [allInstallments, allBorrowers, loans]);
 
   const aiInput = useMemo((): DueDateMonitoringInput => {
     const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');
@@ -219,7 +227,7 @@ export function ManagerDashboard() {
     <>
       <PageHeader
         title="Manager Dashboard"
-        description="Overview of your assigned branches."
+        description="Overview of your approved loan portfolio."
       />
       <div className="p-4 md:p-6 grid gap-6">
         <ManagerStatsCards 
