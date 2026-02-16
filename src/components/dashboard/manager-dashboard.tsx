@@ -8,12 +8,14 @@ import { useMemo } from 'react';
 import { DueDateMonitor } from './due-date-monitor';
 import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
 import { formatCurrency } from '@/lib/utils';
-import { startOfToday, startOfMonth } from 'date-fns';
+import { startOfToday, startOfMonth, subMonths, format } from 'date-fns';
 import { ManagerStatsCards } from './manager/stats-cards';
 import { LoansOverview } from './manager/loans-overview';
 import { CustomerOverview } from './manager/customer-overview';
 import { CollectionOverview } from './manager/collection-overview';
 import { CreateIndexCard } from './manager/CreateIndexCard';
+import { LoanStatusChart } from './manager/loan-status-chart';
+import { DisbursalTrendChart } from './manager/disbursal-trend-chart';
 
 export function ManagerDashboard() {
   const firestore = useFirestore();
@@ -79,13 +81,18 @@ export function ManagerDashboard() {
       inactiveCustomers,
       todaysCollectionRate,
       monthlyCollectionRate,
+      loanStatusData,
+      disbursalTrendData,
   } = useMemo(() => {
+      const defaultState = {
+            outstandingLoanBalance: 0, performingLoanBalance: 0, totalCustomers: 0,
+            disbursedLoans: 0, loansDueToday: 0, monthToDateArrears: 0, outstandingTotalLoanArrears: 0,
+            activeCustomers: 0, inactiveCustomers: 0, todaysCollectionRate: 0, monthlyCollectionRate: 0,
+            loanStatusData: [], disbursalTrendData: [],
+      };
+
       if (isLoading || !loans || !allBorrowers || !allInstallments || !allRepayments) {
-          return {
-              outstandingLoanBalance: 0, performingLoanBalance: 0, totalCustomers: 0,
-              disbursedLoans: 0, loansDueToday: 0, monthToDateArrears: 0, outstandingTotalLoanArrears: 0,
-              activeCustomers: 0, inactiveCustomers: 0, todaysCollectionRate: 0, monthlyCollectionRate: 0
-          };
+          return defaultState;
       }
       
       // Filter all data to only include records relevant to the manager's approved loans.
@@ -173,10 +180,39 @@ export function ManagerDashboard() {
       }).reduce((sum, r) => sum + r.amount, 0);
       const monthlyCollectionRate = expectedThisMonth > 0 ? (paidThisMonthForDues / expectedThisMonth) * 100 : 0;
   
+      // --- Chart Data ---
+      const CHART_COLORS = {
+        'Active': 'hsl(var(--chart-1))', 'Completed': 'hsl(var(--chart-2))', 'Pending Approval': 'hsl(var(--chart-3))',
+        'Rejected': 'hsl(var(--chart-4))', 'Overdue': 'hsl(var(--chart-5))', 'Draft': 'hsl(var(--muted))'
+      };
+
+      const loanStatusCounts = loans.reduce((acc, loan) => {
+          acc[loan.status] = (acc[loan.status] || 0) + 1;
+          return acc;
+      }, {} as Record<string, number>);
+      const loanStatusData = Object.entries(loanStatusCounts).map(([name, value]) => ({
+          name, value, fill: CHART_COLORS[name as keyof typeof CHART_COLORS] || 'hsl(var(--muted))'
+      }));
+
+      const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
+      const monthLabels = last6Months.map(d => format(d, 'MMM yyyy'));
+      
+      const disbursalData = loans.filter(l => l.status === 'Active' || l.status === 'Completed').reduce((acc, loan) => {
+          const [year, monthNum, day] = loan.issueDate.split('-').map(Number);
+          const issueDateObj = new Date(year, monthNum - 1, day);
+          const month = format(issueDateObj, 'MMM yyyy');
+          acc[month] = (acc[month] || 0) + loan.principal;
+          return acc;
+      }, {} as Record<string, number>);
+
+      const disbursalTrendData = monthLabels.map(month => ({ name: month.split(' ')[0], total: disbursalData[month] || 0 }));
+
+
       return {
           outstandingLoanBalance, performingLoanBalance, totalCustomers,
           disbursedLoans, loansDueToday, monthToDateArrears, outstandingTotalLoanArrears,
-          activeCustomers, inactiveCustomers, todaysCollectionRate, monthlyCollectionRate
+          activeCustomers, inactiveCustomers, todaysCollectionRate, monthlyCollectionRate,
+          loanStatusData, disbursalTrendData
       };
   }, [isLoading, loans, allBorrowers, allInstallments, allRepayments]);
 
@@ -261,6 +297,10 @@ export function ManagerDashboard() {
                     monthlyCollectionRate={monthlyCollectionRate}
                     isLoading={isLoading}
                 />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+                <LoanStatusChart data={loanStatusData} isLoading={isLoading} />
+                <DisbursalTrendChart data={disbursalTrendData} isLoading={isLoading} />
             </div>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
                 <div className="lg:col-span-4">
