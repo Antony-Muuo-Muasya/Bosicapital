@@ -39,7 +39,7 @@ export default function LeadsPage() {
     if (isSuperAdmin) return loansCol;
     return query(loansCol, where('organizationId', '==', organizationId));
   }, [firestore, organizationId, isSuperAdmin]);
-  const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(allLoansQuery);
+  const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
 
   const leads = useMemo(() => {
     if (!allBorrowers || !allLoans) return [];
