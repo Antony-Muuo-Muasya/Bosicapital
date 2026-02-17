@@ -100,7 +100,7 @@ export function TargetsManagement() {
                 <TableBody>
                     {isLoading && Array.from({length: 3}).map((_, i) => (
                         <TableRow key={i}>
-                            {columns.map(col => <TableCell key={col.id}><Skeleton className="h-5 w-full" /></TableCell>)}
+                            {columns.map((col, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
                         </TableRow>
                     ))}
                     {!isLoading && table.getRowModel().rows.map((row) => (
