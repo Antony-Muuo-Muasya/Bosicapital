@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -38,7 +38,25 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const staffRoles = useMemo(() => roles.filter(r => r.id !== 'user' && r.id !== 'superadmin'), [roles]);
+  const staffRoles = useMemo(() => {
+    if (!adminProfile) return [];
+    
+    const currentRole = adminProfile.roleId;
+    
+    if (currentRole === 'admin') {
+      return roles.filter(r => r.id === 'manager');
+    }
+    
+    if (currentRole === 'manager') {
+      return roles.filter(r => r.id === 'loan_officer');
+    }
+    
+    if (currentRole === 'superadmin') {
+        return roles.filter(r => r.id !== 'user' && r.id !== 'superadmin');
+    }
+
+    return [];
+  }, [roles, adminProfile]);
 
   const form = useForm<StaffFormData>({
     resolver: zodResolver(staffSchema),
@@ -50,6 +68,15 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
     },
   });
 
+  useEffect(() => {
+    form.reset({
+        fullName: '',
+        email: '',
+        password: '',
+        roleId: '',
+    });
+  }, [staffRoles, form, open]);
+
   const onSubmit = async (values: StaffFormData) => {
     if (!adminProfile) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not identify administrator profile.' });
@@ -58,9 +85,6 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
     setIsSubmitting(true);
 
     try {
-        // We cannot create auth users and firestore documents in a single transaction.
-        // So we create the auth user first. If the firestore write fails, the admin may need to delete the auth user manually.
-        // This is a limitation of operating on the client.
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         await updateProfile(userCredential.user, { displayName: values.fullName });
 
@@ -129,7 +153,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
             <FormField control={form.control} name="roleId" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Assign a role" /></SelectTrigger>
                         </FormControl>
@@ -144,7 +168,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
             )}/>
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || staffRoles.length === 0}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Create User
                 </Button>

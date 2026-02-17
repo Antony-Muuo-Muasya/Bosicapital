@@ -1,4 +1,3 @@
-
 'use client';
 import { AppShell } from '@/components/app-shell';
 import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
@@ -10,7 +9,7 @@ import type { User as AppUser, Role, Branch } from '@/lib/types';
 
 const staffRoles = ['superadmin', 'admin', 'manager', 'loan_officer'];
 const routePermissions = {
-    '/users': ['superadmin', 'admin'],
+    '/users': ['superadmin', 'admin', 'manager'],
     '/settings': ['superadmin', 'admin'],
     '/branches': ['superadmin', 'admin', 'manager'],
     '/loan-products': ['superadmin', 'admin'], // Assuming this will be a page

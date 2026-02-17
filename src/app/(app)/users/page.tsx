@@ -25,8 +25,12 @@ export default function UsersPage() {
   const usersQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile) return null;
     if (isSuperAdmin) return collection(firestore, 'users');
-    if (userProfile.roleId !== 'admin') return null;
-    return query(collection(firestore, 'users'), where('organizationId', '==', userProfile.organizationId));
+
+    if (userProfile.roleId === 'admin' || userProfile.roleId === 'manager') {
+      return query(collection(firestore, 'users'), where('organizationId', '==', userProfile.organizationId));
+    }
+    
+    return null;
   }, [firestore, userProfile, isSuperAdmin]);
 
   const rolesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
@@ -61,13 +65,17 @@ export default function UsersPage() {
   
   const columns = useMemo(() => getUserColumns(handleEditUser), [handleEditUser]);
   
+  const canAddStaff = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager' || userProfile?.roleId === 'superadmin';
+
   return (
     <>
       <PageHeader title="User Management" description="Create, edit, and manage user accounts and roles.">
-        <Button onClick={() => setIsAddStaffDialogOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Staff User
-        </Button>
+        {canAddStaff && (
+            <Button onClick={() => setIsAddStaffDialogOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Staff User
+            </Button>
+        )}
       </PageHeader>
       <div className="p-4 md:p-6">
         {isLoading && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">Loading users...</div>}
