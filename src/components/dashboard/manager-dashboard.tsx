@@ -166,16 +166,19 @@ export function ManagerDashboard() {
       // --- Collection Overview stats ---
       const installmentsDueTodayList = installments.filter(i => i.dueDate === todayISOString);
       const expectedToday = installmentsDueTodayList.reduce((sum, i) => sum + i.expectedAmount, 0);
-      const collectedForDuesToday = installmentsDueTodayList.reduce((sum, i) => sum + i.paidAmount, 0);
-      const todaysCollectionRate = expectedToday > 0 ? (collectedForDuesToday / expectedToday) * 100 : 0;
+      const paidTodayForDues = repayments.filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISOString && installmentsDueTodayList.some(i => i.loanId === r.loanId)).reduce((sum, r) => sum + r.amount, 0);
+      const todaysCollectionRate = expectedToday > 0 ? (paidTodayForDues / expectedToday) * 100 : 0;
       
       const installmentsDueThisMonth = installments.filter(i => {
         const dueDate = new Date(i.dueDate);
         return dueDate >= startOfMonthDate && dueDate <= today
       });
       const expectedThisMonth = installmentsDueThisMonth.reduce((sum, i) => sum + i.expectedAmount, 0);
-      const collectedForDuesThisMonth = installmentsDueThisMonth.reduce((sum, i) => sum + i.paidAmount, 0);
-      const monthlyCollectionRate = expectedThisMonth > 0 ? (collectedForDuesThisMonth / expectedThisMonth) * 100 : 0;
+      const paidThisMonthForDues = repayments.filter(r => {
+        const paymentDate = new Date(r.paymentDate);
+        return paymentDate >= startOfMonthDate && installmentsDueThisMonth.some(i => i.loanId === r.loanId)
+      }).reduce((sum, r) => sum + r.amount, 0);
+      const monthlyCollectionRate = expectedThisMonth > 0 ? (paidThisMonthForDues / expectedThisMonth) * 100 : 0;
   
       // --- Chart Data ---
       const CHART_COLORS = {
