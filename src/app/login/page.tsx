@@ -14,7 +14,6 @@ import { z } from 'zod';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import Image from 'next/image';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -70,13 +69,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex justify-center">
-          <Image
+          <img
             src="https://firebasestorage.googleapis.com/v0/b/studio-2397588411-6a237.appspot.com/o/WhatsApp_Image_2026-02-11_at_4.10.39_PM-removebg-preview.png?alt=media&token=70d5cc88-c5e0-4cad-ba20-75cdf4230ef2"
             alt="Bosi Capital Logo"
             width={196}
             height={196}
             className="rounded-md"
-            priority
           />
         </div>
         <Card>
