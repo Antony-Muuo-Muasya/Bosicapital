@@ -40,7 +40,13 @@ import {
   Search,
   RefreshCw,
   Bell,
+  ChevronDown,
 } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useAuth, useUserProfile } from '@/firebase';
 import { ThemeToggle } from './theme-toggle';
 import { AppFooter } from './app-footer';
@@ -48,7 +54,18 @@ import { AppFooter } from './app-footer';
 
 const allNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'manager', 'loan_officer'] },
-  { href: '/loans', label: 'Loans', icon: CircleDollarSign, roles: ['admin', 'manager', 'loan_officer'] },
+  {
+    label: 'Loans',
+    icon: CircleDollarSign,
+    roles: ['admin', 'manager', 'loan_officer'],
+    children: [
+      { href: '/loans', label: 'All Loans' },
+      { href: '/loans/defaulters', label: 'Defaulters' },
+      { href: '/loans/active-customers', label: 'Active Customers' },
+      { href: '/loans/leads', label: 'Leads' },
+      { href: '/loans/due-today', label: 'Due Today' },
+    ]
+  },
   { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['manager', 'superadmin'] },
   { href: '/disbursements', label: 'Disbursements', icon: FileKey, roles: ['admin', 'superadmin'] },
   { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
@@ -85,6 +102,63 @@ const NavLink = ({
   );
 };
 
+const CollapsibleNavLink = ({ item }: { item: typeof allNavItems[1] }) => {
+    const pathname = usePathname();
+    const isLoansRoute = pathname.startsWith('/loans');
+    const [isOpen, setIsOpen] = React.useState(isLoansRoute);
+
+    React.useEffect(() => {
+        if (isLoansRoute) {
+            setIsOpen(true);
+        }
+    }, [pathname, isLoansRoute]);
+
+    return (
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <CollapsibleTrigger asChild>
+                <div className={cn(
+                    'flex items-center justify-between w-full gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary cursor-pointer',
+                    isLoansRoute && 'text-primary'
+                )}>
+                    <div className="flex items-center gap-3">
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                    </div>
+                    <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
+                </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-1">
+                <div className="pl-9 space-y-1">
+                    {item.children.map(child => {
+                        const otherChildren = item.children.filter(c => c.href !== '/loans');
+                        const isOtherChildActive = otherChildren.some(c => pathname === c.href);
+                        
+                        let isActive = false;
+                        if (child.href === '/loans') {
+                            isActive = isLoansRoute && !isOtherChildActive;
+                        } else {
+                            isActive = pathname === child.href;
+                        }
+
+                        return (
+                            <Link
+                                key={child.href}
+                                href={child.href}
+                                className={cn(
+                                    'block rounded-md px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+                                    isActive && 'bg-muted text-primary'
+                                )}
+                            >
+                                {child.label}
+                            </Link>
+                        )
+                    })}
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
+    )
+}
+
 function SidebarNav() {
   const { userRole } = useUserProfile();
 
@@ -97,9 +171,12 @@ function SidebarNav() {
 
   return (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-      {visibleNavItems.map((item) => (
-        <NavLink key={item.href} {...item} />
-      ))}
+      {visibleNavItems.map((item) => {
+          if ('children' in item && item.children) {
+              return <CollapsibleNavLink key={item.label} item={item as typeof allNavItems[1]} />
+          }
+          return <NavLink key={(item as any).href} {...(item as any)} />
+      })}
     </nav>
   );
 }
