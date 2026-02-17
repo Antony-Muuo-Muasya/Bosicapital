@@ -149,12 +149,11 @@ export default function DefaultersPage() {
 
     const today = startOfToday();
 
-    const unpaidInstallmentsQuery = useMemoFirebase(() => {
+    const allInstallmentsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         const installmentsCol = collectionGroup(firestore, 'installments');
         
-        // This query is simpler to avoid complex indexes. We filter for date on the client.
-        let q = query(installmentsCol, where('status', 'in', ['Unpaid', 'Partial', 'Overdue']));
+        let q = query(installmentsCol);
 
         if (!isSuperAdmin && organizationId) {
             q = query(q, where('organizationId', '==', organizationId));
@@ -162,38 +161,47 @@ export default function DefaultersPage() {
         return q;
     }, [firestore, organizationId, isSuperAdmin]);
 
-    const { data: unpaidInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(unpaidInstallmentsQuery);
+    const { data: allInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(allInstallmentsQuery);
     
     // Fetch all related data for enrichment
     const allLoansQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'loans');
+        if (!organizationId) return null;
         return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     const { data: allLoans } = useCollection<Loan>(allLoansQuery);
 
     const allBorrowersQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'borrowers');
+        if (!organizationId) return null;
         return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     const { data: allBorrowers } = useCollection<Borrower>(allBorrowersQuery);
 
     const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'loanProducts');
+        if (!organizationId) return null;
         return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     const { data: allProducts } = useCollection<LoanProduct>(allProductsQuery);
 
     const isLoading = isProfileLoading || isLoadingInstallments;
 
     const defaulterLoans = useMemo(() => {
-        if (!unpaidInstallments || !allLoans || !allBorrowers || !allProducts) return [];
+        if (!allInstallments || !allLoans || !allBorrowers || !allProducts) return [];
 
         // Client-side filtering for overdue installments
-        const overdueInstallments = unpaidInstallments.filter(inst => new Date(inst.dueDate) < today);
+        const overdueInstallments = allInstallments.filter(inst => {
+            const isUnpaid = ['Unpaid', 'Partial', 'Overdue'].includes(inst.status);
+            return isUnpaid && new Date(inst.dueDate) < today;
+        });
 
         const loansMap = new Map(allLoans.map(l => [l.id, l]));
         const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
-        const productsMap = new Map(allProducts.map(p => [p.id, p]));
+        const productsMap = new Map(allProducts.map(p => [p.id, p.name]));
 
         let installments = overdueInstallments;
         if (userProfile?.roleId === 'manager' || userProfile?.roleId === 'loan_officer') {
@@ -235,7 +243,7 @@ export default function DefaultersPage() {
             }
         }).filter(Boolean) as DefaulterLoan[];
 
-    }, [unpaidInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, today]);
+    }, [allInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, today]);
 
 
   return (

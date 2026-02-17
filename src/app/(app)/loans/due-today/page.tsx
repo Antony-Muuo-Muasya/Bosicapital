@@ -165,57 +165,61 @@ export default function DueTodayPage() {
         if (!firestore) return null;
         const installmentsCol = collectionGroup(firestore, 'installments');
         
-        // Changed from '!=' to 'in' for better performance and indexing.
-        let q = query(installmentsCol, where('dueDate', '==', todayISO), where('status', 'in', ['Unpaid', 'Partial', 'Overdue']));
-
-        if (!isSuperAdmin && organizationId) {
-            q = query(q, where('organizationId', '==', organizationId));
-        }
-
-        // NOTE: Branch-level filtering on a collection group query is not straightforward
-        // without including branchId in every installment and creating complex indexes.
-        // We will filter client-side for managers/officers for now.
-        return q;
-    }, [firestore, todayISO, organizationId, isSuperAdmin]);
+        // Query only by dueDate to avoid complex indexes. 
+        // We will filter by status and org/branch on the client.
+        return query(installmentsCol, where('dueDate', '==', todayISO));
+    }, [firestore, todayISO]);
 
     const { data: dueInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(dueTodayQuery);
     
-    // Fetch all related data for enrichment
+    // Fetch all related data for enrichment. These need to be org-wide for the client-side filter.
     const allLoansQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'loans');
+        if (!organizationId) return null;
         return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     const { data: allLoans } = useCollection<Loan>(allLoansQuery);
 
     const allBorrowersQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'borrowers');
+        if (!organizationId) return null;
         return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     const { data: allBorrowers } = useCollection<Borrower>(allBorrowersQuery);
 
     const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
+        if (!firestore) return null;
+        if (isSuperAdmin) return collection(firestore, 'loanProducts');
+        if (!organizationId) return null;
         return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    }, [firestore, organizationId, isSuperAdmin]);
     const { data: allProducts } = useCollection<LoanProduct>(allProductsQuery);
 
     const isLoading = isProfileLoading || isLoadingInstallments;
 
     const dueTodayWithDetails = useMemo(() => {
-        if (!dueInstallments || !allLoans || !allBorrowers || !allProducts) return [];
+        if (!dueInstallments || !allLoans || !allBorrowers || !allProducts || !userProfile) return [];
 
         const loansMap = new Map(allLoans.map(l => [l.id, l]));
         const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
         const productsMap = new Map(allProducts.map(p => [p.id, p]));
 
-        let filteredInstallments = dueInstallments;
-        if (userProfile?.roleId === 'manager' || userProfile?.roleId === 'loan_officer') {
-            const allowedBranches = new Set(branchIds);
-            filteredInstallments = dueInstallments.filter(inst => {
-                const loan = loansMap.get(inst.loanId);
-                return loan && allowedBranches.has(loan.branchId);
-            });
-        }
+        const filteredInstallments = dueInstallments.filter(inst => {
+            // 1. Filter by status
+            if (!['Unpaid', 'Partial', 'Overdue'].includes(inst.status)) {
+                return false;
+            }
+            // 2. Filter by user's scope (organization/branch)
+            if (!isSuperAdmin && inst.organizationId !== organizationId) {
+                return false;
+            }
+            if ((userProfile.roleId === 'manager' || userProfile.roleId === 'loan_officer') && !branchIds?.includes(inst.branchId)) {
+                return false;
+            }
+            return true;
+        });
 
         return filteredInstallments.map(inst => {
             const loan = loansMap.get(inst.loanId);
@@ -229,7 +233,7 @@ export default function DueTodayPage() {
             }
         });
 
-    }, [dueInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds]);
+    }, [dueInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, isSuperAdmin, organizationId]);
 
 
   return (
