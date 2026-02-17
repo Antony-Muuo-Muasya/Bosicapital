@@ -28,7 +28,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const logoUrl = "https://firebasestorage.googleapis.com/v0/b/studio-2397588411-6a237.appspot.com/o/WhatsApp_Image_2026-02-11_at_4.10.39_PM-removebg-preview.png?alt=media&token=70d5cc88-c5e0-4cad-ba20-75cdf4230ef2";
+  const logoUrl = "https://firebasestorage.googleapis.com/v0/b/studio-2397588411-6a237.firebasestorage.app/o/WhatsApp_Image_2026-02-11_at_4.10.39_PM-removebg-preview.png?alt=media&token=70d5cc88-c5e0-4cad-ba20-75cdf4230ef2";
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
