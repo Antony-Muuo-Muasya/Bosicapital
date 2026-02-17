@@ -165,7 +165,8 @@ export default function DueTodayPage() {
         if (!firestore) return null;
         const installmentsCol = collectionGroup(firestore, 'installments');
         
-        let q = query(installmentsCol, where('dueDate', '==', todayISO), where('status', '!=', 'Paid'));
+        // Changed from '!=' to 'in' for better performance and indexing.
+        let q = query(installmentsCol, where('dueDate', '==', todayISO), where('status', 'in', ['Unpaid', 'Partial', 'Overdue']));
 
         if (!isSuperAdmin && organizationId) {
             q = query(q, where('organizationId', '==', organizationId));

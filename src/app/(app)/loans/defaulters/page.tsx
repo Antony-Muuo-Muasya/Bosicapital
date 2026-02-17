@@ -148,21 +148,21 @@ export default function DefaultersPage() {
     const branchIds = userProfile?.branchIds;
 
     const today = startOfToday();
-    const todayISO = today.toISOString().split('T')[0];
 
-    const overdueInstallmentsQuery = useMemoFirebase(() => {
+    const unpaidInstallmentsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         const installmentsCol = collectionGroup(firestore, 'installments');
         
-        let q = query(installmentsCol, where('dueDate', '<', todayISO), where('status', 'in', ['Unpaid', 'Partial', 'Overdue']));
+        // This query is simpler to avoid complex indexes. We filter for date on the client.
+        let q = query(installmentsCol, where('status', 'in', ['Unpaid', 'Partial', 'Overdue']));
 
         if (!isSuperAdmin && organizationId) {
             q = query(q, where('organizationId', '==', organizationId));
         }
         return q;
-    }, [firestore, todayISO, organizationId, isSuperAdmin]);
+    }, [firestore, organizationId, isSuperAdmin]);
 
-    const { data: overdueInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(overdueInstallmentsQuery);
+    const { data: unpaidInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(unpaidInstallmentsQuery);
     
     // Fetch all related data for enrichment
     const allLoansQuery = useMemoFirebase(() => {
@@ -186,7 +186,10 @@ export default function DefaultersPage() {
     const isLoading = isProfileLoading || isLoadingInstallments;
 
     const defaulterLoans = useMemo(() => {
-        if (!overdueInstallments || !allLoans || !allBorrowers || !allProducts) return [];
+        if (!unpaidInstallments || !allLoans || !allBorrowers || !allProducts) return [];
+
+        // Client-side filtering for overdue installments
+        const overdueInstallments = unpaidInstallments.filter(inst => new Date(inst.dueDate) < today);
 
         const loansMap = new Map(allLoans.map(l => [l.id, l]));
         const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
@@ -232,7 +235,7 @@ export default function DefaultersPage() {
             }
         }).filter(Boolean) as DefaulterLoan[];
 
-    }, [overdueInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds]);
+    }, [unpaidInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, today]);
 
 
   return (
