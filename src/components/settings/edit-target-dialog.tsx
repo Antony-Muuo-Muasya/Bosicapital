@@ -12,12 +12,13 @@ import { doc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Branch, Target } from '@/lib/types';
+import type { Branch, Target, User as AppUser } from '@/lib/types';
 import { format } from 'date-fns';
 
 const targetSchema = z.object({
   name: z.string().min(3, 'Target name is required.'),
   branchId: z.string().min(1, 'A branch must be selected.'),
+  userId: z.string().optional(),
   type: z.enum(['disbursal_amount', 'new_borrowers', 'portfolio_value']),
   value: z.coerce.number().positive('Target value must be a positive number.'),
   startDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid start date is required.' }),
@@ -32,11 +33,12 @@ type TargetFormData = z.infer<typeof targetSchema>;
 interface EditTargetDialogProps {
   target: Target;
   branches: Branch[];
+  users: AppUser[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditTargetDialog({ target, branches, open, onOpenChange }: EditTargetDialogProps) {
+export function EditTargetDialog({ target, branches, users, open, onOpenChange }: EditTargetDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,16 +46,21 @@ export function EditTargetDialog({ target, branches, open, onOpenChange }: EditT
   const form = useForm<TargetFormData>({
     resolver: zodResolver(targetSchema),
     defaultValues: {
-        ...target
+        ...target,
+        userId: target.userId || '',
     },
   });
 
   const onSubmit = (values: TargetFormData) => {
     setIsSubmitting(true);
-
     const targetDocRef = doc(firestore, 'targets', target.id);
     
-    updateDocumentNonBlocking(targetDocRef, values)
+    const updateData: Partial<TargetFormData> = { ...values };
+    if (updateData.userId === '') {
+      delete updateData.userId;
+    }
+
+    updateDocumentNonBlocking(targetDocRef, updateData)
       .then(() => {
         toast({ title: 'Success', description: 'Target updated.' });
         onOpenChange(false);
@@ -75,14 +82,14 @@ export function EditTargetDialog({ target, branches, open, onOpenChange }: EditT
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Target Name</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Target Name</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
                <FormField control={form.control} name="branchId" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Branch</FormLabel>
@@ -91,6 +98,21 @@ export function EditTargetDialog({ target, branches, open, onOpenChange }: EditT
                         <SelectContent>
                             {branches.map(branch => (
                                 <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+              )}/>
+               <FormField control={form.control} name="userId" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Assign to User (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Branch-wide target" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                             <SelectItem value="">Branch-wide</SelectItem>
+                            {users.map(user => (
+                                <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

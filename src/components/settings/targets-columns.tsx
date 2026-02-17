@@ -2,7 +2,7 @@
 import type { Target } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, User, Building } from 'lucide-react';
 import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -51,15 +51,35 @@ const TargetActions = ({ target, onEdit }: { target: Target, onEdit: (target: Ta
   );
 };
 
-export const getTargetsColumns = (onEdit: (target: Target) => void, branchesMap: Map<string, string>): ColumnDef<Target>[] => [
+export const getTargetsColumns = (onEdit: (target: Target) => void, branchesMap: Map<string, string>, usersMap: Map<string, string>): ColumnDef<Target>[] => [
   {
     accessorKey: 'name',
     header: 'Target Name',
   },
   {
-    accessorKey: 'branchId',
-    header: 'Branch',
-    cell: ({ row }) => branchesMap.get(row.original.branchId) || 'Unknown Branch'
+    id: 'scope',
+    header: 'Scope',
+    cell: ({ row }) => {
+      const target = row.original;
+      if (target.userId) {
+        const userName = usersMap.get(target.userId);
+        return (
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="font-medium">{userName || 'Unknown User'}</p>
+              <p className="text-xs text-muted-foreground">{branchesMap.get(target.branchId) || 'Unknown Branch'}</p>
+            </div>
+          </div>
+        );
+      }
+      return (
+         <div className="flex items-center gap-2">
+           <Building className="h-4 w-4 text-muted-foreground" />
+           {branchesMap.get(target.branchId) || 'Unknown Branch'}
+         </div>
+      );
+    }
   },
   {
     accessorKey: 'type',

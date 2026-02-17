@@ -12,12 +12,13 @@ import { collection, doc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Branch } from '@/lib/types';
+import type { Branch, User as AppUser } from '@/lib/types';
 import { format } from 'date-fns';
 
 const targetSchema = z.object({
   name: z.string().min(3, 'Target name is required.'),
   branchId: z.string().min(1, 'A branch must be selected.'),
+  userId: z.string().optional(),
   type: z.enum(['disbursal_amount', 'new_borrowers', 'portfolio_value']),
   value: z.coerce.number().positive('Target value must be a positive number.'),
   startDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid start date is required.' }),
@@ -33,9 +34,10 @@ interface AddTargetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   branches: Branch[];
+  users: AppUser[];
 }
 
-export function AddTargetDialog({ open, onOpenChange, branches }: AddTargetDialogProps) {
+export function AddTargetDialog({ open, onOpenChange, branches, users }: AddTargetDialogProps) {
   const firestore = useFirestore();
   const { userProfile } = useUserProfile();
   const { toast } = useToast();
@@ -46,6 +48,7 @@ export function AddTargetDialog({ open, onOpenChange, branches }: AddTargetDialo
     defaultValues: {
       name: '',
       branchId: '',
+      userId: '',
       type: 'disbursal_amount',
       value: 0,
       startDate: format(new Date(), 'yyyy-MM-dd'),
@@ -58,11 +61,15 @@ export function AddTargetDialog({ open, onOpenChange, branches }: AddTargetDialo
     setIsSubmitting(true);
 
     const newTargetRef = doc(collection(firestore, 'targets'));
-    const newTargetData = {
+    const newTargetData: Partial<TargetFormData> & { id: string, organizationId: string } = {
       ...values,
       id: newTargetRef.id,
       organizationId: userProfile.organizationId,
     };
+    
+    if (!newTargetData.userId) {
+      delete newTargetData.userId;
+    }
 
     setDocumentNonBlocking(newTargetRef, newTargetData, { merge: false })
       .then(() => {
@@ -82,19 +89,19 @@ export function AddTargetDialog({ open, onOpenChange, branches }: AddTargetDialo
         <DialogHeader>
           <DialogTitle>Add New Performance Target</DialogTitle>
           <DialogDescription>
-            Set a new performance goal for a specific branch.
+            Set a new performance goal for a specific branch or user.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Target Name</FormLabel>
+                <FormControl><Input placeholder="e.g., Q3 Disbursals" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Target Name</FormLabel>
-                  <FormControl><Input placeholder="e.g., Q3 Disbursals" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
                <FormField control={form.control} name="branchId" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Branch</FormLabel>
@@ -103,6 +110,21 @@ export function AddTargetDialog({ open, onOpenChange, branches }: AddTargetDialo
                         <SelectContent>
                             {branches.map(branch => (
                                 <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+              )}/>
+               <FormField control={form.control} name="userId" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Assign to User (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Branch-wide target" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            <SelectItem value="">Branch-wide</SelectItem>
+                            {users.map(user => (
+                                <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

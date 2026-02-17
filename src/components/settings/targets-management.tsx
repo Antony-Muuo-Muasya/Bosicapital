@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import type { Target, Branch } from '@/lib/types';
+import type { Target, Branch, User as AppUser } from '@/lib/types';
 import { getTargetsColumns } from './targets-columns';
 import { Button } from '../ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -32,21 +32,35 @@ export function TargetsManagement() {
         return query(collection(firestore, 'branches'), where('organizationId', '==', organizationId));
     }, [firestore, organizationId]);
 
+    const usersQuery = useMemoFirebase(() => {
+        if (!firestore || !organizationId) return null;
+        return query(collection(firestore, 'users'), 
+            where('organizationId', '==', organizationId),
+            where('roleId', 'in', ['manager', 'loan_officer'])
+        );
+    }, [firestore, organizationId]);
+
     const { data: targets, isLoading: areTargetsLoading } = useCollection<Target>(targetsQuery);
     const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
+    const { data: users, isLoading: areUsersLoading } = useCollection<AppUser>(usersQuery);
     
-    const isLoading = isProfileLoading || areTargetsLoading || areBranchesLoading;
+    const isLoading = isProfileLoading || areTargetsLoading || areBranchesLoading || areUsersLoading;
 
     const branchesMap = useMemo(() => {
         if (!branches) return new Map();
         return new Map(branches.map(b => [b.id, b.name]));
     }, [branches]);
 
+    const usersMap = useMemo(() => {
+        if (!users) return new Map();
+        return new Map(users.map(u => [u.id, u.fullName]));
+    }, [users]);
+
     const handleEdit = (target: Target) => {
         setEditingTarget(target);
     }
     
-    const columns = useMemo(() => getTargetsColumns(handleEdit, branchesMap), [branchesMap]);
+    const columns = useMemo(() => getTargetsColumns(handleEdit, branchesMap, usersMap), [branchesMap, usersMap]);
 
     const table = useReactTable({
         data: targets || [],
@@ -61,7 +75,7 @@ export function TargetsManagement() {
             <div className='flex items-center justify-between'>
                 <div>
                     <CardTitle>Performance Targets</CardTitle>
-                    <CardDescription>Set and manage performance goals for your branches.</CardDescription>
+                    <CardDescription>Set and manage performance goals for your branches and staff.</CardDescription>
                 </div>
                 <Button onClick={() => setIsAddDialogOpen(true)}>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -110,11 +124,12 @@ export function TargetsManagement() {
             </div>
         </CardContent>
     </Card>
-    <AddTargetDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} branches={branches || []} />
+    <AddTargetDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} branches={branches || []} users={users || []} />
     {editingTarget && (
         <EditTargetDialog 
             target={editingTarget}
             branches={branches || []}
+            users={users || []}
             open={!!editingTarget}
             onOpenChange={(open) => !open && setEditingTarget(null)}
         />

@@ -11,23 +11,25 @@ import { doc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Loan } from '@/lib/types';
+import type { Loan, User as AppUser } from '@/lib/types';
 import { Input } from '../ui/input';
 
 const editLoanSchema = z.object({
   status: z.enum(['Draft', 'Pending Approval', 'Approved', 'Active', 'Completed', 'Rejected']),
   principal: z.coerce.number().positive(),
+  loanOfficerId: z.string().min(1, 'A loan officer must be assigned.'),
 });
 
 type EditLoanFormData = z.infer<typeof editLoanSchema>;
 
 interface EditLoanDialogProps {
   loan: Loan;
+  loanOfficers: AppUser[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditLoanDialog({ loan, open, onOpenChange }: EditLoanDialogProps) {
+export function EditLoanDialog({ loan, loanOfficers, open, onOpenChange }: EditLoanDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,6 +39,7 @@ export function EditLoanDialog({ loan, open, onOpenChange }: EditLoanDialogProps
     defaultValues: {
         status: loan.status,
         principal: loan.principal,
+        loanOfficerId: loan.loanOfficerId,
     },
   });
 
@@ -44,29 +47,26 @@ export function EditLoanDialog({ loan, open, onOpenChange }: EditLoanDialogProps
     setIsSubmitting(true);
     const loanDocRef = doc(firestore, 'loans', loan.id);
     
-    // Special handling when marking a loan as 'Completed'
     if (values.status === 'Completed' && loan.status !== 'Completed') {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. Update the main loan document
             batch.update(loanDocRef, {
                 status: 'Completed',
-                principal: values.principal, // also apply principal change if any
+                principal: values.principal,
+                loanOfficerId: values.loanOfficerId,
             });
 
-            // 2. Fetch all installments and update them
             const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
             const installmentsSnapshot = await getDocs(installmentsColRef);
             
             installmentsSnapshot.forEach(installmentDoc => {
                 batch.update(installmentDoc.ref, { 
                     status: 'Paid',
-                    paidAmount: installmentDoc.data().expectedAmount // Mark as fully paid
+                    paidAmount: installmentDoc.data().expectedAmount
                 });
             });
 
-            // 3. Commit the batch
             await batch.commit();
 
             toast({ title: 'Success', description: 'Loan marked as completed and all installments updated to paid.' });
@@ -80,15 +80,13 @@ export function EditLoanDialog({ loan, open, onOpenChange }: EditLoanDialogProps
         }
 
     } else {
-        // Standard update for any other status change
         const updates = {
             status: values.status,
             principal: values.principal,
+            loanOfficerId: values.loanOfficerId,
         };
 
         if (values.principal !== loan.principal) {
-            // In a real application, changing the principal would require recalculating installments.
-            // For now, we just warn the user.
             toast({
                 title: 'Warning: Principal Changed',
                 description: 'Installment amounts have not been automatically recalculated. Please do this manually if needed.',
@@ -144,6 +142,22 @@ export function EditLoanDialog({ loan, open, onOpenChange }: EditLoanDialogProps
                 <FormMessage />
             </FormItem>
             )}/>
+             <FormField control={form.control} name="loanOfficerId" render={({ field }) => (
+              <FormItem>
+                  <FormLabel>Loan Officer</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Assign a loan officer" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                          {loanOfficers.map(officer => (
+                              <SelectItem key={officer.id} value={officer.id}>{officer.fullName}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <FormMessage />
+              </FormItem>
+              )}/>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>

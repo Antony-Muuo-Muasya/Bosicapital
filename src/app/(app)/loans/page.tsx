@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import type { Loan, Borrower, LoanProduct } from '@/lib/types';
+import type { Loan, Borrower, LoanProduct, User as AppUser } from '@/lib/types';
 import { LoansDataTable } from '@/components/loans/loans-data-table';
 import { getColumns } from '@/components/loans/columns';
 import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
@@ -77,9 +77,19 @@ export default function LoansPage() {
     return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
   }, [firestore, organizationId, isSuperAdmin]);
 
+  const usersQuery = useMemoFirebase(() => {
+    if (!firestore || !organizationId) return null;
+    return query(
+      collection(firestore, 'users'),
+      where('organizationId', '==', organizationId),
+      where('roleId', 'in', ['loan_officer', 'manager'])
+    );
+  }, [firestore, organizationId]);
+
   const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
   const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
+  const { data: loanOfficers, isLoading: isLoadingLoanOfficers } = useCollection<AppUser>(usersQuery);
 
 
   const loansWithDetails: LoanWithDetails[] = useMemo(() => {
@@ -103,7 +113,7 @@ export default function LoansPage() {
   
   const columns = useMemo(() => getColumns(handleEdit), [handleEdit]);
 
-  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
+  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingProducts || isLoadingLoanOfficers;
 
   return (
     <>
@@ -128,6 +138,7 @@ export default function LoansPage() {
        {editingLoan && (
         <EditLoanDialog 
             loan={editingLoan}
+            loanOfficers={loanOfficers || []}
             open={!!editingLoan}
             onOpenChange={(open) => !open && setEditingLoan(null)}
         />
