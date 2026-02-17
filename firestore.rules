@@ -183,6 +183,17 @@ service cloud.firestore {
         allow write: if request.auth != null && isUserInRole(['admin', 'superadmin']);
       }
     }
+
+    // TARGETS: Performance goals
+    match /targets/{targetId} {
+        // READ: Admins can read all targets in their org. Managers can read targets for their branch.
+        allow read: if request.auth != null && (
+            (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId) ||
+            (isUserInRole(['manager']) && isAssignedToBranch(resource.data.branchId))
+        );
+        // WRITE: Only privileged users can create or modify targets.
+        allow write: if request.auth != null && isPrivilegedUser();
+    }
     
     // REPAYMENTS, REGISTRATION PAYMENTS, AND ORGANIZATIONS
     // Allowing staff to manage these records, scoped to their organization for non-superadmins.

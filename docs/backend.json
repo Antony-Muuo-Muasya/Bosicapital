@@ -285,6 +285,23 @@
         "status": { "type": "string", "enum": ["confirmed"], "default": "confirmed" }
       },
       "required": ["id", "organizationId", "borrowerId", "amount", "paymentMethod", "collectedBy", "createdAt"]
+    },
+    "Target": {
+        "title": "Target",
+        "description": "Represents a performance target for a branch or user.",
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "organizationId": { "type": "string" },
+          "branchId": { "type": "string", "description": "The ID of the branch this target is for." },
+          "userId": { "type": "string", "description": "Optional: The ID of the user this target is for." },
+          "name": { "type": "string", "description": "e.g., 'Q3 Disbursal Target'" },
+          "type": { "type": "string", "enum": ["disbursal_amount", "new_borrowers", "collection_rate", "portfolio_value"] },
+          "value": { "type": "number" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" }
+        },
+        "required": ["id", "organizationId", "branchId", "name", "type", "value", "startDate", "endDate"]
     }
   },
   "auth": {
@@ -388,6 +405,14 @@
             "entityName": "RegistrationPayment",
             "schema": { "$ref": "#/backend/entities/RegistrationPayment" },
             "description": "Stores one-time registration fee payment records for borrowers."
+        }
+      },
+      {
+        "path": "/targets/{targetId}",
+        "definition": {
+          "entityName": "Target",
+          "schema": { "$ref": "#/backend/entities/Target" },
+          "description": "Stores performance targets for branches or users."
         }
       }
     ]

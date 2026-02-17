@@ -25,9 +25,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FileDown } from 'lucide-react';
 
 type DueInstallmentWithDetails = Installment & {
     borrowerName: string;
+    borrowerPhone: string;
     borrowerPhotoUrl: string;
     loanProductName: string;
 };
@@ -54,7 +56,7 @@ export const dueTodayColumns: ColumnDef<DueInstallmentWithDetails>[] = [
             </Avatar>
             <div className="grid gap-0.5">
               <span className="font-medium">{installment.borrowerName}</span>
-              <span className="text-xs text-muted-foreground">{installment.loanId}</span>
+              <span className="text-xs text-muted-foreground">{installment.borrowerPhone}</span>
             </div>
           </div>
         );
@@ -165,14 +167,11 @@ export default function DueTodayPage() {
         if (!firestore) return null;
         const installmentsCol = collectionGroup(firestore, 'installments');
         
-        // Query only by dueDate to avoid complex indexes. 
-        // We will filter by status and org/branch on the client.
         return query(installmentsCol, where('dueDate', '==', todayISO));
     }, [firestore, todayISO]);
 
     const { data: dueInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(dueTodayQuery);
     
-    // Fetch all related data for enrichment. These need to be org-wide for the client-side filter.
     const allLoansQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         if (isSuperAdmin) return collection(firestore, 'loans');
@@ -207,11 +206,9 @@ export default function DueTodayPage() {
         const productsMap = new Map(allProducts.map(p => [p.id, p]));
 
         const filteredInstallments = dueInstallments.filter(inst => {
-            // 1. Filter by status
             if (!['Unpaid', 'Partial', 'Overdue'].includes(inst.status)) {
                 return false;
             }
-            // 2. Filter by user's scope (organization/branch)
             if (!isSuperAdmin && inst.organizationId !== organizationId) {
                 return false;
             }
@@ -228,6 +225,7 @@ export default function DueTodayPage() {
             return {
                 ...inst,
                 borrowerName: borrower?.fullName || 'Unknown',
+                borrowerPhone: borrower?.phone || 'N/A',
                 borrowerPhotoUrl: borrower?.photoUrl || `https://picsum.photos/seed/${inst.borrowerId}/400/400`,
                 loanProductName: product?.name || 'Unknown Product',
             }
@@ -235,10 +233,44 @@ export default function DueTodayPage() {
 
     }, [dueInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, isSuperAdmin, organizationId]);
 
+    const handleExport = () => {
+        if (!dueTodayWithDetails || dueTodayWithDetails.length === 0) return;
+    
+        const headers = ['Borrower Name', 'Phone', 'Loan Product', 'Amount Due'];
+        const csvRows = [
+            headers.join(','),
+            ...dueTodayWithDetails.map(row => {
+                const amountDue = row.expectedAmount - row.paidAmount;
+                return [
+                    `"${row.borrowerName.replace(/"/g, '""')}"`,
+                    row.borrowerPhone,
+                    `"${row.loanProductName.replace(/"/g, '""')}"`,
+                    amountDue
+                ].join(',');
+            })
+        ];
+    
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'dues_today.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
 
   return (
     <>
-      <PageHeader title="Due Today" description="All loan installments that are due for payment today." />
+      <PageHeader title="Due Today" description="All loan installments that are due for payment today.">
+        <Button onClick={handleExport} disabled={isLoading || !dueTodayWithDetails.length}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Export CSV
+        </Button>
+      </PageHeader>
       <div className="p-4 md:p-6">
         <DueTodayTable columns={dueTodayColumns} data={dueTodayWithDetails} isLoading={isLoading} />
       </div>
