@@ -56,8 +56,8 @@ export function EditTargetDialog({ target, branches, users, open, onOpenChange }
     const targetDocRef = doc(firestore, 'targets', target.id);
     
     const updateData: Partial<TargetFormData> = { ...values };
-    if (updateData.userId === '') {
-      delete updateData.userId;
+    if (updateData.userId === '' || updateData.userId === 'none') {
+      delete (updateData as any).userId;
     }
 
     updateDocumentNonBlocking(targetDocRef, updateData)
@@ -110,7 +110,7 @@ export function EditTargetDialog({ target, branches, users, open, onOpenChange }
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Branch-wide target" /></SelectTrigger></FormControl>
                         <SelectContent>
-                             <SelectItem value="">Branch-wide</SelectItem>
+                             <SelectItem value="none">Branch-wide</SelectItem>
                             {users.map(user => (
                                 <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>
                             ))}

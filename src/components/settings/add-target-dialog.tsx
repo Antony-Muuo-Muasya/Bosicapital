@@ -67,8 +67,8 @@ export function AddTargetDialog({ open, onOpenChange, branches, users }: AddTarg
       organizationId: userProfile.organizationId,
     };
     
-    if (!newTargetData.userId) {
-      delete newTargetData.userId;
+    if (!newTargetData.userId || newTargetData.userId === 'none') {
+      delete (newTargetData as any).userId;
     }
 
     setDocumentNonBlocking(newTargetRef, newTargetData, { merge: false })
@@ -122,7 +122,7 @@ export function AddTargetDialog({ open, onOpenChange, branches, users }: AddTarg
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Branch-wide target" /></SelectTrigger></FormControl>
                         <SelectContent>
-                            <SelectItem value="">Branch-wide</SelectItem>
+                            <SelectItem value="none">Branch-wide</SelectItem>
                             {users.map(user => (
                                 <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>
                             ))}
