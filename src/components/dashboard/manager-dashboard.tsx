@@ -163,19 +163,21 @@ export function ManagerDashboard() {
       const activeCustomers = activeLoanBorrowerIds.size;
       const inactiveCustomers = allLoanBorrowerIds.size - activeLoanBorrowerIds.size;
       
-      // --- Collection Overview stats ---
-      const installmentsDueTodayList = installments.filter(i => i.dueDate === todayISOString);
-      const expectedToday = installmentsDueTodayList.reduce((sum, i) => sum + i.expectedAmount, 0);
-      const paidToday = repayments.filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISOString).reduce((sum, r) => sum + r.amount, 0);
-      const todaysCollectionRate = expectedToday > 0 ? (paidToday / expectedToday) * 100 : 0;
-      
+      // --- Collection Overview stats (Corrected Logic) ---
+      const installmentsDueToday = installments.filter(i => i.dueDate === todayISOString);
+      const expectedToday = installmentsDueToday.reduce((sum, i) => sum + i.expectedAmount, 0);
+      const collectedForTodayDues = installmentsDueToday.reduce((sum, i) => sum + i.paidAmount, 0);
+      let todaysCollectionRate = expectedToday > 0 ? (collectedForTodayDues / expectedToday) * 100 : 0;
+      todaysCollectionRate = Math.min(todaysCollectionRate, 100);
+
       const installmentsDueThisMonth = installments.filter(i => {
         const dueDate = new Date(i.dueDate);
-        return dueDate >= startOfMonthDate && dueDate <= today
+        return dueDate >= startOfMonthDate && dueDate <= today;
       });
       const expectedThisMonth = installmentsDueThisMonth.reduce((sum, i) => sum + i.expectedAmount, 0);
-      const paidThisMonth = repayments.filter(r => new Date(r.paymentDate) >= startOfMonthDate).reduce((sum, r) => sum + r.amount, 0);
-      const monthlyCollectionRate = expectedThisMonth > 0 ? (paidThisMonth / expectedThisMonth) * 100 : 0;
+      const collectedForMonthDues = installmentsDueThisMonth.reduce((sum, i) => sum + i.paidAmount, 0);
+      let monthlyCollectionRate = expectedThisMonth > 0 ? (collectedForMonthDues / expectedThisMonth) * 100 : 0;
+      monthlyCollectionRate = Math.min(monthlyCollectionRate, 100);
   
       // --- Chart Data ---
       const CHART_COLORS = {
