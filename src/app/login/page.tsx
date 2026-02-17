@@ -71,7 +71,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex justify-center">
           <Image
-            src="https://firebasestorage.googleapis.com/v0/b/studio-2397588411-6a237.appspot.com/o/logo.png?alt=media"
+            src="https://firebasestorage.googleapis.com/v0/b/studio-2397588411-6a237.appspot.com/o/logo.jpg?alt=media"
             alt="Bosi Capital Logo"
             width={196}
             height={196}
