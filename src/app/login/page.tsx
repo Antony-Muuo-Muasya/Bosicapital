@@ -13,8 +13,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, Landmark } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -70,13 +69,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex justify-center">
-          <Image
-            src="/logo.jpg"
-            alt="Bosi Capital Logo"
-            width={120}
-            height={120}
-            className="rounded-lg"
-          />
+          <div className="rounded-lg bg-primary/10 p-6 text-primary">
+             <Landmark className="h-16 w-16" />
+          </div>
         </div>
         <Card>
           <CardHeader className="text-center">
