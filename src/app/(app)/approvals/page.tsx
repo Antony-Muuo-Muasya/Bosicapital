@@ -58,11 +58,14 @@ export default function ApprovalsPage() {
         const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
     
         return pendingLoans.map(loan => {
+            const borrower = borrowersMap.get(loan.borrowerId);
             const product = loanProductsMap.get(loan.loanProductId);
             return {
                 ...loan,
-                borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown Borrower',
-                borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl,
+                borrowerName: borrower?.fullName || 'Unknown Borrower',
+                borrowerPhotoUrl: borrower?.photoUrl,
+                businessPhotoUrl: borrower?.businessPhotoUrl,
+                homeAssetsPhotoUrl: borrower?.homeAssetsPhotoUrl,
                 loanProductName: product?.name || 'Unknown Product',
                 repaymentCycle: product?.repaymentCycle,
             };

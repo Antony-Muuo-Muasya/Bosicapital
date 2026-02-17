@@ -4,7 +4,7 @@ import type { Loan } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Eye } from 'lucide-react';
 import { useFirestore, updateDocumentNonBlocking, useUserProfile } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
@@ -19,11 +19,22 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import Image from 'next/image';
 
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
+  businessPhotoUrl?: string;
+  homeAssetsPhotoUrl?: string;
   loanProductName: string;
   repaymentCycle?: 'Weekly' | 'Monthly';
 };
@@ -84,6 +95,40 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     return (
         <>
             <div className='flex items-center justify-end gap-2'>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                            <Eye className="mr-2 h-4 w-4" />
+                            Photos
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>Supporting Photos for {loan.borrowerName}</DialogTitle>
+                            <DialogDescription>
+                                Photos of the business and home assets provided during onboarding.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                            <div className="space-y-2">
+                                <h3 className="font-semibold text-center">Business Photo</h3>
+                                <div className="border rounded-md p-2 h-80 flex items-center justify-center bg-muted/50">
+                                    {loan.businessPhotoUrl ? (
+                                        <Image src={loan.businessPhotoUrl} alt="Business" width={500} height={500} className="max-h-full w-auto object-contain rounded-md"/>
+                                    ) : <p className="text-muted-foreground">No photo provided.</p>}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="font-semibold text-center">Home Assets Photo</h3>
+                                <div className="border rounded-md p-2 h-80 flex items-center justify-center bg-muted/50">
+                                    {loan.homeAssetsPhotoUrl ? (
+                                        <Image src={loan.homeAssetsPhotoUrl} alt="Home Assets" width={500} height={500} className="max-h-full w-auto object-contain rounded-md" />
+                                    ) : <p className="text-muted-foreground">No photo provided.</p>}
+                                </div>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
                 <Button
                     variant="ghost"
                     size="sm"
