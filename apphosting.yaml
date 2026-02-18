@@ -5,20 +5,3 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
-
-# Environment variables that will be available to your app both during the build
-# and at runtime.
-# IMPORTANT: Replace the placeholder values with your actual Firebase project keys.
-env:
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "YOUR_API_KEY_HERE"
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "YOUR_AUTH_DOMAIN_HERE"
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "YOUR_PROJECT_ID_HERE"
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "YOUR_STORAGE_BUCKET_HERE"
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "YOUR_MESSAGING_SENDER_ID_HERE"
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "YOUR_APP_ID_HERE"
