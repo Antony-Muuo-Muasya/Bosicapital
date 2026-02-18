@@ -34,11 +34,13 @@ service cloud.firestore {
     // USERS: Manage user profiles
     match /users/{userId} {
       // READ: Users can read their own profile. Admins/Superadmins can read any user in their org.
-      // Managers/Officers can read users within their assigned branches.
+      // Managers/Officers can only read 'user' (borrower) role profiles in their assigned branches.
       allow read: if request.auth != null && (
         isOwner(userId) ||
         (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId) ||
-        (isUserInRole(['manager', 'loan_officer']) && isAssignedToBranch(get(/databases/$(database)/documents/users/$(userId)).data.branchIds[0]))
+        (isUserInRole(['manager', 'loan_officer']) &&
+         get(/databases/$(database)/documents/users/$(userId)).data.roleId == 'user' &&
+         isAssignedToBranch(get(/databases/$(database)/documents/users/$(userId)).data.branchIds[0]))
       );
       
       // CREATE: A user can create their own profile during signup.
@@ -155,14 +157,22 @@ service cloud.firestore {
          incomingData().status == 'Pending Approval');
 
       // UPDATE: Handle the loan lifecycle (approval, disbursal)
-      allow update: if request.auth != null && (
-        // Manager/Head of Product can approve loans for their branch
-        (isUserInRole(['manager']) && isAssignedToBranch(resource.data.branchId) && resource.data.status == 'Pending Approval' && incomingData().status == 'Approved') ||
-        // Admin/Head of Ops can disburse approved loans
-        (isUserInRole(['admin', 'superadmin']) && resource.data.status == 'Approved' && incomingData().status == 'Active') ||
-        // Admin/Superadmin can make general edits
-        isPrivilegedUser()
-      );
+      allow update: if request.auth != null &&
+        // Ensure core fields that link a loan to a borrower, org, branch, and product are immutable.
+        incomingData().borrowerId == resource.data.borrowerId &&
+        incomingData().organizationId == resource.data.organizationId &&
+        incomingData().branchId == resource.data.branchId &&
+        incomingData().loanProductId == resource.data.loanProductId &&
+        (
+            // Manager can approve or reject a pending loan for their branch.
+            (isUserInRole(['manager']) && isAssignedToBranch(resource.data.branchId) &&
+                resource.data.status == 'Pending Approval' &&
+                (incomingData().status == 'Approved' || incomingData().status == 'Rejected') &&
+                incomingData().approvedById == request.auth.uid
+            ) ||
+            // Admin/Superadmin can disburse, complete, or make other general edits (like changing principal or officer).
+            (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId)
+        );
       
       // DELETE: Only Superadmin for cleanup.
       allow delete: if request.auth != null && isUserInRole(['superadmin']);
@@ -172,15 +182,16 @@ service cloud.firestore {
         // This rule supports both direct subcollection access and collection group queries
         allow read: if request.auth != null && (
             // Borrower can read their own installments by checking through the borrower document
-            (get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid) ||
+            (exists(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)) &&
+             get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid) ||
             // Staff access based on role and scope
             (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId) ||
             (isUserInRole(['manager']) && isAssignedToBranch(resource.data.branchId)) ||
             (isUserInRole(['loan_officer']) && request.auth.uid == resource.data.loanOfficerId)
         );
         
-        // WRITE: Only Admins can create/update installments (as part of loan disbursement)
-        allow write: if request.auth != null && isUserInRole(['admin', 'superadmin']);
+        // WRITE: Only Admins/Superadmins can create/update installments (as part of loan disbursement or manual completion).
+        allow write: if request.auth != null && isPrivilegedUser();
       }
     }
 
@@ -195,17 +206,47 @@ service cloud.firestore {
         allow write: if request.auth != null && isPrivilegedUser();
     }
     
-    // REPAYMENTS, REGISTRATION PAYMENTS, AND ORGANIZATIONS
-    // Allowing staff to manage these records, scoped to their organization for non-superadmins.
-    match /{collection}/{docId} 
-    where collection in ['repayments', 'registrationPayments', 'organizations', 'mpesa_callbacks', 'failed_mpesa_callbacks', 'auditLogs'] {
-      // These collections are written to by backend services or privileged users
+    // ORGANIZATIONS
+    match /organizations/{organizationId} {
+        allow read: if request.auth != null && getUserData().organizationId == organizationId;
+        allow update: if request.auth != null && isPrivilegedUser() && getUserData().organizationId == organizationId;
+    }
+
+    // REPAYMENTS
+    match /repayments/{repaymentId} {
+        allow read: if request.auth != null && (
+            (exists(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)) && get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid) ||
+            (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId) ||
+            (isUserInRole(['manager']) && isAssignedToBranch(get(/databases/$(database)/documents/loans/$(resource.data.loanId)).data.branchId)) ||
+            (isUserInRole(['loan_officer']) && resource.data.loanOfficerId == request.auth.uid)
+        );
+        allow create: if request.auth != null && isUserInRole(['loan_officer', 'manager']);
+    }
+
+    // REGISTRATION PAYMENTS
+    match /registrationPayments/{paymentId} {
+        allow read: if request.auth != null && (
+            (exists(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)) && get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.userId == request.auth.uid) ||
+            (isPrivilegedUser() && getUserData().organizationId == resource.data.organizationId) ||
+            (isUserInRole(['manager', 'loan_officer']) && isAssignedToBranch(get(/databases/$(database)/documents/borrowers/$(resource.data.borrowerId)).data.branchId))
+        );
+        allow create: if request.auth != null && isUserInRole(['loan_officer', 'manager']);
+    }
+
+    // BACKEND-ONLY COLLECTIONS
+    match /mpesa_callbacks/{docId} {
       allow read: if request.auth != null && isPrivilegedUser();
-      allow write: if request.auth != null && (
-          isPrivilegedUser() ||
-          // Allow Loan Officers to create repayment records
-          (collection == 'repayments' && isUserInRole(['loan_officer', 'manager']))
-      );
+      allow write: if false; // Only backend can write
+    }
+
+    match /failed_mpesa_callbacks/{docId} {
+      allow read: if request.auth != null && isPrivilegedUser();
+      allow write: if false; // Only backend can write
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if request.auth != null && isPrivilegedUser();
+      allow write: if false; // Only backend can write
     }
   }
 }
