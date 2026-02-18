@@ -4,6 +4,9 @@
 /node_modules
 /.pnp
 .pnp.js
+/dist
+/lib
+/functions/lib
 
 # testing
 /coverage
@@ -25,11 +28,9 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env*.local
-.env
+.env*
+!.env.example
+functions/.env
 
 # vercel
 .vercel
-
-# turbo
-.turbo
