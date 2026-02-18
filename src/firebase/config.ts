@@ -1,12 +1,20 @@
 import type { FirebaseOptions } from 'firebase/app';
 
-// IMPORTANT: Environment Variable Configuration
-// This configuration relies on environment variables that MUST be prefixed with NEXT_PUBLIC_.
-// These variables must be set in your Firebase App Hosting backend settings for deployment.
-// They will be loaded automatically from your local .env file during development.
+// ======================================================================================
 //
-// Firebase Documentation:
-// https://firebase.google.com/docs/hosting/frameworks/nextjs
+//  IMPORTANT: ENVIRONMENT VARIABLE CONFIGURATION FOR FIREBASE HOSTING
+//
+//  The "auth/invalid-api-key" error you are seeing is because your hosting environment
+//  does not have access to these secret keys. To fix this, you must set them in your
+//  Firebase App Hosting backend.
+//
+//  This file correctly reads the environment variables, but they must be provided
+//  by the hosting environment to work.
+//
+//  Firebase Documentation:
+//  https://firebase.google.com/docs/app-hosting/configure-backend#set-secrets
+//
+// ======================================================================================
 
 const firebaseConfig: FirebaseOptions = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
