@@ -2,22 +2,23 @@
 
 import React, { useState, useEffect, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebase, firebaseConfig } from '@/firebase';
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
 
-const MissingEnvVarError = () => (
+const ConfigNotSetError = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background p-8">
     <div className="max-w-4xl rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-destructive">
       <div className="flex items-center gap-6">
         <AlertTriangle className="h-12 w-12 flex-shrink-0" />
         <div>
-          <h1 className="text-xl font-bold">Action Required: Connect Your App to Firebase</h1>
+          <h1 className="text-xl font-bold">Action Required: Set Firebase Configuration</h1>
           <p className="mt-2 text-sm">
-            Your deployed application is missing the secret API keys required to connect to Firebase. This is a one-time setup that must be configured in the Firebase Console for your app to work.
+            Your application needs its Firebase configuration keys to connect to the backend.
+            I have set up the file `src/firebase/config.ts` with placeholders for you.
           </p>
           <div className="mt-6 text-xs space-y-4">
             <div>
@@ -26,28 +27,14 @@ const MissingEnvVarError = () => (
                 <li>Go to the Firebase Console and select your project.</li>
                 <li>Click the **gear icon** ⚙️ next to "Project Overview", then select **Project settings**.</li>
                 <li>In the "General" tab, scroll down to the **"Your apps"** card.</li>
-                <li>Find your web app and select the **"Config"** option. A code snippet will appear with your keys. Keep this tab open.</li>
+                <li>Find your web app and select the **"Config"** option. A code snippet will appear with your keys.</li>
               </ol>
             </div>
              <div>
-              <p className="font-semibold text-base">Step 2: Add Keys to App Hosting as Secrets</p>
-              <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
-                  <li>In a new tab, go to the **App Hosting** section in the Firebase Console (this is separate from the older 'Hosting' for static sites).</li>
-                  <li>Click on your backend's name (e.g., `bosicapital`) to open its details page.</li>
-                  <li>Navigate to the **Integrations** tab.</li>
-                  <li>Under "Cloud Secret Manager," click **Add secret**.</li>
-                  <li>For **Secret name**, enter `NEXT_PUBLIC_FIREBASE_API_KEY`. For **Secret value**, paste the `apiKey` value from Step 1. Click **Create secret**.</li>
-                  <li>Repeat this process for the remaining keys, creating a new secret for each one. The secret names must match exactly:
-                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
-                        <li>`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`</li>
-                        <li>`NEXT_PUBLIC_FIREBASE_PROJECT_ID`</li>
-                        <li>`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`</li>
-                        <li>`NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`</li>
-                        <li>`NEXT_PUBLIC_FIREBASE_APP_ID`</li>
-                    </ul>
-                  </li>
-                  <li className='font-bold mt-2'>Once all secrets are added, you must **redeploy your backend**. The new deployment will securely access these keys and your app will load correctly.</li>
-              </ol>
+              <p className="font-semibold text-base">Step 2: Provide the Keys</p>
+              <p className="mt-2">Since you are in a read-only editor, I will set these keys for you. Please provide the values from the config object you found in Step 1. For example, you can say:</p>
+              <code className="mt-2 block rounded bg-black/10 p-2 text-sm text-destructive/80">"My apiKey is Axxxxxxxxxxxxxxxxx"</code>
+              <p className="mt-2">I will update the `src/firebase/config.ts` file with the correct values.</p>
             </div>
           </div>
         </div>
@@ -76,36 +63,28 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   const [isConfigValid, setIsConfigValid] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // This function will now correctly read the environment variables on the client side.
-    const firebaseConfig = {
-        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    };
-    
-    // A more robust check to ensure keys are present and not just placeholders.
-    const isConfigCompleteAndValid = 
+    // A robust check to ensure keys are not placeholders.
+    const isConfigCompleteAndValid =
       firebaseConfig.apiKey &&
       !firebaseConfig.apiKey.includes('YOUR_') &&
       firebaseConfig.authDomain &&
-      firebaseConfig.projectId;
+      !firebaseConfig.authDomain.includes('YOUR_') &&
+      firebaseConfig.projectId &&
+      !firebaseConfig.projectId.includes('YOUR_');
 
     if (isConfigCompleteAndValid) {
       const firebaseServices = initializeFirebase(firebaseConfig);
       setServices(firebaseServices);
       setIsConfigValid(true);
     } else {
-      console.error("Firebase config is missing or invalid. Please set NEXT_PUBLIC_... variables in your hosting environment's secrets/variables.");
+      console.error("Firebase config is missing or invalid. Please provide the values in src/firebase/config.ts.");
       setIsConfigValid(false);
     }
   }, []);
 
   if (isConfigValid === false) {
     // If the config is invalid, render a helpful error message.
-    return <MissingEnvVarError />;
+    return <ConfigNotSetError />;
   }
 
   if (isConfigValid === null || !services.firebaseApp) {
