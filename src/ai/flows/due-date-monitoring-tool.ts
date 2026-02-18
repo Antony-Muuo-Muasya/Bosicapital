@@ -1,12 +1,9 @@
+// NOTE: This file has been temporarily disabled to resolve a build dependency conflict.
+// The AI features will be unavailable until this is restored with compatible packages.
+
+/*
 'use server';
 
-/**
- * @fileOverview A tool for branch managers to analyze repayment histories and external events to generate recommendations for managing repayments.
- *
- * - generateDueDateRecommendations - A function that generates recommendations based on repayment history and external events.
- * - DueDateMonitoringInput - The input type for the generateDueDateRecommendations function.
- * - DueDateMonitoringOutput - The return type for the generateDueDateRecommendations function.
- */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
@@ -77,4 +74,6 @@ const dueDateMonitoringFlow = ai.defineFlow(
     const {output} = await dueDateMonitoringPrompt(input);
     return output!;
   }
-); 
+);
+*/
+export {}; // Add an empty export to satisfy TypeScript module requirements

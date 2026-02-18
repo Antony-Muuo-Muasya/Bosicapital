@@ -1,9 +1,11 @@
 'use server';
 
+/*
 import {
   generateDueDateRecommendations,
   DueDateMonitoringInput,
 } from '@/ai/flows/due-date-monitoring-tool';
+*/
 import { z } from 'zod';
 
 const DueDateMonitoringInputSchema = z.object({
@@ -24,34 +26,10 @@ export async function generateDueDateRecommendationsAction(
   prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const validatedFields = DueDateMonitoringInputSchema.safeParse({
-    repaymentHistory: formData.get('repaymentHistory'),
-    externalEvents: formData.get('externalEvents'),
-    upcomingSchedule: formData.get('upcomingSchedule'),
-    overdueSchedule: formData.get('overdueSchedule'),
-    currentSchedule: formData.get('currentSchedule'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      recommendations: '',
-      riskAssessment: '',
-      error: 'All fields are required. Please provide the necessary information.',
-    };
-  }
-
-  try {
-    const result = await generateDueDateRecommendations(validatedFields.data);
-    return {
-      ...result,
-      error: null,
-    };
-  } catch (error) {
-    console.error('Error generating recommendations:', error);
-    return {
-      recommendations: '',
-      riskAssessment: '',
-      error: 'An unexpected error occurred. Please try again later.',
-    };
-  }
+  // Return an error state since the AI functionality is disabled.
+  return {
+    recommendations: '',
+    riskAssessment: '',
+    error: 'AI feature is temporarily disabled due to a build dependency issue.',
+  };
 }
