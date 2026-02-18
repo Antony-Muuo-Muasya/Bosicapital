@@ -2,11 +2,11 @@ import type { FirebaseOptions } from 'firebase/app';
 
 // IMPORTANT: Environment Variable Configuration
 // This configuration relies on environment variables that MUST be prefixed with NEXT_PUBLIC_.
-// These variables must be set in your Vercel project settings for deployment.
-// They will be loaded automatically from your local .env.local file during development.
+// These variables must be set in your Firebase App Hosting backend settings for deployment.
+// They will be loaded automatically from your local .env file during development.
 //
-// Vercel Documentation:
-// https://vercel.com/docs/projects/environment-variables
+// Firebase Documentation:
+// https://firebase.google.com/docs/hosting/frameworks/nextjs
 
 const firebaseConfig: FirebaseOptions = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
