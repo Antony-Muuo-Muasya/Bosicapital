@@ -14,6 +14,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -126,7 +127,10 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="justify-center text-sm">
             <p className="text-muted-foreground">
-              {/* Removed signup link */}
+              Don't have an organization?{' '}
+              <Link href="/signup" className="text-primary hover:underline">
+                Sign up
+              </Link>
             </p>
           </CardFooter>
         </Card>
