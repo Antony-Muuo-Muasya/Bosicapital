@@ -7,12 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, useAuth } from '@/firebase';
+import { useFirestore, useUserProfile, useFirebaseApp } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import type { User as AppUser, Role } from '@/lib/types';
 
 
@@ -33,7 +34,7 @@ interface AddStaffDialogProps {
 
 export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProps) {
   const firestore = useFirestore();
-  const auth = useAuth();
+  const mainApp = useFirebaseApp();
   const { userProfile: adminProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +45,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
     const currentRole = adminProfile.roleId;
     
     if (currentRole === 'admin') {
-      return roles.filter(r => r.id === 'manager');
+      return roles.filter(r => r.id === 'manager' || r.id === 'loan_officer');
     }
     
     if (currentRole === 'manager') {
@@ -83,9 +84,14 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
         return;
     }
     setIsSubmitting(true);
+    
+    // Create a temporary Firebase app instance to create the user without affecting the admin's session.
+    const tempAppName = `user-creation-${Date.now()}`;
+    const secondaryApp = initializeApp(mainApp.options, tempAppName);
+    const secondaryAuth = getAuth(secondaryApp);
 
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, values.email, values.password);
         await updateProfile(userCredential.user, { displayName: values.fullName });
 
         const userDocRef = doc(firestore, 'users', userCredential.user.uid);
@@ -114,6 +120,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
         console.error("Error creating staff user:", error);
         toast({ variant: 'destructive', title: 'Creation Failed', description });
     } finally {
+        await deleteApp(secondaryApp);
         setIsSubmitting(false);
     }
   };

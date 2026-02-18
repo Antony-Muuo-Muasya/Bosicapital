@@ -23,7 +23,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth, useFirestore, useUserProfile } from '@/firebase';
+import { useFirestore, useUserProfile, useFirebaseApp } from '@/firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 import { Loader2, AlertTriangle, Camera, Image as LucideImage } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +36,8 @@ import {
   } from "@/components/ui/select";
 import type { User as AppUser, Borrower } from '@/lib/types';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Label } from '../ui/label';
 
 
@@ -62,7 +63,7 @@ interface AddBorrowerDialogProps {
 
 export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps) {
   const firestore = useFirestore();
-  const auth = useAuth();
+  const mainApp = useFirebaseApp();
   const { userProfile: staffProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -181,9 +182,14 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
         return;
     }
     setIsSubmitting(true);
+    
+    // Create a temporary Firebase app instance to create the user without affecting the admin's session.
+    const tempAppName = `user-creation-${Date.now()}`;
+    const secondaryApp = initializeApp(mainApp.options, tempAppName);
+    const secondaryAuth = getAuth(secondaryApp);
 
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, values.email, values.password);
         await updateProfile(userCredential.user, { displayName: values.fullName });
 
         const newUserId = userCredential.user.uid;
@@ -244,6 +250,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
         console.error("Error creating borrower account:", error);
         toast({ variant: 'destructive', title: 'Creation Failed', description });
     } finally {
+        await deleteApp(secondaryApp);
         setIsSubmitting(false);
     }
   };
