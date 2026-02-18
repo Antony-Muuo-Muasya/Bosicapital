@@ -26,10 +26,18 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
 
   useEffect(() => {
     // This effect ensures Firebase is initialized only on the client-side,
-    // after the initial server render. This is the safe place to do it.
+    // after the initial server render.
     const firebaseServices = initializeFirebase();
     setServices(firebaseServices);
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
+
+  // On initial render (server-side and client-side before useEffect),
+  // services will be null. We should not render children that depend on Firebase.
+  if (!services.firebaseApp) {
+    // Returning null prevents child components from rendering and throwing errors.
+    // The app may show a blank screen for a moment, which is acceptable during initialization.
+    return null;
+  }
 
   return (
     <FirebaseProvider
