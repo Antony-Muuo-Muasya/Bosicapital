@@ -71,7 +71,7 @@ const allNavItems = [
   { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/reports', label: 'Reports', icon: BarChart, roles: ['admin', 'manager'] },
-  { href: '/users', label: 'Users', icon: UserCog, roles: ['admin', 'superadmin'] },
+  { href: '/users', label: 'Users', icon: UserCog, roles: ['admin', 'manager', 'superadmin'] },
   { href: '/branches', label: 'Branches', icon: Building, roles: ['admin', 'manager', 'superadmin'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin', 'superadmin'] },
 ];
@@ -214,7 +214,7 @@ function Header() {
                 className="flex flex-col items-center gap-2 text-lg font-semibold mb-4 text-center"
               >
                 <Link href="/dashboard" className="flex flex-col items-center gap-1">
-                  {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" />}
+                  {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" style={{ height: 'auto' }} />}
                   <span className="font-headline text-xl">{organization?.name || ''}</span>
                   {organization?.slogan && <p className="text-xs text-muted-foreground -mt-1 font-normal">{organization.slogan}</p>}
                 </Link>
@@ -310,7 +310,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex flex-col items-center justify-center gap-2 border-b p-6">
             <Link href="/dashboard" className="flex flex-col items-center gap-1 font-semibold text-center">
-              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" />}
+              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" style={{ height: 'auto' }} />}
               <span className="font-headline text-xl">{organization?.name || ''}</span>
               {organization?.slogan && <p className="text-xs text-muted-foreground -mt-1 font-normal">{organization.slogan}</p>}
             </Link>

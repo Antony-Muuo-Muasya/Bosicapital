@@ -153,6 +153,7 @@ export default function SignupPage() {
             width={196}
             height={196}
             className="rounded-md"
+            style={{ height: 'auto' }}
             priority
           />
         </div>

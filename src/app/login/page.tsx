@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth, useUser } from '@/firebase';
@@ -77,6 +77,7 @@ export default function LoginPage() {
             width={196}
             height={196}
             className="rounded-md"
+            style={{ height: 'auto' }}
             priority
           />
         </div>
@@ -123,6 +124,11 @@ export default function LoginPage() {
               </form>
             </Form>
           </CardContent>
+          <CardFooter className="justify-center text-sm">
+            <p className="text-muted-foreground">
+              {/* Removed signup link */}
+            </p>
+          </CardFooter>
         </Card>
       </div>
     </div>

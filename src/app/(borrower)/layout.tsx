@@ -72,7 +72,7 @@ export default function BorrowerLayout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex flex-col items-center gap-4 py-6">
             <Link href="/my-dashboard" className="flex flex-col items-center gap-1 text-center">
-              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" />}
+              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" style={{ height: 'auto' }} />}
               <span className="text-2xl font-bold sm:inline-block font-headline">{organization?.name || ''}</span>
               {organization?.slogan && <p className="text-sm text-muted-foreground font-normal -mt-1">{organization.slogan}</p>}
             </Link>
