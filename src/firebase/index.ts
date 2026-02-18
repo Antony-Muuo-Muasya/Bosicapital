@@ -12,7 +12,6 @@ export function initializeFirebase() {
   }
 
   // This will throw the native "auth/invalid-api-key" error if the config is invalid.
-  // The error originates from the environment variables not being set in the hosting provider.
   const firebaseApp = initializeApp(firebaseConfig);
   return getSdks(firebaseApp);
 }
