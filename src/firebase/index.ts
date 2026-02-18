@@ -1,17 +1,17 @@
 'use client';
 
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp, FirebaseOptions } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { firebaseConfig } from './config';
 
-export function initializeFirebase() {
+export function initializeFirebase(firebaseConfig: FirebaseOptions) {
   // If the app is already initialized, return the existing services.
   if (getApps().length) {
     return getSdks(getApp());
   }
 
-  // This will throw the native "auth/invalid-api-key" error if the config is invalid.
+  // The check for a valid apiKey now happens in the FirebaseClientProvider
+  // before this function is ever called.
   const firebaseApp = initializeApp(firebaseConfig);
   return getSdks(firebaseApp);
 }
