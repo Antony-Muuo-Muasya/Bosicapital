@@ -3,9 +3,8 @@
 /*
 import {
   generateDueDateRecommendations,
-  DueDateMonitoringInput,
+  type DueDateMonitoringInput,
 } from '@/ai/flows/due-date-monitoring-tool';
-*/
 import { z } from 'zod';
 
 const DueDateMonitoringInputSchema = z.object({
@@ -26,10 +25,36 @@ export async function generateDueDateRecommendationsAction(
   prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
-  // Return an error state since the AI functionality is disabled.
-  return {
-    recommendations: '',
-    riskAssessment: '',
-    error: 'AI feature is temporarily disabled due to a build dependency issue.',
-  };
+  const validatedFields = DueDateMonitoringInputSchema.safeParse({
+    repaymentHistory: formData.get('repaymentHistory'),
+    externalEvents: formData.get('externalEvents'),
+    upcomingSchedule: formData.get('upcomingSchedule'),
+    overdueSchedule: formData.get('overdueSchedule'),
+    currentSchedule: formData.get('currentSchedule'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      recommendations: '',
+      riskAssessment: '',
+      error: 'Invalid form data. All fields are required.',
+    };
+  }
+
+  try {
+    const result = await generateDueDateRecommendations(validatedFields.data);
+    return {
+      recommendations: result.recommendations,
+      riskAssessment: result.riskAssessment,
+      error: null,
+    };
+  } catch (e: any) {
+    console.error(e);
+    return {
+      recommendations: '',
+      riskAssessment: '',
+      error: e.message || 'An unexpected error occurred.',
+    };
+  }
 }
+*/

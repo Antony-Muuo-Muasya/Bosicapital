@@ -1,10 +1,16 @@
-// NOTE: This file has been temporarily disabled to resolve a build dependency conflict.
-// The AI features will be unavailable until this is restored with compatible packages.
-
-/*
 'use server';
 
+// This type is exported to prevent breaking the import in DueDateMonitor.tsx.
+// The actual AI functionality is commented out below to resolve dependency issues.
+export type DueDateMonitoringInput = {
+    repaymentHistory: string;
+    externalEvents: string;
+    upcomingSchedule: string;
+    overdueSchedule: string;
+    currentSchedule: string;
+};
 
+/*
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
@@ -76,4 +82,3 @@ const dueDateMonitoringFlow = ai.defineFlow(
   }
 );
 */
-export {}; // Add an empty export to satisfy TypeScript module requirements
