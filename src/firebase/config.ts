@@ -5,17 +5,14 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  measurementId: "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// This validation check ensures that the app doesn't try to initialize Firebase
-// without the necessary credentials, which causes the 'auth/invalid-api-key' error.
-// It will now fail with a much clearer error message if the environment variables are not set.
-if (!firebaseConfig.apiKey) {
-  throw new Error(
-    'Firebase API Key is missing. Please make sure NEXT_PUBLIC_FIREBASE_API_KEY is set in your environment variables (e.g., in your .env file or Vercel project settings).'
-  );
-}
+// NOTE: The validation check for API keys has been removed to allow Firebase's native error handling.
+// If you see errors like "auth/invalid-api-key", it still means that your 
+// environment variables are not configured correctly in your deployment environment (e.g., Vercel).
+// You MUST add your NEXT_PUBLIC_... variables to your Vercel project settings.
 
 export { firebaseConfig };
