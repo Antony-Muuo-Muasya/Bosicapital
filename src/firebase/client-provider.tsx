@@ -17,29 +17,36 @@ const MissingEnvVarError = () => (
         <div>
           <h1 className="text-xl font-bold">Configuration Error: Firebase API Key Missing or Invalid</h1>
           <p className="mt-2 text-sm">
-            Your deployed application is missing the secret API keys required to connect to Firebase. This must be configured in the Firebase Console.
+            Your deployed application is missing the secret API keys required to connect to Firebase. This is a one-time setup that must be configured in the Firebase Console for your app to work.
           </p>
           <div className="mt-6 text-xs space-y-4">
             <div>
-              <p className="font-semibold text-base">Step 1: Find Your API Keys</p>
+              <p className="font-semibold text-base">Step 1: Find Your Firebase Web App Keys</p>
               <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
                 <li>Go to the Firebase Console and select your project.</li>
                 <li>Click the **gear icon** ⚙️ next to "Project Overview", then select **Project settings**.</li>
                 <li>In the "General" tab, scroll down to the **"Your apps"** card.</li>
-                <li>Find your web app and select the **"Config"** option to view your keys (apiKey, authDomain, etc.). Keep this tab open.</li>
+                <li>Find your web app and select the **"Config"** option. A code snippet will appear with your keys. Keep this tab open.</li>
               </ol>
             </div>
              <div>
-              <p className="font-semibold text-base">Step 2: Add Keys to App Hosting</p>
+              <p className="font-semibold text-base">Step 2: Add Keys to App Hosting as Secrets</p>
               <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
                 <li>In a new tab, go to the **App Hosting** section in the Firebase Console.</li>
                 <li>Click on your backend's name (e.g., `bosicapital`) to open its details page.</li>
                 <li>Navigate to the **Integrations** tab.</li>
                 <li>Under "Cloud Secret Manager," click **Add secret**.</li>
-                <li>For **Secret name**, enter `NEXT_PUBLIC_FIREBASE_API_KEY`.</li>
-                <li>For **Secret value**, paste the `apiKey` value from Step 1. Click **Create secret**.</li>
-                <li>Repeat this process for all other `NEXT_PUBLIC_...` variables, adding a new secret for each one.</li>
-                <li>Once all secrets are added, **redeploy your backend**. The new deployment will have access to the keys.</li>
+                <li>For **Secret name**, enter `NEXT_PUBLIC_FIREBASE_API_KEY`. For **Secret value**, paste the `apiKey` value from Step 1. Click **Create secret**.</li>
+                <li>Repeat this process for the remaining keys, creating a new secret for each one:
+                  <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
+                      <li>`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`</li>
+                      <li>`NEXT_PUBLIC_FIREBASE_PROJECT_ID`</li>
+                      <li>`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`</li>
+                      <li>`NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`</li>
+                      <li>`NEXT_PUBLIC_FIREBASE_APP_ID`</li>
+                  </ul>
+                </li>
+                <li className='font-bold mt-2'>Once all secrets are added, you must **redeploy your backend**. The new deployment will securely access these keys and your app will load correctly.</li>
               </ol>
             </div>
           </div>
