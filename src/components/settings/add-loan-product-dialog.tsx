@@ -40,9 +40,9 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
     defaultValues: {
       name: '',
       category: '',
-      minAmount: 5000,
-      maxAmount: 30000,
-      duration: 1,
+      minAmount: 0,
+      maxAmount: 0,
+      duration: 0,
       repaymentCycle: 'Monthly',
     },
   });
@@ -56,7 +56,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
       ...values,
       id: newProductRef.id,
       organizationId: userProfile.organizationId,
-      interestRate: 25, // Always 25%
+      interestRate: 25, // Business rule: interest is always fixed at 25%
     };
 
     setDocumentNonBlocking(newProductRef, newProductData, { merge: false })
@@ -77,7 +77,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
         <DialogHeader>
           <DialogTitle>Add New Loan Product</DialogTitle>
           <DialogDescription>
-            Define a new loan product that can be assigned to borrowers. Interest is fixed at 25%.
+            Define a new loan product that can be assigned to borrowers. The interest rate is fixed at 25%.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -117,7 +117,7 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (installments)</FormLabel>
+                  <FormLabel>Duration (in installments)</FormLabel>
                   <FormControl><Input type="number" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
