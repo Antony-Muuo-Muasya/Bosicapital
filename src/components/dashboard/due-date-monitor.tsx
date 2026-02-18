@@ -1,6 +1,6 @@
 'use client';
-import { useState, useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useState } from 'react';
+import { useFormStatus, useFormState } from 'react-dom';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -44,7 +44,7 @@ const getRiskVariant = (risk: string | null) => {
 }
 
 export function DueDateMonitor({ aiInput }: { aiInput: DueDateMonitoringInput }) {
-  const [state, formAction] = useActionState(generateDueDateRecommendationsAction, initialState);
+  const [state, formAction] = useFormState(generateDueDateRecommendationsAction, initialState);
   const formKey = JSON.stringify(aiInput);
 
   return (
