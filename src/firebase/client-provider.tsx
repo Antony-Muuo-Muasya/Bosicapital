@@ -11,26 +11,37 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 
 const MissingEnvVarError = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background p-8">
-    <div className="max-w-3xl rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-destructive">
+    <div className="max-w-4xl rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-destructive">
       <div className="flex items-center gap-6">
         <AlertTriangle className="h-12 w-12 flex-shrink-0" />
         <div>
           <h1 className="text-xl font-bold">Configuration Error: Firebase API Key Missing or Invalid</h1>
           <p className="mt-2 text-sm">
-            Your Firebase environment variables are not set correctly. The application cannot connect to Firebase without them.
+            Your deployed application is missing the secret API keys required to connect to Firebase. This must be configured in the Firebase Console.
           </p>
-          <div className="mt-4 text-xs">
-            <p className="font-semibold">To fix this, you must add your Firebase project's secret keys to your Firebase App Hosting environment:</p>
-            <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
-              <li>Go to the Firebase Console and select your project.</li>
-              <li>Navigate to **Project settings** (gear icon ⚙️) &gt; **General** tab.</li>
-              <li>Under "Your apps," find your web app and select **Config** to view your keys.</li>
-              <li>Navigate to the **App Hosting** section in the left menu.</li>
-              <li>Click on your backend's name to open its details page.</li>
-              <li>Go to the **Configuration** tab and find the **Secret Manager** section.</li>
-              <li>Click **Add secret** and create a secret for each `NEXT_PUBLIC_...` variable, pasting the corresponding value.</li>
-              <li>Redeploy your backend for the changes to take effect.</li>
-            </ol>
+          <div className="mt-6 text-xs space-y-4">
+            <div>
+              <p className="font-semibold text-base">Step 1: Find Your API Keys</p>
+              <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
+                <li>Go to the Firebase Console and select your project.</li>
+                <li>Click the **gear icon** ⚙️ next to "Project Overview", then select **Project settings**.</li>
+                <li>In the "General" tab, scroll down to the **"Your apps"** card.</li>
+                <li>Find your web app and select the **"Config"** option to view your keys (apiKey, authDomain, etc.). Keep this tab open.</li>
+              </ol>
+            </div>
+             <div>
+              <p className="font-semibold text-base">Step 2: Add Keys to App Hosting</p>
+              <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
+                <li>In a new tab, go to the **App Hosting** section in the Firebase Console.</li>
+                <li>Click on your backend's name (e.g., `bosicapital`) to open its details page.</li>
+                <li>Navigate to the **Integrations** tab.</li>
+                <li>Under "Cloud Secret Manager," click **Add secret**.</li>
+                <li>For **Secret name**, enter `NEXT_PUBLIC_FIREBASE_API_KEY`.</li>
+                <li>For **Secret value**, paste the `apiKey` value from Step 1. Click **Create secret**.</li>
+                <li>Repeat this process for all other `NEXT_PUBLIC_...` variables, adding a new secret for each one.</li>
+                <li>Once all secrets are added, **redeploy your backend**. The new deployment will have access to the keys.</li>
+              </ol>
+            </div>
           </div>
         </div>
       </div>
@@ -71,9 +82,9 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     // A more robust check to ensure keys are present and not just placeholders.
     const isConfigCompleteAndValid = 
       firebaseConfig.apiKey &&
+      !firebaseConfig.apiKey.includes('YOUR_') &&
       firebaseConfig.authDomain &&
-      firebaseConfig.projectId &&
-      !firebaseConfig.apiKey.includes('AIza') === false; // A valid key must start with 'AIza'
+      firebaseConfig.projectId;
 
     if (isConfigCompleteAndValid) {
       const firebaseServices = initializeFirebase(firebaseConfig);
