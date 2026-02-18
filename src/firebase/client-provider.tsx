@@ -32,21 +32,21 @@ const MissingEnvVarError = () => (
              <div>
               <p className="font-semibold text-base">Step 2: Add Keys to App Hosting as Secrets</p>
               <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
-                <li>In a new tab, go to the **App Hosting** section in the Firebase Console (this is separate from the older 'Hosting' for static sites).</li>
-                <li>Click on your backend's name (e.g., `bosicapital`) to open its details page.</li>
-                <li>Navigate to the **Integrations** tab.</li>
-                <li>Under "Cloud Secret Manager," click **Add secret**.</li>
-                <li>For **Secret name**, enter `NEXT_PUBLIC_FIREBASE_API_KEY`. For **Secret value**, paste the `apiKey` value from Step 1. Click **Create secret**.</li>
-                <li>Repeat this process for the remaining keys, creating a new secret for each one. The secret names must match exactly:
-                  <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
-                      <li>`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`</li>
-                      <li>`NEXT_PUBLIC_FIREBASE_PROJECT_ID`</li>
-                      <li>`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`</li>
-                      <li>`NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`</li>
-                      <li>`NEXT_PUBLIC_FIREBASE_APP_ID`</li>
-                  </ul>
-                </li>
-                <li className='font-bold mt-2'>Once all secrets are added, you must **redeploy your backend**. The new deployment will securely access these keys and your app will load correctly.</li>
+                  <li>In a new tab, go to the **App Hosting** section in the Firebase Console (this is separate from the older 'Hosting' for static sites).</li>
+                  <li>Click on your backend's name (e.g., `bosicapital`) to open its details page.</li>
+                  <li>Navigate to the **Integrations** tab.</li>
+                  <li>Under "Cloud Secret Manager," click **Add secret**.</li>
+                  <li>For **Secret name**, enter `NEXT_PUBLIC_FIREBASE_API_KEY`. For **Secret value**, paste the `apiKey` value from Step 1. Click **Create secret**.</li>
+                  <li>Repeat this process for the remaining keys, creating a new secret for each one. The secret names must match exactly:
+                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
+                        <li>`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`</li>
+                        <li>`NEXT_PUBLIC_FIREBASE_PROJECT_ID`</li>
+                        <li>`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`</li>
+                        <li>`NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`</li>
+                        <li>`NEXT_PUBLIC_FIREBASE_APP_ID`</li>
+                    </ul>
+                  </li>
+                  <li className='font-bold mt-2'>Once all secrets are added, you must **redeploy your backend**. The new deployment will securely access these keys and your app will load correctly.</li>
               </ol>
             </div>
           </div>
