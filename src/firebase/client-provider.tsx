@@ -15,7 +15,7 @@ const MissingEnvVarError = () => (
       <div className="flex items-center gap-6">
         <AlertTriangle className="h-12 w-12 flex-shrink-0" />
         <div>
-          <h1 className="text-xl font-bold">Configuration Error: Firebase API Key Missing</h1>
+          <h1 className="text-xl font-bold">Configuration Error: Firebase API Key Missing or Invalid</h1>
           <p className="mt-2 text-sm">
             Your Firebase environment variables are not set correctly. The application cannot connect to Firebase without them.
           </p>
@@ -23,7 +23,7 @@ const MissingEnvVarError = () => (
             <p className="font-semibold">To fix this, you must add your Firebase project's secret keys to your Firebase App Hosting environment:</p>
             <ol className="list-decimal list-inside space-y-1 pl-2 mt-2">
               <li>Go to the Firebase Console and select your project.</li>
-              <li>Navigate to **Project settings** (gear icon ⚙️) {'>'} **General** tab.</li>
+              <li>Navigate to **Project settings** (gear icon ⚙️) &gt; **General** tab.</li>
               <li>Under "Your apps," find your web app and select **Config** to view your keys.</li>
               <li>Navigate to the **App Hosting** section in the left menu.</li>
               <li>Click on your backend's name to open its details page.</li>
@@ -68,18 +68,25 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
         appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     };
     
-    if (firebaseConfig && firebaseConfig.apiKey) {
+    // A more robust check to ensure keys are present and not just placeholders.
+    const isConfigCompleteAndValid = 
+      firebaseConfig.apiKey &&
+      firebaseConfig.authDomain &&
+      firebaseConfig.projectId &&
+      !firebaseConfig.apiKey.includes('AIza') === false; // A valid key must start with 'AIza'
+
+    if (isConfigCompleteAndValid) {
       const firebaseServices = initializeFirebase(firebaseConfig);
       setServices(firebaseServices);
       setIsConfigValid(true);
     } else {
-      console.error("Firebase config is missing an API key. Please set NEXT_PUBLIC_FIREBASE_API_KEY in your hosting environment's secrets/variables.");
+      console.error("Firebase config is missing or invalid. Please set NEXT_PUBLIC_... variables in your hosting environment's secrets/variables.");
       setIsConfigValid(false);
     }
   }, []);
 
   if (isConfigValid === false) {
-    // If the config is invalid (e.g., missing API key), render a helpful error message.
+    // If the config is invalid, render a helpful error message.
     return <MissingEnvVarError />;
   }
 
