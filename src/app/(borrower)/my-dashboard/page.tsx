@@ -1,8 +1,13 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { useUserProfile, useCollection, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, query, where, doc } from "firebase/firestore";
+import { useUserProfile } from "@/firebase";
+import { getBorrowers } from "@/actions/borrowers";
+import { getLoans } from "@/actions/loans";
+import { getInstallments } from "@/actions/installments";
+import { getLoanProducts } from "@/actions/loan-products";
+import { getUserProfile } from "@/actions/users";
 import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } from '@/lib/types';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Loader2, Trophy, Lightbulb, User, Mail, Wallet, CalendarDays, Hourglass, Sparkles, BookOpen, ShieldCheck, History, PlusCircle, Info } from "lucide-react";
@@ -37,33 +42,69 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string, va
 
 
 export default function MyDashboardPage() {
-    const firestore = useFirestore();
     const { user, userProfile } = useUserProfile();
     const [randomTip, setRandomTip] = useState<string | undefined>();
+    const [isLoading, setIsLoading] = useState(true);
+    const [borrower, setBorrower] = useState<Borrower | null>(null);
+    const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
+    const [installments, setInstallments] = useState<Installment[] | null>(null);
+    const [loanProduct, setLoanProduct] = useState<LoanProduct | null>(null);
+    const [loanOfficer, setLoanOfficer] = useState<LoanOfficer | null>(null);
 
     useEffect(() => {
         setRandomTip(financialTips[Math.floor(Math.random() * financialTips.length)]);
     }, []);
 
-    // 1. Fetch borrower profile
-    const borrowerQuery = useMemoFirebase(() => {
-        if (!user) return null;
-        return query(collection(firestore, 'borrowers'), where('userId', '==', user.uid));
-    }, [firestore, user]);
-    const { data: borrowerData, isLoading: isLoadingBorrower } = useCollection<Borrower>(borrowerQuery);
-    const borrower = useMemo(() => borrowerData?.[0], [borrowerData]);
+    const fetchMyDashboardData = useCallback(async () => {
+        if (!user) return;
+        setIsLoading(true);
+        try {
+            // Borrower
+            const borrowersRes = await getBorrowers(undefined as any, user.uid);
+            if (borrowersRes.success && borrowersRes.borrowers && borrowersRes.borrowers.length > 0) {
+                const b = borrowersRes.borrowers[0];
+                setBorrower(b as any);
+                
+                // All Loans
+                const loansRes = await getLoans(b.organizationId, b.id);
+                if (loansRes.success && loansRes.loans) {
+                    setAllLoans(loansRes.loans as any);
+                    const active = loansRes.loans.find((l: any) => l.status === 'Active');
+                    if (active) {
+                        // Installments
+                        const instRes = await getInstallments(undefined as any, active.id);
+                        if (instRes.success && instRes.installments) {
+                            setInstallments(instRes.installments as any);
+                        }
+                        
+                        // Product
+                        const productsRes = await getLoanProducts(b.organizationId);
+                        if (productsRes.success && productsRes.products) {
+                            setLoanProduct(productsRes.products.find((p: any) => p.id === active.loanProductId) as any);
+                        }
+                        
+                        // Loan Officer
+                        const officerRes = await getUserProfile(active.loanOfficerId);
+                        if (officerRes.success && officerRes.user) {
+                            setLoanOfficer(officerRes.user as any);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user]);
 
-    // 2. Fetch all loans for the borrower (active, pending, etc.)
-    const allLoansQuery = useMemoFirebase(() => {
-        if (!borrower) return null;
-        return query(collection(firestore, 'loans'), 
-            where('organizationId', '==', borrower.organizationId),
-            where('borrowerId', '==', borrower.id)
-        );
-    }, [firestore, borrower]);
-    const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(allLoansQuery);
+    useEffect(() => {
+        if (user) {
+            fetchMyDashboardData();
+        }
+    }, [user, fetchMyDashboardData]);
 
-    // 3. Separate loans by status
+    // 5. Compute derived data for the dashboard
     const { activeLoan, pendingLoan } = useMemo(() => {
         if (!allLoans) return { activeLoan: undefined, pendingLoan: undefined };
         const active = allLoans.find(l => l.status === 'Active');
@@ -71,26 +112,6 @@ export default function MyDashboardPage() {
         return { activeLoan: active, pendingLoan: pending };
     }, [allLoans]);
 
-    // 4. Fetch details for the active loan (installments, product, officer)
-    const installmentsQuery = useMemoFirebase(() => {
-        if (!activeLoan) return null;
-        return collection(firestore, 'loans', activeLoan.id, 'installments');
-    }, [firestore, activeLoan]);
-    const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
-    
-    const productRef = useMemoFirebase(() => {
-        if (!activeLoan) return null;
-        return doc(firestore, 'loanProducts', activeLoan.loanProductId);
-    }, [firestore, activeLoan]);
-    const { data: loanProduct, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
-
-    const loanOfficerRef = useMemoFirebase(() => {
-        if (!activeLoan) return null;
-        return doc(firestore, 'users', activeLoan.loanOfficerId);
-    }, [firestore, activeLoan]);
-    const { data: loanOfficer, isLoading: isLoadingLoanOfficer } = useDoc<LoanOfficer>(loanOfficerRef);
-
-    // 5. Compute derived data for the dashboard
     const { 
         nextDueDate, 
         nextInstallmentAmount, 
@@ -145,8 +166,6 @@ export default function MyDashboardPage() {
             achievements: { totalPayments: totalPaymentsMade, isPromptPayer, hasCompletedLoan }
         };
     }, [installments, activeLoan, allLoans]);
-
-    const isLoading = isLoadingBorrower || isLoadingLoans || isLoadingInstallments || isLoadingLoanOfficer || isLoadingProduct;
 
     if (isLoading) {
         return (

@@ -1,6 +1,10 @@
 'use client';
 
-import { useAuth, useFirestore, useUserProfile, updateDocumentNonBlocking, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { useUserProfile, useAuth } from '@/firebase';
+import { getBorrowers } from '@/actions/borrowers';
+import { getBranches, updateUser } from '@/actions/users';
+import { updateBorrower } from '@/actions/borrowers';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -9,9 +13,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Camera, Loader2, User, KeyRound, Bell, Phone, Home as HomeIcon, Fingerprint } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { doc, collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
@@ -38,26 +39,42 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 export default function BorrowerProfilePage() {
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const auth = useAuth();
-  const firestore = useFirestore();
   const { toast } = useToast();
   
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [borrower, setBorrower] = useState<Borrower | null>(null);
+  const [branch, setBranch] = useState<Branch | null>(null);
 
-  // Fetch the borrower profile linked to the user
-  const borrowerQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(collection(firestore, 'borrowers'), where('userId', '==', user.uid));
-  }, [firestore, user]);
-  const { data: borrowerData, isLoading: isBorrowerLoading } = useCollection<Borrower>(borrowerQuery);
-  const borrower = useMemo(() => borrowerData?.[0], [borrowerData]);
+  const fetchProfileData = useCallback(async () => {
+      if (!user) return;
+      setIsLoading(true);
+      try {
+          // Borrower
+          const borrowersRes = await getBorrowers(undefined as any, user.uid);
+          if (borrowersRes.success && borrowersRes.borrowers && borrowersRes.borrowers.length > 0) {
+              const b = borrowersRes.borrowers[0];
+              setBorrower(b as any);
+              
+              // Branch
+              const branchesRes = await getBranches(b.organizationId, false);
+              if (branchesRes.success && branchesRes.branches) {
+                  setBranch(branchesRes.branches.find((br: any) => br.id === b.branchId) || null);
+              }
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsLoading(false);
+      }
+  }, [user]);
 
-  // Fetch the branch name
-  const branchRef = useMemoFirebase(() => {
-      if (!firestore || !borrower) return null;
-      return doc(firestore, 'branches', borrower.branchId);
-  }, [firestore, borrower]);
-  const { data: branch, isLoading: isBranchLoading } = useDoc<Branch>(branchRef);
+  useEffect(() => {
+    if (!isProfileLoading && user) {
+        fetchProfileData();
+    }
+  }, [isProfileLoading, user, fetchProfileData]);
 
 
   const profileForm = useForm<ProfileFormData>({
@@ -78,27 +95,25 @@ export default function BorrowerProfilePage() {
   const onProfileSubmit = async (data: ProfileFormData) => {
     if (!user) return;
     setIsProfileSubmitting(true);
-    const userDocRef = doc(firestore, 'users', user.uid);
-    // Also update the linked borrower doc
-    const borrowerDocRef = borrower ? doc(firestore, 'borrowers', borrower.id) : null;
-    
-    const updatePromises = [
-        updateDocumentNonBlocking(userDocRef, { fullName: data.fullName })
-    ];
-    if (borrowerDocRef) {
-        updatePromises.push(updateDocumentNonBlocking(borrowerDocRef, { fullName: data.fullName }));
-    }
+    try {
+        const updatePromises = [
+            updateUser(user.uid, { fullName: data.fullName })
+        ];
+        if (borrower) {
+            updatePromises.push(updateBorrower(borrower.id, { fullName: data.fullName }));
+        }
 
-    Promise.all(updatePromises)
-        .then(() => {
+        const results = await Promise.all(updatePromises);
+        if (results.every(r => r.success)) {
             toast({ title: 'Success', description: 'Your name has been updated.' });
-        })
-        .catch(() => {
+        } else {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update profile.' });
-        })
-        .finally(() => {
-            setIsProfileSubmitting(false);
-        });
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+    } finally {
+        setIsProfileSubmitting(false);
+    }
   };
 
   const onPasswordSubmit = async (data: PasswordFormData) => {
@@ -132,16 +147,18 @@ export default function BorrowerProfilePage() {
     }
   };
 
-  const handleMarketingToggle = (checked: boolean) => {
+  const handleMarketingToggle = async (checked: boolean) => {
     if (!user) return;
-    const userDocRef = doc(firestore, 'users', user.uid);
-    updateDocumentNonBlocking(userDocRef, { marketingOptIn: checked })
-        .then(() => {
+    try {
+        const res = await updateUser(user.uid, { marketingOptIn: checked } as any);
+        if (res.success) {
             toast({ title: 'Preferences Updated', description: `You will ${checked ? '' : 'not '}receive marketing updates.` });
-        })
-        .catch(() => {
+        } else {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update preferences.' });
-        });
+        }
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+    }
   }
 
   const isLoading = isProfileLoading || isBorrowerLoading || isBranchLoading;

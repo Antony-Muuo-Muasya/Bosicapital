@@ -7,8 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { createLoanProduct } from '@/actions/loan-products';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,7 +30,6 @@ interface AddLoanProductDialogProps {
 }
 
 export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialogProps) {
-  const firestore = useFirestore();
   const { userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,28 +46,29 @@ export function AddLoanProductDialog({ open, onOpenChange }: AddLoanProductDialo
     },
   });
 
-  const onSubmit = (values: ProductFormData) => {
-    if (!userProfile || !firestore) return;
+  const onSubmit = async (values: ProductFormData) => {
+    if (!userProfile) return;
     setIsSubmitting(true);
 
-    const newProductRef = doc(collection(firestore, 'loanProducts'));
-    const newProductData = {
-      ...values,
-      id: newProductRef.id,
-      organizationId: userProfile.organizationId,
-      interestRate: 25, // Business rule: interest is always fixed at 25%
-    };
-
-    setDocumentNonBlocking(newProductRef, newProductData, { merge: false })
-      .then(() => {
+    try {
+      const res = await createLoanProduct({
+        ...values,
+        organizationId: userProfile.organizationId,
+        interestRate: 25, // Business rule: interest is always fixed at 25%
+      });
+      
+      if (res.success) {
         toast({ title: 'Success', description: 'Loan product created.' });
         form.reset();
         onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not create product.' });
-      })
-      .finally(() => setIsSubmitting(false));
+      } else {
+         toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not create product.' });
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not create product.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

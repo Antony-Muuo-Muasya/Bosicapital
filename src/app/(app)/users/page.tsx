@@ -1,54 +1,59 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/firebase';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
-import { collection, query, where } from 'firebase/firestore';
 import { UsersDataTable } from '@/components/users/users-data-table';
 import { getUserColumns } from '@/components/users/columns';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { EditUserDialog } from '@/components/users/edit-user-dialog';
 import { AddStaffDialog } from '@/components/users/add-staff-dialog';
+import { getUsers, getRoles, getBranches } from '@/actions/users';
 
 type UserWithRole = AppUser & { roleName: string };
 
 export default function UsersPage() {
-  const firestore = useFirestore();
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
 
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [isAddStaffDialogOpen, setIsAddStaffDialogOpen] = useState(false);
 
+  const [users, setUsers] = useState<AppUser[] | null>(null);
+  const [roles, setRoles] = useState<Role[] | null>(null);
+  const [branches, setBranches] = useState<Branch[] | null>(null);
+  const [areDataLoading, setAreDataLoading] = useState(true);
+
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
-  const usersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    if (isSuperAdmin) return collection(firestore, 'users');
+  const fetchData = useCallback(async () => {
+    if (!userProfile) return;
+    setAreDataLoading(true);
 
-    if (userProfile.roleId === 'admin' || userProfile.roleId === 'manager') {
-      return query(collection(firestore, 'users'), where('organizationId', '==', userProfile.organizationId));
+    try {
+      const [usersRes, rolesRes, branchesRes] = await Promise.all([
+        getUsers(userProfile.organizationId, userProfile.roleId),
+        getRoles(userProfile.organizationId, isSuperAdmin),
+        getBranches(userProfile.organizationId, isSuperAdmin)
+      ]);
+
+      if (usersRes.success) setUsers(usersRes.users as any);
+      if (rolesRes.success) setRoles(rolesRes.roles as any);
+      if (branchesRes.success) setBranches(branchesRes.branches as any);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setAreDataLoading(false);
     }
-    
-    return null;
-  }, [firestore, userProfile, isSuperAdmin]);
+  }, [userProfile, isSuperAdmin]);
 
-  const rolesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'roles') : null, [firestore]);
-  
-  const branchesQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    if (isSuperAdmin) return collection(firestore, 'branches');
-    return query(collection(firestore, 'branches'), where('organizationId', '==', userProfile.organizationId));
-  }, [firestore, userProfile, isSuperAdmin]);
+  useEffect(() => {
+    if (!isProfileLoading && userProfile) {
+      fetchData();
+    }
+  }, [isProfileLoading, userProfile, fetchData, isAddStaffDialogOpen]);
 
-
-  const { data: users, isLoading: areUsersLoading } = useCollection<AppUser>(usersQuery);
-  const { data: roles, isLoading: areRolesLoading } = useCollection<Role>(rolesQuery);
-  const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
-
-
-  const isLoading = isProfileLoading || areUsersLoading || areRolesLoading || areBranchesLoading;
-
+  const isLoading = isProfileLoading || areDataLoading;
 
   const usersWithRoles: UserWithRole[] = useMemo(() => {
     if (!users || !roles) return [];
@@ -63,7 +68,7 @@ export default function UsersPage() {
     setEditingUser(user);
   }, []);
   
-  const columns = useMemo(() => getUserColumns(handleEditUser), [handleEditUser]);
+  const columns = useMemo(() => getUserColumns(handleEditUser, fetchData), [handleEditUser, fetchData]);
   
   const canAddStaff = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager' || userProfile?.roleId === 'superadmin';
 
@@ -87,13 +92,17 @@ export default function UsersPage() {
             roles={roles}
             branches={branches}
             open={!!editingUser}
-            onOpenChange={(open) => !open && setEditingUser(null)}
+            onOpenChange={(open) => {
+              if (!open) setEditingUser(null);
+              if (!open) fetchData();
+            }}
         />
       )}
        <AddStaffDialog 
         open={isAddStaffDialogOpen} 
         onOpenChange={setIsAddStaffDialogOpen}
         roles={roles || []}
+        branches={branches || []}
        />
     </>
   );

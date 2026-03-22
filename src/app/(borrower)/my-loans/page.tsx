@@ -1,11 +1,13 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { useUserProfile, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
+import { useUserProfile } from "@/firebase";
+import { getBorrowers } from "@/actions/borrowers";
+import { getLoans } from "@/actions/loans";
+import { getLoanProducts } from "@/actions/loan-products";
 import type { Borrower, Loan, LoanProduct } from '@/lib/types';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { useMemo } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -22,29 +24,47 @@ const getStatusVariant = (status: string): {variant: "default" | "secondary" | "
 };
 
 export default function MyLoansPage() {
-    const firestore = useFirestore();
-    const { user } = useUserProfile();
+    const { user, isLoading: isProfileLoading } = useUserProfile();
 
-    const borrowerQuery = useMemoFirebase(() => {
-        if (!user) return null;
-        return query(collection(firestore, 'borrowers'), where('userId', '==', user.uid));
-    }, [firestore, user]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [borrower, setBorrower] = useState<Borrower | null>(null);
+    const [loans, setLoans] = useState<Loan[] | null>(null);
+    const [loanProducts, setLoanProducts] = useState<LoanProduct[] | null>(null);
 
-    const { data: borrowerData, isLoading: isLoadingBorrower } = useCollection<Borrower>(borrowerQuery);
-    const borrower = useMemo(() => borrowerData?.[0], [borrowerData]);
+    const fetchMyLoansData = useCallback(async () => {
+        if (!user) return;
+        setIsLoading(true);
+        try {
+            // Borrower
+            const borrowersRes = await getBorrowers(undefined as any, user.uid);
+            if (borrowersRes.success && borrowersRes.borrowers && borrowersRes.borrowers.length > 0) {
+                const b = borrowersRes.borrowers[0];
+                setBorrower(b as any);
+                
+                // Loans
+                const loansRes = await getLoans(b.organizationId, b.id);
+                if (loansRes.success && loansRes.loans) {
+                    setLoans(loansRes.loans as any);
+                }
 
-    const loansQuery = useMemoFirebase(() => {
-        if (!borrower) return null;
-        return query(collection(firestore, 'loans'), 
-            where('organizationId', '==', borrower.organizationId),
-            where('borrowerId', '==', borrower.id)
-        );
-    }, [firestore, borrower]);
+                // Products
+                const productsRes = await getLoanProducts(b.organizationId);
+                if (productsRes.success && productsRes.products) {
+                    setLoanProducts(productsRes.products as any);
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user]);
 
-    const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-
-    const loanProductsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
-    const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
+    useEffect(() => {
+        if (!isProfileLoading && user) {
+            fetchMyLoansData();
+        }
+    }, [isProfileLoading, user, fetchMyLoansData]);
     
     const loansWithDetails = useMemo(() => {
         if (!loans || !loanProducts) return [];
@@ -55,7 +75,7 @@ export default function MyLoansPage() {
         })).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
     }, [loans, loanProducts]);
 
-    const isLoading = isLoadingBorrower || isLoadingLoans || isLoadingProducts;
+    /* Redundant isLoading removal */
 
     if (isLoading) {
         return (

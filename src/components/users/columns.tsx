@@ -13,39 +13,40 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking, useUserProfile, deleteDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { updateUser, deleteUser } from '@/actions/users';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { Row } from '@tanstack/react-table';
 
 type UserWithRole = AppUser & { roleName: string };
 
-const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: UserWithRole) => void }) => {
-  const firestore = useFirestore();
+const UserActions = ({ user, onEdit, onRefresh }: { user: UserWithRole, onEdit: (user: UserWithRole) => void, onRefresh: () => void }) => {
   const { user: currentUser } = useUserProfile();
   const { toast } = useToast();
 
-  const handleStatusToggle = () => {
+  const handleStatusToggle = async () => {
     const newStatus = user.status === 'active' ? 'suspended' : 'active';
     if (confirm(`Are you sure you want to ${newStatus} this user?`)) {
-      const userDocRef = doc(firestore, 'users', user.id);
-      updateDocumentNonBlocking(userDocRef, { status: newStatus })
-        .then(() => toast({ title: 'Success', description: 'User status updated.' }))
-        .catch(() => toast({ title: 'Error', variant: 'destructive', description: 'Failed to update user status.' }))
+      const res = await updateUser(user.id, { status: newStatus });
+      if (res.success) {
+        toast({ title: 'Success', description: 'User status updated.' });
+        onRefresh();
+      } else {
+        toast({ title: 'Error', variant: 'destructive', description: res.error || 'Failed to update user status.' });
+      }
     }
   };
   
-  const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete ${user.fullName}? This only deletes their record from the app, not their authentication account.`)) {
-      const userDocRef = doc(firestore, 'users', user.id);
-      deleteDocumentNonBlocking(userDocRef)
-        .then(() => {
-          toast({ title: 'Success', description: 'User deleted successfully.' });
-        })
-        .catch(() => {
-          toast({ title: 'Error', variant: 'destructive', description: 'Failed to delete user.' });
-        });
+  const handleDelete = async () => {
+    if (confirm(`Are you sure you want to delete ${user.fullName}? This will permanently delete the user and their login credentials.`)) {
+      const res = await deleteUser(user.id);
+      if (res.success) {
+        toast({ title: 'Success', description: 'User deleted successfully.' });
+        onRefresh();
+      } else {
+        toast({ title: 'Error', variant: 'destructive', description: res.error || 'Failed to delete user.' });
+      }
     }
   };
 
@@ -107,7 +108,7 @@ const CreatedAtCell = ({ row }: { row: Row<UserWithRole> }) => {
 };
 
 
-export const getUserColumns = (onEdit: (user: UserWithRole) => void): ColumnDef<UserWithRole>[] => [
+export const getUserColumns = (onEdit: (user: UserWithRole) => void, onRefresh: () => void): ColumnDef<UserWithRole>[] => [
   {
     accessorKey: 'fullName',
     header: 'Name',
@@ -137,7 +138,7 @@ export const getUserColumns = (onEdit: (user: UserWithRole) => void): ColumnDef<
     id: 'actions',
     cell: ({ row }) => {
       const user = row.original;
-      return <UserActions user={user} onEdit={onEdit} />;
+      return <UserActions user={user} onEdit={onEdit} onRefresh={onRefresh} />;
     },
   },
 ];

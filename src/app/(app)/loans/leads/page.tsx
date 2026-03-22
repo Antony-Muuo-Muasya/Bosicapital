@@ -1,58 +1,53 @@
 'use client';
 
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
 import type { Borrower, Loan } from '@/lib/types';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { BorrowersDataTable } from '@/components/borrowers/borrowers-data-table';
 import { getBorrowerColumns } from '@/components/borrowers/columns';
-import { useState, useMemo, useCallback } from 'react';
 import { EditBorrowerDialog } from '@/components/borrowers/edit-borrower-dialog';
 import { PayRegistrationFeeDialog } from '@/components/borrowers/pay-registration-fee-dialog';
 
 export default function LeadsPage() {
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const firestore = useFirestore();
   const [selectedBorrower, setSelectedBorrower] = useState<Borrower | null>(null);
   const [editingBorrower, setEditingBorrower] = useState<Borrower | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [leads, setLeads] = useState<Borrower[] | null>(null);
 
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
-  const roleId = userProfile?.roleId;
-  const branchIds = userProfile?.branchIds;
   const organizationId = userProfile?.organizationId;
 
-  // Query for all borrowers within the user's scope.
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !roleId) return null;
-    const borrowersCol = collection(firestore, 'borrowers');
-    if (isSuperAdmin) return borrowersCol;
-    if (organizationId) return query(borrowersCol, where('organizationId', '==', organizationId));
-    return null;
-  }, [firestore, roleId, organizationId, isSuperAdmin]);
-  const { data: allBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
+  const fetchLeads = useCallback(async () => {
+      if (!userProfile) return;
+      setIsLoading(true);
+      try {
+          const borrowersRes = await getBorrowers(isSuperAdmin ? undefined as any : organizationId!);
+          const loansRes = await getLoans(isSuperAdmin ? undefined as any : organizationId!);
+          
+          if (borrowersRes.success && borrowersRes.borrowers && loansRes.success && loansRes.loans) {
+              const activeBorrowerIds = new Set(
+                  loansRes.loans.filter((l: any) => l.status === 'Active' || l.status === 'Pending Approval').map((l: any) => l.borrowerId)
+              );
+              setLeads(borrowersRes.borrowers.filter((b: any) => !activeBorrowerIds.has(b.id)) as any);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsLoading(false);
+      }
+  }, [userProfile, isSuperAdmin, organizationId]);
 
-  // Query for all loans to determine who has an active/pending loan.
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    const loansCol = collection(firestore, 'loans');
-    if (isSuperAdmin) return loansCol;
-    return query(loansCol, where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-  const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-
-  const leads = useMemo(() => {
-    if (!allBorrowers || !allLoans) return [];
-    
-    const activeBorrowerIds = new Set(
-        allLoans.filter(loan => loan.status === 'Active' || loan.status === 'Pending Approval').map(loan => loan.borrowerId)
-    );
-
-    return allBorrowers.filter(borrower => !activeBorrowerIds.has(borrower.id));
-
-  }, [allBorrowers, allLoans]);
-
-  const isLoading = isProfileLoading || isLoadingBorrowers || isLoadingLoans;
+  useEffect(() => {
+     if (!isProfileLoading && userProfile) {
+         fetchLeads();
+     }
+  }, [isProfileLoading, userProfile, fetchLeads]);
 
   const handleRecordPayment = useCallback((borrower: Borrower) => {
     setSelectedBorrower(borrower);
@@ -63,14 +58,14 @@ export default function LeadsPage() {
     setEditingBorrower(borrower);
   }, []);
 
-  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment, handleEditBorrower), [handleRecordPayment, handleEditBorrower]);
+  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment, handleEditBorrower, fetchLeads), [handleRecordPayment, handleEditBorrower, fetchLeads]);
 
   return (
     <>
       <PageHeader title="Leads" description="Customers who are eligible for new loans." />
       <div className="p-4 md:p-6">
         {isLoading && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">Loading leads...</div>}
-        {!isLoading && <BorrowersDataTable columns={columns} data={leads} />}
+        {!isLoading && <BorrowersDataTable columns={columns} data={leads || []} />}
       </div>
       {selectedBorrower && (
         <PayRegistrationFeeDialog 

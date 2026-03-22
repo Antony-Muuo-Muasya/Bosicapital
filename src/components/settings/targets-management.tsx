@@ -1,7 +1,10 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { useEffect, useCallback } from 'react';
+import { getTargets } from '@/actions/targets';
+import { getBranches } from '@/actions/branches';
+import { getUsers } from '@/actions/users';
 import type { Target, Branch, User as AppUser } from '@/lib/types';
 import { getTargetsColumns } from './targets-columns';
 import { Button } from '../ui/button';
@@ -14,37 +17,47 @@ import { AddTargetDialog } from './add-target-dialog';
 import { EditTargetDialog } from './edit-target-dialog';
 
 export function TargetsManagement() {
-    const firestore = useFirestore();
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [editingTarget, setEditingTarget] = useState<Target | null>(null);
-
-    const isSuperAdmin = userProfile?.roleId === 'superadmin';
+    const [editingTarget, setEditingTarget] = useState<any | null>(null);
     const organizationId = userProfile?.organizationId;
 
-    const targetsQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
-        return query(collection(firestore, 'targets'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    const [targets, setTargets] = useState<any[]>([]);
+    const [branches, setBranches] = useState<any[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
+    const [areDataLoading, setAreDataLoading] = useState(true);
 
-    const branchesQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
-        return query(collection(firestore, 'branches'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId]);
+    const fetchData = useCallback(async () => {
+        if (!organizationId) return;
+        setAreDataLoading(true);
+        try {
+            const [targetsRes, branchesRes, usersRes] = await Promise.all([
+                getTargets(organizationId),
+                getBranches(organizationId),
+                getUsers(organizationId)
+            ]);
+            
+            if (targetsRes.success) setTargets(targetsRes.targets as any[]);
+            if (branchesRes.success) setBranches(branchesRes.branches as any[]);
+            if (usersRes.success && usersRes.users) {
+                // Filter to only manager and loan_officer
+                const filteredUsers = usersRes.users.filter((u: any) => u.roleId === 'manager' || u.roleId === 'loan_officer');
+                setUsers(filteredUsers);
+            }
+        } catch(err) {
+            console.error(err);
+        } finally {
+            setAreDataLoading(false);
+        }
+    }, [organizationId]);
 
-    const usersQuery = useMemoFirebase(() => {
-        if (!firestore || !organizationId) return null;
-        return query(collection(firestore, 'users'), 
-            where('organizationId', '==', organizationId),
-            where('roleId', 'in', ['manager', 'loan_officer'])
-        );
-    }, [firestore, organizationId]);
+    useEffect(() => {
+        if (!isProfileLoading && organizationId) {
+            fetchData();
+        }
+    }, [isProfileLoading, organizationId, fetchData, isAddDialogOpen]);
 
-    const { data: targets, isLoading: areTargetsLoading } = useCollection<Target>(targetsQuery);
-    const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
-    const { data: users, isLoading: areUsersLoading } = useCollection<AppUser>(usersQuery);
-    
-    const isLoading = isProfileLoading || areTargetsLoading || areBranchesLoading || areUsersLoading;
+    const isLoading = isProfileLoading || areDataLoading;
 
     const branchesMap = useMemo(() => {
         if (!branches) return new Map();
@@ -60,7 +73,7 @@ export function TargetsManagement() {
         setEditingTarget(target);
     }
     
-    const columns = useMemo(() => getTargetsColumns(handleEdit, branchesMap, usersMap), [branchesMap, usersMap]);
+    const columns = useMemo(() => getTargetsColumns(handleEdit, branchesMap, usersMap, fetchData), [branchesMap, usersMap, fetchData]);
 
     const table = useReactTable({
         data: targets || [],
@@ -124,14 +137,22 @@ export function TargetsManagement() {
             </div>
         </CardContent>
     </Card>
-    <AddTargetDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} branches={branches || []} users={users || []} />
+    <AddTargetDialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if(!open) fetchData();
+    }} branches={branches || []} users={users || []} />
     {editingTarget && (
         <EditTargetDialog 
             target={editingTarget}
             branches={branches || []}
             users={users || []}
             open={!!editingTarget}
-            onOpenChange={(open) => !open && setEditingTarget(null)}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setEditingTarget(null);
+                    fetchData();
+                }
+            }}
         />
     )}
     </>

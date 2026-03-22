@@ -3,13 +3,16 @@
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
 import type { Loan, Borrower, LoanProduct, User as AppUser } from '@/lib/types';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getUsers } from '@/actions/users';
 import { LoansDataTable } from '@/components/loans/loans-data-table';
 import { getColumns } from '@/components/loans/columns';
 import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { EditLoanDialog } from '@/components/loans/edit-loan-dialog';
 
 type LoanWithDetails = Loan & {
@@ -20,76 +23,94 @@ type LoanWithDetails = Loan & {
 
 export default function LoansPage() {
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const firestore = useFirestore();
+  const [loans, setLoans] = useState<LoanWithDetails[] | null>(null);
+  const [borrowers, setBorrowers] = useState<Borrower[] | null>(null);
+  const [loanProducts, setLoanProducts] = useState<LoanProduct[] | null>(null);
+  const [loanOfficers, setLoanOfficers] = useState<AppUser[] | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<LoanWithDetails | null>(null);
-  
+
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
   const roleId = userProfile?.roleId;
   const branchIds = userProfile?.branchIds;
   const organizationId = userProfile?.organizationId;
   const userId = user?.uid;
 
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !roleId) return null;
+  const [isLoadingLoans, setIsLoadingLoans] = useState(true);
+  const [isLoadingBorrowers, setIsLoadingBorrowers] = useState(true);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [isLoadingLoanOfficers, setIsLoadingLoanOfficers] = useState(true);
 
-    const loansCol = collection(firestore, 'loans');
+  const fetchLoansData = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingLoans(true);
+      try {
+          if (!isSuperAdmin) {
+              const res = await getLoans(
+                  organizationId!, 
+                  undefined, 
+                  (roleId === 'manager' || roleId === 'loan_officer') ? branchIds : undefined,
+                  roleId === 'loan_officer' ? userId : undefined
+              );
+              if (res.success && res.loans) {
+                  setLoans(res.loans as any);
+              }
+          }
+      } catch(e) { console.error(e) } finally { setIsLoadingLoans(false) }
+  }, [userProfile, isSuperAdmin, organizationId, roleId, branchIds, userId]);
 
-    if (isSuperAdmin) {
-        return loansCol;
-    }
+  const fetchBorrowersData = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingBorrowers(true);
+      try {
+          if (!isSuperAdmin) {
+              const res = await getBorrowers(organizationId!);
+              if (res.success && res.borrowers) {
+                  let filtered = res.borrowers;
+                  if (roleId === 'manager' || roleId === 'loan_officer') {
+                       filtered = filtered.filter((b: any) => branchIds?.includes(b.branchId));
+                  }
+                  setBorrowers(filtered as any);
+              }
+          }
+      } catch(e) { console.error(e) } finally { setIsLoadingBorrowers(false) }
+  }, [userProfile, isSuperAdmin, organizationId, roleId, branchIds]);
 
-    if (roleId === 'admin') {
-      return query(loansCol, where('organizationId', '==', organizationId));
-    }
-    
-    if (roleId === 'manager' && branchIds?.length > 0) {
-      return query(loansCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-    }
 
-    if (roleId === 'loan_officer' && userId) {
-        return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', userId));
-    }
+  const fetchProductsData = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingProducts(true);
+      try {
+          if (!isSuperAdmin) {
+              const res = await getLoanProducts(organizationId!);
+              if (res.success && res.products) {
+                  setLoanProducts(res.products as any);
+              }
+          }
+      } catch(e) { console.error(e) } finally { setIsLoadingProducts(false) }
+  }, [userProfile, isSuperAdmin, organizationId]);
 
-    return null;
-  }, [firestore, userId, roleId, JSON.stringify(branchIds), organizationId, isSuperAdmin]);
+  const fetchOfficersData = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingLoanOfficers(true);
+      try {
+          if (!isSuperAdmin) {
+              const res = await getUsers(organizationId!);
+              if (res.success && res.users) {
+                  setLoanOfficers(res.users.filter((u: any) => u.roleId === 'loan_officer' || u.roleId === 'manager') as any);
+              }
+          }
+      } catch(e) { console.error(e) } finally { setIsLoadingLoanOfficers(false) }
+  }, [userProfile, isSuperAdmin, organizationId]);
 
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !roleId) return null;
-    const borrowersCol = collection(firestore, 'borrowers');
-
-    if (isSuperAdmin) {
-        return borrowersCol;
-    }
-    if (roleId === 'admin') {
-        return query(borrowersCol, where('organizationId', '==', organizationId));
-    }
-    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
-        return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-    }
-    return null;
-  }, [firestore, roleId, JSON.stringify(branchIds), organizationId, isSuperAdmin]);
-
-  const loanProductsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'loanProducts');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-
-  const usersQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    return query(
-      collection(firestore, 'users'),
-      where('organizationId', '==', organizationId),
-      where('roleId', 'in', ['loan_officer', 'manager'])
-    );
-  }, [firestore, organizationId]);
-
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
-  const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
-  const { data: loanOfficers, isLoading: isLoadingLoanOfficers } = useCollection<AppUser>(usersQuery);
+  useEffect(() => {
+     if (!isProfileLoading && userProfile) {
+         fetchLoansData();
+         fetchBorrowersData();
+         fetchProductsData();
+         fetchOfficersData();
+     }
+  }, [isProfileLoading, userProfile, fetchLoansData, fetchBorrowersData, fetchProductsData, fetchOfficersData, isAddDialogOpen]);
 
 
   const loansWithDetails: LoanWithDetails[] = useMemo(() => {
@@ -103,7 +124,7 @@ export default function LoansPage() {
       borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown Borrower',
       borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl,
       loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown Product',
-    }));
+    })) as any;
 
   }, [loans, borrowers, loanProducts]);
   
@@ -111,7 +132,7 @@ export default function LoansPage() {
     setEditingLoan(loan);
   }, []);
   
-  const columns = useMemo(() => getColumns(handleEdit), [handleEdit]);
+  const columns = useMemo(() => getColumns(handleEdit, fetchLoansData), [handleEdit, fetchLoansData]);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingProducts || isLoadingLoanOfficers;
 
@@ -130,7 +151,10 @@ export default function LoansPage() {
       </div>
       <AddLoanDialog 
         open={isAddDialogOpen} 
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) { fetchLoansData(); }
+        }}
         borrowers={borrowers || []}
         loanProducts={loanProducts || []}
         isLoading={isLoading}
@@ -140,7 +164,9 @@ export default function LoansPage() {
             loan={editingLoan}
             loanOfficers={loanOfficers || []}
             open={!!editingLoan}
-            onOpenChange={(open) => !open && setEditingLoan(null)}
+            onOpenChange={(open) => {
+                if(!open) { setEditingLoan(null); fetchLoansData(); }
+            }}
         />
        )}
     </>

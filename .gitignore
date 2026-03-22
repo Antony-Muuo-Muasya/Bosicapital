@@ -34,3 +34,5 @@ functions/.env
 
 # vercel
 .vercel
+
+/src/generated/prisma

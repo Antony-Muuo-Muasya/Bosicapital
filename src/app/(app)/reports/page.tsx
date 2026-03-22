@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
 import type { Loan, Borrower, LoanProduct } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -169,46 +171,45 @@ const customerColumns: ColumnDef<Borrower>[] = [
 
 export default function ReportsPage() {
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const firestore = useFirestore();
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
   const organizationId = userProfile?.organizationId;
   const branchIds = userProfile?.branchIds;
 
-  // Generic queries based on user role
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    const loansCol = collection(firestore, 'loans');
-    if (isSuperAdmin) return loansCol;
-    if (!organizationId) return null; // Should not happen for non-superadmins
-    if (userProfile.roleId === 'admin') return query(loansCol, where('organizationId', '==', organizationId));
-    if (userProfile.roleId === 'manager' && branchIds?.length > 0) return query(loansCol, where('branchId', 'in', branchIds));
-    return null;
-  }, [firestore, userProfile, isSuperAdmin, organizationId, JSON.stringify(branchIds)]);
-  
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    const borrowersCol = collection(firestore, 'borrowers');
-    if (isSuperAdmin) return borrowersCol;
-    if (!organizationId) return null;
-    if (userProfile.roleId === 'admin') return query(borrowersCol, where('organizationId', '==', organizationId));
-    if (userProfile.roleId === 'manager' && branchIds?.length > 0) return query(borrowersCol, where('branchId', 'in', branchIds));
-    return null;
-  }, [firestore, userProfile, isSuperAdmin, organizationId, JSON.stringify(branchIds)]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
 
-  const loanProductsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    // Superadmin needs all products, but they don't have an org id.
-    // For now, scope to current org, or all if superadmin.
-    if (isSuperAdmin) return collection(firestore, 'loanProducts');
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
+  const fetchReportsData = useCallback(async () => {
+      if (!userProfile) return;
+      setIsLoading(true);
+      try {
+          const orgId = isSuperAdmin ? 'system' : organizationId!;
+          
+          // Loans
+          const loansRes = await getLoans(orgId, undefined, !isSuperAdmin ? branchIds : undefined);
+          if (loansRes.success && loansRes.loans) setLoans(loansRes.loans as any);
 
+          // Borrowers
+          const borrowersRes = await getBorrowers(orgId);
+          if (borrowersRes.success && borrowersRes.borrowers) setBorrowers(borrowersRes.borrowers as any);
 
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
-  const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
+          // Products
+          const productsRes = await getLoanProducts(orgId);
+          if (productsRes.success && productsRes.products) setLoanProducts(productsRes.products as any);
 
-  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingProducts;
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsLoading(false);
+      }
+  }, [userProfile, isSuperAdmin, organizationId, branchIds]);
+
+  useEffect(() => {
+    if (userProfile) {
+        fetchReportsData();
+    }
+  }, [userProfile, fetchReportsData]);
 
   // Process data for reports
   const { activeLoans, inactiveCustomers, leads } = useMemo(() => {

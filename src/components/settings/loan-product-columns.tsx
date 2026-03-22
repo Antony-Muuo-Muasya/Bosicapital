@@ -3,8 +3,7 @@ import type { LoanProduct } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { deleteLoanProduct } from '@/actions/loan-products';
 import { formatCurrency } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -15,16 +14,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 
-const ProductActions = ({ product, onEdit }: { product: LoanProduct, onEdit: (product: LoanProduct) => void }) => {
-  const firestore = useFirestore();
+const ProductActions = ({ product, onEdit, onRefresh }: { product: LoanProduct, onEdit: (product: LoanProduct) => void, onRefresh: () => void }) => {
   const { toast } = useToast();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm(`Are you sure you want to delete the "${product.name}" loan product?`)) {
-      const productDocRef = doc(firestore, 'loanProducts', product.id);
-      deleteDocumentNonBlocking(productDocRef)
-        .then(() => toast({ title: 'Success', description: 'Loan product deleted.' }))
-        .catch(err => toast({ variant: 'destructive', title: 'Error', description: 'Could not delete product.' }));
+      const res = await deleteLoanProduct(product.id);
+      if (res.success) {
+        toast({ title: 'Success', description: 'Loan product deleted.' });
+        onRefresh();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete product.' });
+      }
     }
   };
 
@@ -49,7 +50,7 @@ const ProductActions = ({ product, onEdit }: { product: LoanProduct, onEdit: (pr
   );
 };
 
-export const getLoanProductColumns = (onEdit: (product: LoanProduct) => void): ColumnDef<LoanProduct>[] => [
+export const getLoanProductColumns = (onEdit: (product: LoanProduct) => void, onRefresh: () => void): ColumnDef<LoanProduct>[] => [
   {
     accessorKey: 'name',
     header: 'Name',
@@ -80,7 +81,7 @@ export const getLoanProductColumns = (onEdit: (product: LoanProduct) => void): C
     id: 'actions',
     cell: ({ row }) => {
       const product = row.original;
-      return <ProductActions product={product} onEdit={onEdit} />;
+      return <ProductActions product={product} onEdit={onEdit} onRefresh={onRefresh} />;
     },
   },
 ];

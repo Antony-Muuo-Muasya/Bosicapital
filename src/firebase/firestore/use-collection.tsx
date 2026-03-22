@@ -120,7 +120,7 @@ export function useCollection<T = any>(
   }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
   
   if (memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error('The query object passed to useCollection was not properly memoized using useMemoFirebase. This will cause infinite re-renders.');
+    console.warn('The query object passed to useCollection was not properly memoized using useMemoFirebase. This might cause re-renders.');
   }
   
   return { data, isLoading, error };

@@ -1,6 +1,8 @@
 'use client';
 
-import { useAuth, useFirestore, useUserProfile, updateDocumentNonBlocking, useCollection, useMemoFirebase } from '@/firebase';
+import { useUserProfile } from '@/firebase';
+import { getBranches, updateUser, updatePassword } from '@/actions/users';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -9,9 +11,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Camera, Loader2, User, KeyRound, Bell, Building2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { doc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
@@ -37,19 +36,33 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function ProfilePage() {
   const { user, userProfile, userRole, isLoading: isProfileLoading } = useUserProfile();
-  const auth = useAuth();
-  const firestore = useFirestore();
   const { toast } = useToast();
   
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [allBranches, setAllBranches] = useState<Branch[]>([]);
+  const [areBranchesLoading, setAreBranchesLoading] = useState(true);
 
-  const branchesQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    return collection(firestore, 'branches');
-  }, [firestore, userProfile]);
-  
-  const { data: allBranches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
+  const fetchBranches = useCallback(async () => {
+      if (!userProfile) return;
+      setAreBranchesLoading(true);
+      try {
+          const res = await getBranches(userProfile.organizationId, userProfile.roleId === 'superadmin');
+          if (res.success && res.branches) {
+              setAllBranches(res.branches as any);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setAreBranchesLoading(false);
+      }
+  }, [userProfile]);
+
+  useEffect(() => {
+    if (userProfile) {
+        fetchBranches();
+    }
+  }, [userProfile, fetchBranches]);
 
   const assignedBranches = useMemo(() => {
     if (!userProfile?.branchIds || !allBranches) return [];
@@ -76,62 +89,71 @@ export default function ProfilePage() {
   const onProfileSubmit = async (data: ProfileFormData) => {
     if (!user) return;
     setIsProfileSubmitting(true);
-    const userDocRef = doc(firestore, 'users', user.uid);
-    updateDocumentNonBlocking(userDocRef, { fullName: data.fullName })
-        .then(() => {
+    try {
+        const res = await updateUser(user.uid, { fullName: data.fullName });
+        if (res.success) {
             toast({ title: 'Success', description: 'Your name has been updated.' });
-        })
-        .catch(() => {
+        } else {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update profile.' });
-        })
-        .finally(() => {
-            setIsProfileSubmitting(false);
-        });
+        }
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+    } finally {
+        setIsProfileSubmitting(false);
+    }
   };
 
   const onPasswordSubmit = async (data: PasswordFormData) => {
-    if (!user || !user.email) return;
+    if (!user) return;
 
     setIsPasswordSubmitting(true);
 
     try {
-      const credential = EmailAuthProvider.credential(user.email, data.currentPassword);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, data.newPassword);
-      toast({
-        title: 'Success',
-        description: 'Your password has been updated successfully.',
+      const res = await updatePassword(user.uid, { 
+        currentPassword: data.currentPassword, 
+        newPassword: data.newPassword 
       });
-      passwordForm.reset();
+
+      if (res.success) {
+          toast({
+            title: 'Success',
+            description: 'Your password has been updated successfully.',
+          });
+          passwordForm.reset();
+      } else {
+          toast({
+            variant: 'destructive',
+            title: 'Error updating password',
+            description: res.error || 'The current password you entered is incorrect.',
+          });
+          if (res.error === 'Incorrect current password') {
+              passwordForm.setError('currentPassword', { type: 'manual', message: res.error });
+          }
+      }
     } catch (error: any) {
         console.error(error);
-        let description = 'An unexpected error occurred.';
-        if (error.code === 'auth/wrong-password') {
-            description = 'The current password you entered is incorrect.';
-            passwordForm.setError('currentPassword', { type: 'manual', message: description });
-        } else if (error.code === 'auth/too-many-requests') {
-            description = 'Too many attempts. Please try again later.';
-        }
         toast({
             variant: 'destructive',
             title: 'Error updating password',
-            description,
+            description: 'An unexpected error occurred.',
         });
     } finally {
         setIsPasswordSubmitting(false);
     }
   };
 
-  const handleMarketingToggle = (checked: boolean) => {
+  const handleMarketingToggle = async (checked: boolean) => {
     if (!user) return;
-    const userDocRef = doc(firestore, 'users', user.uid);
-    updateDocumentNonBlocking(userDocRef, { marketingOptIn: checked })
-        .then(() => {
+    try {
+        const res = await updateUser(user.uid, { marketingOptIn: checked } as any);
+        if (res.success) {
             toast({ title: 'Preferences Updated', description: `You will ${checked ? '' : 'not '}receive marketing updates.` });
-        })
-        .catch(() => {
+        } else {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update preferences.' });
-        });
+        }
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+    }
   }
 
   const isLoading = isProfileLoading || areBranchesLoading;

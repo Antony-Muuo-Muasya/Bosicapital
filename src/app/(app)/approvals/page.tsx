@@ -1,55 +1,64 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
 import type { Loan, Borrower, LoanProduct } from '@/lib/types';
-import { useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getApprovalColumns } from '@/components/approvals/columns';
 import { ApprovalsDataTable } from '@/components/approvals/approvals-data-table';
 
 
 export default function ApprovalsPage() {
-    const firestore = useFirestore();
-    const { userProfile } = useUserProfile();
+    const { userProfile, isLoading: isProfileLoading } = useUserProfile();
     const organizationId = userProfile?.organizationId;
     const branchIds = userProfile?.branchIds || [];
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
-    const pendingLoansQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        const loansCol = collection(firestore, 'loans');
-        
-        if (isSuperAdmin) {
-            return query(loansCol, where('status', '==', 'Pending Approval'));
+    const [isLoading, setIsLoading] = useState(true);
+    const [pendingLoans, setPendingLoans] = useState<Loan[] | null>(null);
+    const [borrowers, setBorrowers] = useState<Borrower[] | null>(null);
+    const [loanProducts, setLoanProducts] = useState<LoanProduct[] | null>(null);
+
+    const fetchApprovalsData = useCallback(async () => {
+        if (!userProfile) return;
+        setIsLoading(true);
+        try {
+            // Pending loans
+            const loansRes = await getLoans(
+                isSuperAdmin ? undefined as any : organizationId!,
+                undefined,
+                isSuperAdmin ? undefined : branchIds
+            );
+            if (loansRes.success && loansRes.loans) {
+                setPendingLoans(loansRes.loans.filter((l: any) => l.status === 'Pending Approval') as any);
+            }
+
+            // Borrowers
+            const borrowersRes = await getBorrowers(isSuperAdmin ? undefined as any : organizationId!);
+            if (borrowersRes.success && borrowersRes.borrowers) {
+                setBorrowers(borrowersRes.borrowers as any);
+            }
+
+            // Loan Products
+            const productsRes = await getLoanProducts(isSuperAdmin ? undefined as any : organizationId!);
+            if (productsRes.success && productsRes.products) {
+                setLoanProducts(productsRes.products as any);
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
         }
+    }, [userProfile, isSuperAdmin, organizationId, JSON.stringify(branchIds)]);
 
-        if (!userProfile || branchIds.length === 0) return null;
-        return query(
-            loansCol,
-            where('branchId', 'in', branchIds),
-            where('status', '==', 'Pending Approval')
-        );
-    }, [firestore, JSON.stringify(branchIds), isSuperAdmin]);
-
-    const borrowersQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'borrowers');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    
-    const loanProductsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loanProducts');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-
-    const { data: pendingLoans, isLoading: isLoadingLoans } = useCollection<Loan>(pendingLoansQuery);
-    const { data: borrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
-    const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
-    
-    const isLoading = isLoadingLoans || isLoadingBorrowers || isLoadingProducts || !userProfile;
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchApprovalsData();
+        }
+    }, [isProfileLoading, userProfile, fetchApprovalsData]);
 
     const loansWithDetails = useMemo(() => {
         if (isLoading || !pendingLoans || !borrowers || !loanProducts) return [];

@@ -6,8 +6,7 @@ import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { updateLoan } from '@/actions/loans';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,7 +29,6 @@ interface EditLoanDialogProps {
 }
 
 export function EditLoanDialog({ loan, loanOfficers, open, onOpenChange }: EditLoanDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,48 +43,17 @@ export function EditLoanDialog({ loan, loanOfficers, open, onOpenChange }: EditL
 
   const onSubmit = async (values: EditLoanFormData) => {
     setIsSubmitting(true);
-    const loanDocRef = doc(firestore, 'loans', loan.id);
     
-    if (values.status === 'Completed' && loan.status !== 'Completed') {
-        try {
-            const batch = writeBatch(firestore);
-            
-            batch.update(loanDocRef, {
-                status: 'Completed',
-                principal: values.principal,
-                loanOfficerId: values.loanOfficerId,
-            });
+    const isCompleted = values.status === 'Completed' && loan.status !== 'Completed';
 
-            const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
-            const installmentsSnapshot = await getDocs(installmentsColRef);
-            
-            installmentsSnapshot.forEach(installmentDoc => {
-                batch.update(installmentDoc.ref, { 
-                    status: 'Paid',
-                    paidAmount: installmentDoc.data().expectedAmount
-                });
-            });
-
-            await batch.commit();
-
-            toast({ title: 'Success', description: 'Loan marked as completed and all installments updated to paid.' });
-            onOpenChange(false);
-
-        } catch (err) {
-            console.error('Error completing loan:', err);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not mark loan as completed. Check permissions.' });
-        } finally {
-            setIsSubmitting(false);
-        }
-
-    } else {
+    try {
         const updates = {
             status: values.status,
             principal: values.principal,
             loanOfficerId: values.loanOfficerId,
         };
 
-        if (values.principal !== loan.principal) {
+        if (values.principal !== loan.principal && !isCompleted) {
             toast({
                 title: 'Warning: Principal Changed',
                 description: 'Installment amounts have not been automatically recalculated. Please do this manually if needed.',
@@ -94,15 +61,25 @@ export function EditLoanDialog({ loan, loanOfficers, open, onOpenChange }: EditL
             });
         }
 
-        updateDocumentNonBlocking(loanDocRef, updates)
-        .then(() => {
-            toast({ title: 'Success', description: 'Loan updated.' });
+        const res = await updateLoan(loan.id, updates, isCompleted);
+        
+        if (res.success) {
+            toast({ 
+                title: 'Success', 
+                description: isCompleted 
+                    ? 'Loan marked as completed and all installments updated to paid.' 
+                    : 'Loan updated.' 
+            });
             onOpenChange(false);
-        })
-        .catch(err => {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not update loan.' });
-        })
-        .finally(() => setIsSubmitting(false));
+        } else {
+             toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not update loan.' });
+        }
+
+    } catch (err) {
+        console.error('Error updating loan:', err);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not update loan.' });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 

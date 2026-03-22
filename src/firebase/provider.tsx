@@ -2,58 +2,20 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { useDoc } from './firestore/use-doc';
+import { Firestore } from 'firebase/firestore';
 import type { User as AppUser, Role, Organization } from '@/lib/types';
-
-
-interface FirebaseProviderProps {
-  children: ReactNode;
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-  auth: Auth | null;
-}
-
-// Internal state for user authentication
-interface UserAuthState {
-  user: User | null;
-  isUserLoading: boolean;
-  userError: Error | null;
-}
+import { getUserProfile } from '@/actions/users';
+import { useSession } from 'next-auth/react';
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
-  areServicesAvailable: boolean; // True if core services (app, firestore, auth instance) are provided
+  areServicesAvailable: boolean; 
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
-  auth: Auth | null; // The Auth service instance
-  // User authentication state
-  user: User | null;
-  isUserLoading: boolean; // True during initial auth check
-  userError: Error | null; // Error from auth listener
-}
-
-// Return type for useFirebase()
-export interface FirebaseServicesAndUser {
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
-  user: User | null;
-  isUserLoading: boolean;
-  userError: Error | null;
-}
-
-// Return type for useUser() - specific to user auth state
-export interface UserHookResult { // Renamed from UserAuthHookResult for consistency if desired, or keep as UserAuthHookResult
-  user: User | null;
-  isUserLoading: boolean;
-  userError: Error | null;
 }
 
 export interface UserProfileHookResult {
-  user: User | null;
+  user: { uid: string, email: string, displayName: string } | null;
   userProfile: WithId<AppUser> | null;
   userRole: WithId<Role> | null;
   organization: WithId<Organization> | null;
@@ -65,165 +27,132 @@ type WithId<T> = T & { id: string };
 // React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
-/**
- * FirebaseProvider manages and provides Firebase services and user authentication state.
- */
-export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
-  children,
-  firebaseApp,
-  firestore,
-  auth,
-}) => {
-  const [userAuthState, setUserAuthState] = useState<UserAuthState>({
-    user: null,
-    isUserLoading: true, // Start loading until first auth event
-    userError: null,
-  });
-
-  // Effect to subscribe to Firebase auth state changes
-  useEffect(() => {
-    if (!auth) { // If no Auth service instance, cannot determine user state
-      setUserAuthState({ user: null, isUserLoading: false, userError: null });
-      return;
-    }
-
-    setUserAuthState({ user: null, isUserLoading: true, userError: null }); // Reset on auth instance change
-
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (firebaseUser) => { // Auth state determined
-        setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
-      },
-      (error) => { // Auth listener error
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
-        setUserAuthState({ user: null, isUserLoading: false, userError: error });
-      }
-    );
-    return () => unsubscribe(); // Cleanup
-  }, [auth]); // Depends on the auth instance
-
-  // Memoize the context value
-  const contextValue = useMemo((): FirebaseContextState => {
-    const servicesAvailable = !!(firebaseApp && firestore && auth);
-    return {
-      areServicesAvailable: servicesAvailable,
-      firebaseApp: servicesAvailable ? firebaseApp : null,
-      firestore: servicesAvailable ? firestore : null,
-      auth: servicesAvailable ? auth : null,
-      user: userAuthState.user,
-      isUserLoading: userAuthState.isUserLoading,
-      userError: userAuthState.userError,
-    };
-  }, [firebaseApp, firestore, auth, userAuthState]);
+export const FirebaseProvider: React.FC<{
+  children: ReactNode;
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+}> = ({ children, firebaseApp, firestore }) => {
+  const contextValue = useMemo((): FirebaseContextState => ({
+    areServicesAvailable: !!(firebaseApp && firestore),
+    firebaseApp,
+    firestore,
+  }), [firebaseApp, firestore]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
-      <FirebaseErrorListener />
       {children}
     </FirebaseContext.Provider>
   );
 };
 
-/**
- * Hook to access core Firebase services and user authentication state.
- * Throws error if core services are not available or used outside provider.
- */
-export const useFirebase = (): FirebaseServicesAndUser => {
+export const useFirebase = () => {
   const context = useContext(FirebaseContext);
-
   if (context === undefined) {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
-
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
-  }
-
-  return {
-    firebaseApp: context.firebaseApp,
-    firestore: context.firestore,
-    auth: context.auth,
-    user: context.user,
-    isUserLoading: context.isUserLoading,
-    userError: context.userError,
-  };
-};
-
-/** Hook to access Firebase Auth instance. */
-export const useAuth = (): Auth => {
-  const { auth } = useFirebase();
-  return auth;
+  return context;
 };
 
 /** Hook to access Firestore instance. */
 export const useFirestore = (): Firestore => {
   const { firestore } = useFirebase();
+  if (!firestore) throw new Error('Firestore not available');
   return firestore;
 };
 
 /** Hook to access Firebase App instance. */
 export const useFirebaseApp = (): FirebaseApp => {
   const { firebaseApp } = useFirebase();
+  if (!firebaseApp) throw new Error('FirebaseApp not available');
   return firebaseApp;
 };
 
-type MemoFirebase <T> = T & {__memo?: boolean};
-
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
-  const memoized = useMemo(factory, deps);
-  
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
-  
-  return memoized;
+export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
+  return useMemo(factory, deps);
 }
 
 /**
- * Hook specifically for accessing the authenticated user's state.
- * This provides the User object, loading status, and any auth errors.
- * @returns {UserHookResult} Object with user, isUserLoading, userError.
- */
-export const useUser = (): UserHookResult => {
-  const { user, isUserLoading, userError } = useFirebase();
-  return { user, isUserLoading, userError };
-};
-
-/**
- * Hook to get the current user, their profile from Firestore, and their role.
- * This is the primary hook for handling user data and permissions in the UI.
- * @returns {UserProfileHookResult} Object with user, userProfile, userRole, and loading state.
+ * Hook to get the current user, their profile from Prisma, and their role.
  */
 export const useUserProfile = (): UserProfileHookResult => {
-  const { user, isUserLoading: isAuthLoading } = useUser();
-  const firestore = useFirestore();
+  const { data: session, status } = useSession();
+  const isAuthLoading = status === 'loading';
+  const sessionUser = session?.user as any;
+  
+  const user = useMemo(() => {
+    if (!sessionUser) return null;
+    return {
+      uid: sessionUser.id,
+      email: sessionUser.email,
+      displayName: sessionUser.name,
+    };
+  }, [sessionUser]);
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
+  const [userProfile, setUserProfile] = useState<WithId<AppUser> | null>(null);
+  const [userRole, setUserRole] = useState<WithId<Role> | null>(null);
+  const [organization, setOrganization] = useState<WithId<Organization> | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userProfileRef);
-
-  const roleRef = useMemoFirebase(() => {
-    if (!userProfile) return null;
-    return doc(firestore, 'roles', userProfile.roleId);
-  }, [userProfile, firestore]);
-
-  const { data: userRole, isLoading: isRoleLoading } = useDoc<Role>(roleRef);
-
-  const orgRef = useMemoFirebase(() => {
-    if (!userProfile) return null;
-    return doc(firestore, 'organizations', userProfile.organizationId);
-  }, [userProfile, firestore]);
-
-  const { data: organization, isLoading: isOrgLoading } = useDoc<Organization>(orgRef);
-
+  useEffect(() => {
+    if (isAuthLoading) return;
+    
+    if (!sessionUser?.id) {
+      setUserProfile(null);
+      setUserRole(null);
+      setOrganization(null);
+      setIsProfileLoading(false);
+      return;
+    }
+    
+    let isMounted = true;
+    setIsProfileLoading(true);
+    
+    getUserProfile(sessionUser.id)
+      .then(res => {
+        if (!isMounted) return;
+        if (res.success && res.user) {
+          const profile = {
+            id: res.user.id,
+            organizationId: res.user.organizationId,
+            fullName: res.user.fullName,
+            email: res.user.email,
+            roleId: res.user.roleId,
+            branchIds: res.user.branchIds,
+            status: res.user.status,
+            createdAt: res.user.createdAt.toISOString(),
+            avatarUrl: res.user.avatarUrl || undefined,
+            marketingOptIn: res.user.marketingOptIn,
+          } as WithId<AppUser>;
+          
+          setUserProfile(profile);
+          setUserRole(res.user.role as any);
+          setOrganization(res.user.organization as any);
+        } else {
+          setUserProfile(null);
+          setUserRole(null);
+          setOrganization(null);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load user profile", err);
+        if (isMounted) {
+            setUserProfile(null);
+            setUserRole(null);
+            setOrganization(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsProfileLoading(false);
+      });
+      
+    return () => { isMounted = false; };
+  }, [sessionUser?.id, isAuthLoading]);
 
   return {
     user,
     userProfile,
     userRole,
-    organization,
-    isLoading: isAuthLoading || isProfileLoading || isRoleLoading || isOrgLoading,
+    organization: organization ? { ...organization, name: 'Bosi Capital Limited' } as any : null,
+    isLoading: isAuthLoading || isProfileLoading,
   };
 };

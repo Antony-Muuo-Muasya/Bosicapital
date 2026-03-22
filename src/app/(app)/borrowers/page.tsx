@@ -3,50 +3,55 @@
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import { useCollection, useUserProfile, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
 import type { Borrower } from '@/lib/types';
+import { getBorrowers } from '@/actions/borrowers';
 import { BorrowersDataTable } from '@/components/borrowers/borrowers-data-table';
 import { getBorrowerColumns } from '@/components/borrowers/columns';
 import { AddBorrowerDialog } from '@/components/borrowers/add-borrower-dialog';
 import { PayRegistrationFeeDialog } from '@/components/borrowers/pay-registration-fee-dialog';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { EditBorrowerDialog } from '@/components/borrowers/edit-borrower-dialog';
 
 export default function BorrowersPage() {
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const firestore = useFirestore();
+  const [borrowers, setBorrowers] = useState<any[] | null>(null);
+  const [isBorrowersLoading, setIsBorrowersLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedBorrower, setSelectedBorrower] = useState<Borrower | null>(null);
   const [editingBorrower, setEditingBorrower] = useState<Borrower | null>(null);
-
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
-  const roleId = userProfile?.roleId;
-  const branchIds = userProfile?.branchIds;
-  const organizationId = userProfile?.organizationId;
 
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !roleId) return null;
-
-    const borrowersCol = collection(firestore, 'borrowers');
-
-    if (isSuperAdmin) {
-      return borrowersCol;
+  const fetchBorrowersData = useCallback(async () => {
+    if (!userProfile) return;
+    setIsBorrowersLoading(true);
+    try {
+      if (userProfile.roleId === 'superadmin') {
+         // Should add getAllBorrowers with org join maybe, but superadmin usually has orgId null in this app unless he's root
+      } else {
+         const res = await getBorrowers(userProfile.organizationId);
+         if (res.success && res.borrowers) {
+             let filtered = res.borrowers;
+             if (userProfile.roleId === 'manager' || userProfile.roleId === 'loan_officer') {
+                 filtered = filtered.filter((b: any) => userProfile.branchIds?.includes(b.branchId));
+             }
+             setBorrowers(filtered);
+         }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsBorrowersLoading(false);
     }
+  }, [userProfile]);
 
-    if (roleId === 'admin') {
-      return query(borrowersCol, where('organizationId', '==', organizationId));
+  useEffect(() => {
+    if (!isProfileLoading && userProfile) {
+        fetchBorrowersData();
     }
-    
-    if ((roleId === 'manager' || roleId === 'loan_officer') && branchIds?.length > 0) {
-      return query(borrowersCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-    }
+  }, [isProfileLoading, userProfile, fetchBorrowersData, isAddDialogOpen]);
 
-    return null;
-  }, [firestore, roleId, organizationId, JSON.stringify(branchIds), isSuperAdmin]);
-
-  const { data: borrowers, isLoading: isBorrowersLoading } = useCollection<Borrower>(borrowersQuery);
   const isLoading = isProfileLoading || isBorrowersLoading;
 
 
@@ -59,7 +64,7 @@ export default function BorrowersPage() {
     setEditingBorrower(borrower);
   }, []);
 
-  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment, handleEditBorrower), [handleRecordPayment, handleEditBorrower]);
+  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment, handleEditBorrower, fetchBorrowersData), [handleRecordPayment, handleEditBorrower, fetchBorrowersData]);
 
   return (
     <>
@@ -74,7 +79,10 @@ export default function BorrowersPage() {
         {borrowers && <BorrowersDataTable columns={columns} data={borrowers} />}
         {!isLoading && !borrowers && <div className="border shadow-sm rounded-lg p-8 text-center text-muted-foreground">No borrowers found.</div>}
       </div>
-      <AddBorrowerDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
+      <AddBorrowerDialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if(!open) fetchBorrowersData();
+      }} />
       {selectedBorrower && (
         <PayRegistrationFeeDialog 
             open={isPaymentDialogOpen}
@@ -85,7 +93,12 @@ export default function BorrowersPage() {
       {editingBorrower && (
         <EditBorrowerDialog
           open={!!editingBorrower}
-          onOpenChange={(open) => !open && setEditingBorrower(null)}
+          onOpenChange={(open) => {
+             if(!open) {
+                setEditingBorrower(null);
+                fetchBorrowersData();
+             }
+          }}
           borrower={editingBorrower}
         />
       )}

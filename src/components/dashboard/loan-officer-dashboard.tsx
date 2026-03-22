@@ -1,12 +1,15 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, documentId, collectionGroup } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getLoanOfficerDashboardStats } from '@/actions/dashboard';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getBorrowers } from '@/actions/borrowers';
 import type { Loan, Borrower, LoanProduct, Repayment, Installment } from '@/lib/types';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { HandCoins, PlusCircle, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
 import { AddLoanDialog } from '../loans/add-loan-dialog';
 import { StatCard } from './loan-officer/StatCard';
@@ -24,75 +27,72 @@ import { CreateIndexCard } from './loan-officer/CreateIndexCard';
 
 
 export function LoanOfficerDashboard() {
-  const firestore = useFirestore();
+
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
+  const organizationId = userProfile?.organizationId;
   const router = useRouter();
 
   const [isAddBorrowerOpen, setIsAddBorrowerOpen] = useState(false);
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
 
-  // --- DATA QUERIES ---
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'loans'), where('loanOfficerId', '==', user.uid));
-  }, [firestore, user]);
-  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loans, setLoans] = useState<Loan[] | null>(null);
+  const [borrowersInBranch, setBorrowersInBranch] = useState<Borrower[] | null>(null);
+  const [allLoanProducts, setAllLoanProducts] = useState<LoanProduct[] | null>(null);
+  const [repayments, setRepayments] = useState<Repayment[] | null>(null);
+  const [installments, setInstallments] = useState<Installment[] | null>(null);
+  const [targets, setTargets] = useState<any[] | null>(null);
 
-  const borrowersInBranchQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile?.branchIds || userProfile.branchIds.length === 0) {
-      return query(collection(firestore, 'borrowers'), where(documentId(), '==', 'no-borrowers-found'));
-    };
-    return query(
-        collection(firestore, 'borrowers'), 
-        where('branchId', 'in', userProfile.branchIds)
-    );
-  }, [firestore, JSON.stringify(userProfile?.branchIds)]);
-  const { data: borrowersInBranch, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersInBranchQuery);
-  
+  const fetchDashboardStats = useCallback(async () => {
+      if (!userProfile || !user || !organizationId) return;
+      setIsLoading(true);
+      try {
+          const res = await getLoanOfficerDashboardStats(organizationId, user.uid);
+          if (res.success && res.data) {
+              setLoans(res.data.loans as any);
+              setRepayments(res.data.repayments as any);
+              setInstallments(res.data.installments as any);
+              setTargets(res.data.targets as any);
+          }
+          
+          // Need loan products and borrowers in branch for the "Add" dialogs
+          const productsRes = await getLoanProducts(organizationId);
+          if (productsRes.success && productsRes.products) {
+              setAllLoanProducts(productsRes.products as any);
+          }
+          
+          const borrowersRes = await getBorrowers(organizationId);
+          if (borrowersRes.success && borrowersRes.borrowers) {
+              setBorrowersInBranch(borrowersRes.borrowers as any);
+          }
+
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsLoading(false);
+      }
+  }, [userProfile, user, organizationId]);
+
+  useEffect(() => {
+     if (!isProfileLoading && userProfile) {
+         fetchDashboardStats();
+     }
+  }, [isProfileLoading, userProfile, fetchDashboardStats]);
+
   const myBorrowerIds = useMemo(() => {
       if (!loans) return [];
       return [...new Set(loans.map(l => l.borrowerId))];
   }, [loans]);
 
-  const myBorrowersQuery = useMemoFirebase(() => {
-      if (!firestore || myBorrowerIds.length === 0) return null;
-      if (myBorrowerIds.length > 30) {
-          // This is a fallback if there are too many borrowers for one 'in' query.
-          return null;
-      }
-      return query(collection(firestore, 'borrowers'), where(documentId(), 'in', myBorrowerIds));
-  }, [firestore, JSON.stringify(myBorrowerIds)]);
-  const { data: myBorrowersData, isLoading: myBorrowersLoading } = useCollection<Borrower>(myBorrowersQuery);
-
   const myBorrowers = useMemo(() => {
-      if (myBorrowersData) return myBorrowersData;
       if (borrowersInBranch) {
           const idSet = new Set(myBorrowerIds);
           return borrowersInBranch.filter(b => idSet.has(b.id));
       }
       return [];
-  }, [myBorrowersData, borrowersInBranch, myBorrowerIds]);
+  }, [borrowersInBranch, myBorrowerIds]);
 
-
-  const allLoanProductsQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null;
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId))
-  }, [firestore, userProfile]);
-  const { data: allLoanProducts, isLoading: allLoanProductsLoading } = useCollection<LoanProduct>(allLoanProductsQuery);
-  
-  const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'repayments'), where('loanOfficerId', '==', user.uid));
-  }, [firestore, user]);
-  const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
-
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collectionGroup(firestore, 'installments'), where('loanOfficerId', '==', user.uid));
-  }, [firestore, user]);
-  const { data: installments, isLoading: installmentsLoading, error: installmentsError } = useCollection<Installment>(installmentsQuery);
-
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || myBorrowersLoading || allLoanProductsLoading || repaymentsLoading || installmentsLoading;
+  const installmentsError = null; // Removed from hooks
   
   // --- DATA PROCESSING FOR DASHBOARD ---
   const dashboardStats = useMemo(() => {
@@ -222,7 +222,7 @@ export function LoanOfficerDashboard() {
               <DualTrendChart data={monthlyTrends} isLoading={isLoading} />
             </div>
             <div className='space-y-6'>
-                <PerformanceTracker loans={loans} borrowers={myBorrowers} isLoading={isLoading} />
+                <PerformanceTracker loans={loans} borrowers={myBorrowers} targets={targets} isLoading={isLoading} />
                 <LoanPipeline loans={loans} borrowers={myBorrowers} isLoading={isLoading} />
             </div>
         </div>

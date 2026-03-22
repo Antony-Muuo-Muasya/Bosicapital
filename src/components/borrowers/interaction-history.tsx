@@ -4,8 +4,9 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useCollection, useFirestore, useUserProfile, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useEffect, useCallback } from 'react';
+import { useUserProfile } from '@/firebase';
+import { getInteractions, createInteraction } from '@/actions/interactions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -38,16 +39,29 @@ const interactionSchema = z.object({
 type InteractionFormData = z.infer<typeof interactionSchema>;
 
 export function InteractionHistory({ borrowerId }: InteractionHistoryProps) {
-  const firestore = useFirestore();
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
+  
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [isLoadingInteractions, setIsLoadingInteractions] = useState(true);
 
-  const interactionsQuery = useMemoFirebase(() => {
-    if (!firestore || !borrowerId) return null;
-    return query(collection(firestore, 'borrowers', borrowerId, 'interactions'), orderBy('timestamp', 'desc'));
-  }, [firestore, borrowerId]);
+  const fetchInteractions = useCallback(async () => {
+      setIsLoadingInteractions(true);
+      try {
+          const res = await getInteractions(borrowerId);
+          if (res.success && res.interactions) {
+              setInteractions(res.interactions as any);
+          }
+      } catch (err) {
+          console.error(err);
+      } finally {
+          setIsLoadingInteractions(false);
+      }
+  }, [borrowerId]);
 
-  const { data: interactions, isLoading: isLoadingInteractions } = useCollection<Interaction>(interactionsQuery);
+  useEffect(() => {
+      fetchInteractions();
+  }, [fetchInteractions]);
 
   const form = useForm<InteractionFormData>({
     resolver: zodResolver(interactionSchema),
@@ -61,33 +75,31 @@ export function InteractionHistory({ borrowerId }: InteractionHistoryProps) {
   const canAddInteraction = userProfile?.roleId === 'loan_officer' || userProfile?.roleId === 'manager';
 
   const onSubmit = async (values: InteractionFormData) => {
-    if (!user || !userProfile || !firestore || !userProfile.branchIds?.[0]) {
+    if (!user || !userProfile || !userProfile.branchIds?.[0]) {
       toast({ variant: 'destructive', title: 'Error', description: 'Cannot add interaction. User profile is incomplete.' });
       return;
     }
 
-    const interactionsColRef = collection(firestore, 'borrowers', borrowerId, 'interactions');
-    const newInteractionData = {
-      borrowerId,
-      organizationId: userProfile.organizationId,
-      branchId: userProfile.branchIds[0],
-      recordedById: user.uid,
-      recordedByName: userProfile.fullName,
-      timestamp: new Date().toISOString(),
-      notes: values.notes,
-    };
+    try {
+        const res = await createInteraction({
+            borrowerId,
+            organizationId: userProfile.organizationId,
+            branchId: userProfile.branchIds[0],
+            recordedById: user.uid,
+            recordedByName: userProfile.fullName,
+            notes: values.notes,
+        });
 
-    // We don't await this so the UI is not blocked
-    addDocumentNonBlocking(interactionsColRef, newInteractionData)
-      .then(() => {
-        toast({ title: 'Success', description: 'Interaction logged successfully.' });
-        form.reset();
-      })
-      .catch((err) => {
-        // The non-blocking function will emit a detailed error, so we just show a generic toast.
-        console.error("Error logging interaction:", err);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to log interaction. Check permissions.' });
-      });
+        if (res.success) {
+            toast({ title: 'Success', description: 'Interaction logged successfully.' });
+            form.reset();
+            fetchInteractions();
+        } else {
+             toast({ variant: 'destructive', title: 'Error', description: res.error || 'Failed to log interaction.' });
+        }
+    } catch (err) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to log interaction.' });
+    }
   };
 
   return (

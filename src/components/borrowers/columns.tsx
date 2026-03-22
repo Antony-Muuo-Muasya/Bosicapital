@@ -13,24 +13,25 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { deleteBorrower } from '@/actions/borrowers';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
 
-const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void }) => {
-  const firestore = useFirestore();
+const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower, onRefresh }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void }) => {
   const { userRole } = useUserProfile();
   const router = useRouter();
   const canDelete = userRole?.id === 'admin';
   const canEdit = userRole?.id === 'admin' || userRole?.id === 'manager' || userRole?.id === 'loan_officer';
 
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this borrower?')) {
-      const borrowerDocRef = doc(firestore, 'borrowers', borrower.id);
-      deleteDocumentNonBlocking(borrowerDocRef);
+      const res = await deleteBorrower(borrower.id);
+      if (res.success) {
+         onRefresh();
+      }
     }
   };
 
@@ -65,7 +66,7 @@ const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrow
   );
 };
 
-export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void): ColumnDef<Borrower>[] => [
+export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void): ColumnDef<Borrower>[] => [
   {
     accessorKey: 'fullName',
     header: 'Name',
@@ -119,7 +120,7 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
     id: 'actions',
     cell: ({ row }) => {
       const borrower = row.original;
-      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} onEditBorrower={onEditBorrower} />;
+      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} onEditBorrower={onEditBorrower} onRefresh={onRefresh} />;
     },
   },
 ];

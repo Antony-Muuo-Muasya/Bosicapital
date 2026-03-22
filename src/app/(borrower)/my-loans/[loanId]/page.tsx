@@ -1,15 +1,14 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, collection } from "firebase/firestore";
+import { getLoan } from "@/actions/loans";
 import type { Loan, LoanProduct, Installment } from '@/lib/types';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, FileDown, Circle, CheckCircle, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
 import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,39 +37,34 @@ const getInstallmentStatusConfig = (status: string) => {
 export default function MyLoanDetailPage() {
     const params = useParams() as { loanId: string };
     const loanId = params.loanId;
-    const firestore = useFirestore();
     const router = useRouter();
 
-    const loanRef = useMemoFirebase(() => {
-        if (!firestore || !loanId) return null;
-        return doc(firestore, 'loans', loanId);
-    }, [firestore, loanId]);
-    
-    const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loan, setLoan] = useState<(Loan & { loanProduct: LoanProduct, installments: Installment[] }) | null>(null);
+
+    const fetchLoanDetail = useCallback(async () => {
+        if (!loanId) return;
+        setIsLoading(true);
+        try {
+            const res = await getLoan(loanId);
+            if (res.success && res.loan) {
+                setLoan(res.loan as any);
+            } else {
+                router.replace('/my-loans');
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loanId, router]);
 
     useEffect(() => {
-        if (loanError) {
-            console.error("Permission denied to fetch loan:", loanError.message);
-            router.replace('/access-denied');
-        }
-    }, [loanError, router]);
+        fetchLoanDetail();
+    }, [fetchLoanDetail]);
 
-    const productRef = useMemoFirebase(() => {
-        if (!firestore || !loan) return null;
-        return doc(firestore, 'loanProducts', loan.loanProductId);
-    }, [firestore, loan?.loanProductId]);
-
-    const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
-
-    const installmentsQuery = useMemoFirebase(() => {
-        if (!firestore || !loanId || !loan) return null;
-        if (loan.status === 'Active' || loan.status === 'Completed' || loan.status === 'Pending Approval') {
-            return collection(firestore, 'loans', loanId, 'installments');
-        }
-        return null;
-    }, [firestore, loanId, loan?.status]);
-
-    const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
+    const product = loan?.loanProduct;
+    const installments = loan?.installments;
     
     const sortedInstallments = useMemo(() => {
         if (!installments) return [];
@@ -95,7 +89,7 @@ export default function MyLoanDetailPage() {
         }
     }, [installments, loan]);
 
-    const isLoading = isLoadingLoan || isLoadingProduct || isLoadingInstallments;
+    /* Redundant isLoading removal */
 
     const handleDownload = () => {
         if (!sortedInstallments || !loan || !product) return;
@@ -183,7 +177,7 @@ export default function MyLoanDetailPage() {
                     <CardTitle>Repayment Schedule</CardTitle>
                     <CardDescription>
                         Installments are {formatCurrency(loan.installmentAmount, 'KES')} per {product.repaymentCycle}.
-                         <Badge variant={getLoanStatusVariant(loan.status)} className="ml-2">{loan.status}</Badge>
+                         <Badge variant={getLoanStatusVariant(loan.status) as any} className="ml-2">{loan.status}</Badge>
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -208,7 +202,7 @@ export default function MyLoanDetailPage() {
                                     <TableCell>{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
                                     <TableCell>{formatCurrency(inst.paidAmount, 'KES')}</TableCell>
                                     <TableCell className="text-right">
-                                        <Badge variant={statusConfig.variant} className={cn('gap-1.5', statusConfig.className)}>
+                                        <Badge variant={statusConfig.variant as any} className={cn('gap-1.5', statusConfig.className)}>
                                             <Icon className="h-3 w-3" />
                                             {inst.status}
                                         </Badge>

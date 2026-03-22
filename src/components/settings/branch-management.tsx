@@ -1,7 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getBranches } from '@/actions/branches';
+import { useEffect, useCallback } from 'react';
 import type { Branch } from '@/lib/types';
 import { getBranchColumns } from './branch-columns';
 import { Button } from '../ui/button';
@@ -14,43 +15,51 @@ import { AddBranchDialog } from './add-branch-dialog';
 import { EditBranchDialog } from './edit-branch-dialog';
 
 export function BranchManagement() {
-    const firestore = useFirestore();
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
 
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
-    const branchesQuery = useMemoFirebase(() => {
-        if (!firestore || !userProfile) return null;
-        
-        const branchesCol = collection(firestore, 'branches');
-        const orgId = userProfile.organizationId;
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [areBranchesLoading, setAreBranchesLoading] = useState(true);
 
-        if (isSuperAdmin) {
-            return branchesCol;
+    const fetchBranches = useCallback(async () => {
+        if (!userProfile) return;
+        setAreBranchesLoading(true);
+        try {
+            const res = await getBranches(userProfile.organizationId);
+            if (res.success && res.branches) {
+                let filtered = res.branches;
+                if (!isSuperAdmin) {
+                    if (userProfile.roleId === 'manager' && userProfile.branchIds?.length > 0) {
+                        filtered = res.branches.filter((b: any) => userProfile.branchIds.includes(b.id));
+                    } else if (userProfile.roleId !== 'admin') {
+                        filtered = [];
+                    }
+                }
+                setBranches(filtered as Branch[]);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setAreBranchesLoading(false);
         }
+    }, [userProfile, isSuperAdmin]);
 
-        if (userProfile.roleId === 'admin') {
-            return query(branchesCol, where('organizationId', '==', orgId));
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchBranches();
         }
+    }, [isProfileLoading, userProfile, fetchBranches, isAddDialogOpen]);
 
-        if (userProfile.roleId === 'manager' && userProfile.branchIds?.length > 0) {
-            return query(branchesCol, where('organizationId', '==', orgId), where('id', 'in', userProfile.branchIds));
-        }
-
-        // For other roles or managers with no branches, return a query that finds nothing.
-        return query(branchesCol, where('id', '==', 'no-branches-found'));
-    }, [firestore, userProfile, isSuperAdmin]);
-
-    const { data: branches, isLoading: areBranchesLoading } = useCollection<Branch>(branchesQuery);
     const isLoading = isProfileLoading || areBranchesLoading;
 
     const handleEdit = (branch: Branch) => {
         setEditingBranch(branch);
     }
     
-    const columns = useMemo(() => getBranchColumns(handleEdit), []);
+    const columns = useMemo(() => getBranchColumns(handleEdit, fetchBranches), [fetchBranches]);
 
     const table = useReactTable({
         data: branches || [],
@@ -58,7 +67,7 @@ export function BranchManagement() {
         getCoreRowModel: getCoreRowModel(),
     });
 
-    const canAddBranches = userProfile?.roleId === 'admin';
+    const canAddBranches = userProfile?.roleId === 'admin' || userProfile?.roleId === 'superadmin';
 
   return (
     <>
@@ -70,7 +79,7 @@ export function BranchManagement() {
                     <CardDescription>Manage your organization's branches.</CardDescription>
                 </div>
                 {canAddBranches && (
-                    <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSuperAdmin}>
+                    <Button onClick={() => setIsAddDialogOpen(true)}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Branch
                     </Button>
@@ -125,7 +134,12 @@ export function BranchManagement() {
         <EditBranchDialog 
             branch={editingBranch}
             open={!!editingBranch}
-            onOpenChange={(open) => !open && setEditingBranch(null)}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setEditingBranch(null);
+                    fetchBranches();
+                }
+            }}
         />
     )}
     </>

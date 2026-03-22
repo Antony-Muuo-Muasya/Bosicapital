@@ -3,9 +3,10 @@ import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/theme-provider';
+import AuthProvider from '@/components/providers/session-provider';
 
 export const metadata: Metadata = {
-  title: 'Lending Platform',
+  title: 'Bosi Capital',
   description: 'Your trusted lending partner',
 };
 
@@ -47,17 +48,19 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
-            {children}
-            <Toaster />
-          </FirebaseClientProvider>
+          <AuthProvider>
+            <FirebaseClientProvider>
+                {children}
+                <Toaster />
+            </FirebaseClientProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

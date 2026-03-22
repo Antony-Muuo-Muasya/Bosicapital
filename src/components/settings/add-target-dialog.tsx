@@ -7,11 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { createTarget, createMultipleTargets } from '@/actions/targets';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Branch, User as AppUser } from '@/lib/types';
 import { format } from 'date-fns';
 
@@ -23,6 +24,7 @@ const targetSchema = z.object({
   value: z.coerce.number().positive('Target value must be a positive number.'),
   startDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid start date is required.' }),
   endDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid end date is required.' }),
+  redistribute: z.boolean().default(false),
 }).refine(data => new Date(data.endDate) > new Date(data.startDate), {
     message: 'End date must be after the start date.',
     path: ['endDate'],
@@ -38,7 +40,6 @@ interface AddTargetDialogProps {
 }
 
 export function AddTargetDialog({ open, onOpenChange, branches, users }: AddTargetDialogProps) {
-  const firestore = useFirestore();
   const { userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,34 +54,64 @@ export function AddTargetDialog({ open, onOpenChange, branches, users }: AddTarg
       value: 0,
       startDate: format(new Date(), 'yyyy-MM-dd'),
       endDate: format(new Date(), 'yyyy-MM-dd'),
+      redistribute: false
     },
   });
 
-  const onSubmit = (values: TargetFormData) => {
-    if (!userProfile || !firestore) return;
+  const onSubmit = async (values: TargetFormData) => {
+    if (!userProfile) return;
     setIsSubmitting(true);
 
-    const newTargetRef = doc(collection(firestore, 'targets'));
-    const newTargetData: Partial<TargetFormData> & { id: string, organizationId: string } = {
+    const payload: any = {
       ...values,
-      id: newTargetRef.id,
       organizationId: userProfile.organizationId,
     };
     
-    if (!newTargetData.userId || newTargetData.userId === 'none') {
-      delete (newTargetData as any).userId;
+    if (!payload.userId || payload.userId === 'none') {
+      delete payload.userId;
     }
 
-    setDocumentNonBlocking(newTargetRef, newTargetData, { merge: false })
-      .then(() => {
-        toast({ title: 'Success', description: 'New target created.' });
-        form.reset();
-        onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not create target.' });
-      })
-      .finally(() => setIsSubmitting(false));
+    try {
+      if (values.redistribute && (!values.userId || values.userId === 'none')) {
+        const branchOfficers = users.filter(u => u.branchIds.includes(values.branchId) && u.roleId === 'loan_officer');
+        
+        if (branchOfficers.length === 0) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No loan officers found in this branch to distribute targets to.' });
+            setIsSubmitting(false);
+            return;
+        }
+
+        const individualValue = Math.round((values.value / branchOfficers.length) * 100) / 100;
+        const targetsToCreate = branchOfficers.map(officer => ({
+            ...payload,
+            name: `${values.name} (${officer.fullName})`,
+            userId: officer.id,
+            value: individualValue
+        }));
+
+        const res = await createMultipleTargets(targetsToCreate);
+        if (res.success) {
+            toast({ title: 'Success', description: `Target redistributed among ${branchOfficers.length} loan officers.` });
+            form.reset();
+            onOpenChange(false);
+        } else {
+            throw new Error(res.error);
+        }
+      } else {
+        const res = await createTarget(payload);
+        if (res.success) {
+          toast({ title: 'Success', description: 'New target created.' });
+          form.reset();
+          onOpenChange(false);
+        } else {
+          toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not create target.' });
+        }
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Could not create target.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -167,10 +198,36 @@ export function AddTargetDialog({ open, onOpenChange, branches, users }: AddTarg
                 <FormItem>
                   <FormLabel>End Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
-                  <FormMessage />
+                   <FormMessage />
                 </FormItem>
               )} />
             </div>
+            
+            {!form.watch('userId') || form.watch('userId') === 'none' ? (
+                <FormField
+                    control={form.control}
+                    name="redistribute"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                                <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                                <FormLabel>
+                                    Redistribute Target
+                                </FormLabel>
+                                <p className="text-xs text-muted-foreground">
+                                    Divide the total target value equally among all loan officers in the selected branch.
+                                </p>
+                            </div>
+                        </FormItem>
+                    )}
+                />
+            ) : null}
+            
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>

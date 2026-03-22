@@ -1,8 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import type { LoanProduct } from '@/lib/types';
+import { useUserProfile } from '@/firebase';
+import { getLoanProducts } from '@/actions/loan-products';
+import { useEffect, useCallback } from 'react';
 import { getLoanProductColumns } from './loan-product-columns';
 import { Button } from '../ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -15,18 +15,41 @@ import { EditLoanProductDialog } from './edit-loan-product-dialog';
 
 
 export function LoanProductsManagement() {
-    const firestore = useFirestore();
+    const { userProfile, isLoading: isProfileLoading } = useUserProfile();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<LoanProduct | null>(null);
+    const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
-    const productsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loanProducts') : null, [firestore]);
-    const { data: products, isLoading } = useCollection<LoanProduct>(productsQuery);
+    const [products, setProducts] = useState<any[]>([]);
+    const [areProductsLoading, setAreProductsLoading] = useState(true);
 
-    const handleEdit = (product: LoanProduct) => {
+    const fetchProducts = useCallback(async () => {
+        if (!userProfile) return;
+        setAreProductsLoading(true);
+        try {
+            const res = await getLoanProducts(userProfile.organizationId);
+            if (res.success && res.products) {
+                setProducts(res.products);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setAreProductsLoading(false);
+        }
+    }, [userProfile]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchProducts();
+        }
+    }, [isProfileLoading, userProfile, fetchProducts, isAddDialogOpen]);
+
+    const isLoading = isProfileLoading || areProductsLoading;
+
+    const handleEdit = (product: any) => {
         setEditingProduct(product);
     }
     
-    const columns = useMemo(() => getLoanProductColumns(handleEdit), []);
+    const columns = useMemo(() => getLoanProductColumns(handleEdit, fetchProducts), [fetchProducts]);
 
     const table = useReactTable({
         data: products || [],
@@ -95,12 +118,20 @@ export function LoanProductsManagement() {
             </div>
         </CardContent>
     </Card>
-    <AddLoanProductDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
+    <AddLoanProductDialog open={isAddDialogOpen} onOpenChange={(open) => {
+        setIsAddDialogOpen(open);
+        if(!open) fetchProducts();
+    }} />
     {editingProduct && (
         <EditLoanProductDialog 
             product={editingProduct}
             open={!!editingProduct}
-            onOpenChange={(open) => !open && setEditingProduct(null)}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setEditingProduct(null);
+                    fetchProducts();
+                }
+            }}
         />
     )}
     </>

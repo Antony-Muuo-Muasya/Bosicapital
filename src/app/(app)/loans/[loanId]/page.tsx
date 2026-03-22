@@ -1,7 +1,6 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, collection } from "firebase/firestore";
+import { getLoan } from "@/actions/loans";
 import type { Loan, LoanProduct, Installment, Borrower } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, FileDown, Circle, CheckCircle, AlertCircle, User, Phone, Briefcase } from "lucide-react";
@@ -9,7 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,27 +37,41 @@ const getInstallmentStatusConfig = (status: string) => {
 export default function LoanDetailPage() {
     const params = useParams() as { loanId: string };
     const loanId = params.loanId;
-    const firestore = useFirestore();
-    const router = useRouter();
+    const [data, setData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const loanRef = useMemoFirebase(() => doc(firestore, 'loans', loanId), [firestore, loanId]);
-    const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
+    const fetchLoanData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const res = await getLoan(loanId);
+            if (res.success && res.loan) {
+                setData(res.loan);
+            } else {
+                setError(res.error || 'Loan not found');
+            }
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loanId]);
 
     useEffect(() => {
-        if (loanError) {
-            console.error("Permission denied or error fetching loan:", loanError.message);
+        fetchLoanData();
+    }, [fetchLoanData]);
+
+    useEffect(() => {
+        if (error && error.includes('not found')) {
+            console.error("Permission denied or error fetching loan:", error);
             router.replace('/access-denied');
         }
-    }, [loanError, router]);
+    }, [error, router]);
 
-    const productRef = useMemoFirebase(() => loan ? doc(firestore, 'loanProducts', loan.loanProductId) : null, [firestore, loan?.loanProductId]);
-    const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
-
-    const borrowerRef = useMemoFirebase(() => loan ? doc(firestore, 'borrowers', loan.borrowerId) : null, [firestore, loan?.borrowerId]);
-    const { data: borrower, isLoading: isLoadingBorrower } = useDoc<Borrower>(borrowerRef);
-
-    const installmentsQuery = useMemoFirebase(() => loanId ? collection(firestore, 'loans', loanId, 'installments') : null, [firestore, loanId]);
-    const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
+    const loan = data;
+    const product = loan?.loanProduct;
+    const borrower = loan?.borrower;
+    const installments = loan?.installments;
     
     const sortedInstallments = useMemo(() => {
         if (!installments) return [];
@@ -79,11 +92,9 @@ export default function LoanDetailPage() {
         const paid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
         return {
             totalPaid: paid,
-            totalOutstanding: loan.totalPayable - paid
+            totalOutstanding: (loan.totalPayable - paid) > 0 ? (loan.totalPayable - paid) : 0
         }
     }, [installments, loan]);
-
-    const isLoading = isLoadingLoan || isLoadingProduct || isLoadingInstallments || isLoadingBorrower;
 
     if (isLoading) {
         return (
@@ -108,12 +119,12 @@ export default function LoanDetailPage() {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 md:px-6">
-             <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${loan.id.substring(0, 8)}`}>
-                <Button variant="outline">
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Download Statement
-                </Button>
-            </PageHeader>
+                 <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${loan.id.substring(0, 8)}`}>
+                    <Button variant="outline">
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download Statement
+                    </Button>
+                </PageHeader>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1 space-y-6">
@@ -192,7 +203,7 @@ export default function LoanDetailPage() {
                                             <TableCell>{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
                                             <TableCell>{formatCurrency(inst.paidAmount, 'KES')}</TableCell>
                                             <TableCell className="text-right">
-                                                <Badge variant={statusConfig.variant} className={cn('gap-1.5', statusConfig.className)}>
+                                                <Badge variant={statusConfig.variant as any} className={cn('gap-1.5', statusConfig.className)}>
                                                     <Icon className="h-3 w-3" />
                                                     {inst.status}
                                                 </Badge>

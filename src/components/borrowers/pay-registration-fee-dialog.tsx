@@ -22,8 +22,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { payRegistrationFee } from '@/actions/borrowers';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -50,7 +50,6 @@ interface PayRegistrationFeeDialogProps {
 }
 
 export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRegistrationFeeDialogProps) {
-  const firestore = useFirestore();
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,40 +64,25 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
   });
 
   const onSubmit = async (values: PaymentFormData) => {
-    if (!user || !firestore || !userProfile || !borrower) {
+    if (!user || !userProfile || !borrower) {
         toast({ variant: 'destructive', title: 'Error', description: 'Required information is missing.' });
         return;
     }
     setIsSubmitting(true);
 
     try {
-        const batch = writeBatch(firestore);
-
-        // 1. Create RegistrationPayment Document
-        const paymentRef = doc(collection(firestore, 'registrationPayments'));
-        const paymentData = {
-            id: paymentRef.id,
+        const res = await payRegistrationFee({
             organizationId: userProfile.organizationId,
             borrowerId: borrower.id,
             amount: registrationFeeAmount,
-            currency: 'KES',
             paymentMethod: values.paymentMethod,
             reference: values.reference,
             collectedBy: user.uid,
-            createdAt: new Date().toISOString(),
-            status: 'confirmed',
-        };
-        batch.set(paymentRef, paymentData);
-
-        // 2. Update Borrower Document
-        const borrowerRef = doc(firestore, 'borrowers', borrower.id);
-        batch.update(borrowerRef, {
-            registrationFeePaid: true,
-            registrationFeePaidAt: new Date().toISOString(),
-            registrationPaymentId: paymentRef.id,
         });
 
-        await batch.commit();
+        if (!res.success) {
+            throw new Error(res.error);
+        }
 
         toast({ title: 'Success', description: 'Registration fee paid successfully.' });
         form.reset();

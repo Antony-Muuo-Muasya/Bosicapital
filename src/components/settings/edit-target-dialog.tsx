@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { updateTarget } from '@/actions/targets';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,7 +38,6 @@ interface EditTargetDialogProps {
 }
 
 export function EditTargetDialog({ target, branches, users, open, onOpenChange }: EditTargetDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,24 +49,27 @@ export function EditTargetDialog({ target, branches, users, open, onOpenChange }
     },
   });
 
-  const onSubmit = (values: TargetFormData) => {
+  const onSubmit = async (values: TargetFormData) => {
     setIsSubmitting(true);
-    const targetDocRef = doc(firestore, 'targets', target.id);
     
-    const updateData: Partial<TargetFormData> = { ...values };
+    const updateData: any = { ...values };
     if (updateData.userId === '' || updateData.userId === 'none') {
-      delete (updateData as any).userId;
+      delete updateData.userId;
     }
 
-    updateDocumentNonBlocking(targetDocRef, updateData)
-      .then(() => {
+    try {
+      const res = await updateTarget(target.id, updateData);
+      if (res.success) {
         toast({ title: 'Success', description: 'Target updated.' });
         onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update target.' });
-      })
-      .finally(() => setIsSubmitting(false));
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not update target.' });
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update target.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

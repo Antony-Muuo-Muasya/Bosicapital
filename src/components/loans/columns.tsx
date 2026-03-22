@@ -5,13 +5,13 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { MoreHorizontal } from 'lucide-react';
 import { useUserProfile } from '@/firebase';
 import { formatCurrency } from '@/lib/utils';
@@ -35,15 +35,15 @@ const getStatusVariant = (status: string) => {
     }
   };
 
-const LoanActions = ({ loan, onEdit }: { loan: LoanWithDetails, onEdit: (loan: LoanWithDetails) => void }) => {
-  const { userRole } = useUserProfile();
+const LoanActions = ({ loan, onEdit, onRefresh }: { loan: LoanWithDetails, onEdit: (loan: LoanWithDetails) => void, onRefresh: () => void }) => {
+  const { userProfile } = useUserProfile();
   const router = useRouter();
 
   const handleDelete = () => {
     alert('For data integrity, loans cannot be deleted. Consider rejecting or archiving instead.');
   };
 
-  const canManage = userRole?.id === 'admin' || userRole?.id === 'manager';
+  const canManage = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager';
 
   return (
     <DropdownMenu>
@@ -62,8 +62,8 @@ const LoanActions = ({ loan, onEdit }: { loan: LoanWithDetails, onEdit: (loan: L
         <DropdownMenuItem onClick={() => router.push(`/loans/${loan.id}`)}>
             View Details
         </DropdownMenuItem>
-        {canManage && <DropdownMenuItem onClick={() => onEdit(loan)}>Edit Loan</DropdownMenuItem>}
-        {userRole?.id === 'admin' && (
+        {canManage && <DropdownMenuItem onClick={() => { onEdit(loan); }}>Edit Loan</DropdownMenuItem>}
+        {userProfile?.roleId === 'admin' && (
              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
                 Delete Loan
              </DropdownMenuItem>
@@ -73,7 +73,7 @@ const LoanActions = ({ loan, onEdit }: { loan: LoanWithDetails, onEdit: (loan: L
   );
 };
 
-export const getColumns = (onEdit: (loan: LoanWithDetails) => void): ColumnDef<LoanWithDetails>[] => [
+export const getColumns = (onEdit: (loan: LoanWithDetails) => void, onRefresh: () => void): ColumnDef<LoanWithDetails>[] => [
   {
     accessorKey: 'borrowerName',
     header: 'Borrower',
@@ -129,7 +129,7 @@ export const getColumns = (onEdit: (loan: LoanWithDetails) => void): ColumnDef<L
     id: 'actions',
     cell: ({ row }) => {
       const loan = row.original;
-      return <LoanActions loan={loan} onEdit={onEdit} />;
+      return <LoanActions loan={loan} onEdit={onEdit} onRefresh={onRefresh} />;
     },
   },
 ];

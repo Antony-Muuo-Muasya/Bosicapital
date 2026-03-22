@@ -1,6 +1,6 @@
 'use client';
-import { useUserProfile, useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getOrganization, updateOrganization } from '@/actions/organizations';
 import type { Organization } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useForm } from 'react-hook-form';
@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { Skeleton } from '../ui/skeleton';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { transformImageUrl } from '@/lib/utils';
 
 const settingsSchema = z.object({
@@ -31,16 +31,11 @@ type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export function GeneralSettings() {
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
-    const firestore = useFirestore();
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const orgRef = useMemoFirebase(() => {
-        if (!firestore || !userProfile) return null;
-        return doc(firestore, 'organizations', userProfile.organizationId);
-    }, [firestore, userProfile]);
-
-    const { data: organization, isLoading: isOrgLoading } = useDoc<Organization>(orgRef);
+    
+    const [organization, setOrganization] = useState<any | null>(null);
+    const [isOrgLoading, setIsOrgLoading] = useState(true);
 
     const form = useForm<SettingsFormData>({
         resolver: zodResolver(settingsSchema),
@@ -53,25 +48,62 @@ export function GeneralSettings() {
         },
     });
 
+    const fetchOrg = useCallback(async () => {
+        if (!userProfile?.organizationId) return;
+        setIsOrgLoading(true);
+        try {
+            const res = await getOrganization(userProfile.organizationId);
+            if (res.success && res.organization) {
+                setOrganization(res.organization);
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsOrgLoading(false);
+        }
+    }, [userProfile]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchOrg();
+        }
+    }, [isProfileLoading, userProfile, fetchOrg]);
+
+    useEffect(() => {
+        if (organization) {
+            form.reset({
+                name: organization.name || 'Bosi Capital Limited',
+                logoUrl: organization.logoUrl || '',
+                slogan: organization.slogan || 'Capital that works',
+                phone: organization.phone || '0755595565',
+                address: organization.address || 'Wayi Plaza B14, 7th Floor, along Galana Road, Kilimani, Nairobi',
+            });
+        }
+    }, [organization, form]);
+
     const watchedLogoUrl = form.watch('logoUrl');
 
     const displayLogoUrl = useMemo(() => {
         return transformImageUrl(watchedLogoUrl);
     }, [watchedLogoUrl]);
 
-    const onSubmit = (values: SettingsFormData) => {
-        if (!orgRef) return;
+    const onSubmit = async (values: SettingsFormData) => {
+        if (!userProfile?.organizationId) return;
         setIsSubmitting(true);
-        updateDocumentNonBlocking(orgRef, values)
-            .then(() => {
+        
+        try {
+            const res = await updateOrganization(userProfile.organizationId, values);
+            if (res.success) {
                 toast({ title: 'Success', description: 'Organization settings updated.' });
-            })
-            .catch(() => {
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to update settings.' });
-            })
-            .finally(() => {
-                setIsSubmitting(false);
-            });
+                setOrganization({ ...organization, ...values });
+            } else {
+                 toast({ variant: 'destructive', title: 'Error', description: res.error || 'Failed to update settings.' });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to update settings.' });
+        } finally {
+            setIsSubmitting(false);
+        }
     }
     
     const isLoading = isProfileLoading || isOrgLoading;

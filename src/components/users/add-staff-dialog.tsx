@@ -7,14 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, useFirebaseApp } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { createUser } from '@/actions/users';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import type { User as AppUser, Role } from '@/lib/types';
+import type { User as AppUser, Role, Branch } from '@/lib/types';
 
 
 const staffSchema = z.object({
@@ -22,6 +20,7 @@ const staffSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
   roleId: z.string().min(1, 'A role must be selected.'),
+  branchId: z.string().min(1, 'A branch must be selected.'),
 });
 
 type StaffFormData = z.infer<typeof staffSchema>;
@@ -30,11 +29,10 @@ interface AddStaffDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roles: Role[];
+  branches: Branch[];
 }
 
-export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProps) {
-  const firestore = useFirestore();
-  const mainApp = useFirebaseApp();
+export function AddStaffDialog({ open, onOpenChange, roles, branches }: AddStaffDialogProps) {
   const { userProfile: adminProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,7 +51,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
     }
     
     if (currentRole === 'superadmin') {
-        return roles.filter(r => r.id !== 'user' && r.id !== 'superadmin');
+        return roles.filter(r => r.id !== 'borrower' && r.id !== 'superadmin');
     }
 
     return [];
@@ -66,6 +64,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
       email: '',
       password: '',
       roleId: '',
+      branchId: '',
     },
   });
 
@@ -75,6 +74,7 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
         email: '',
         password: '',
         roleId: '',
+        branchId: '',
     });
   }, [staffRoles, form, open]);
 
@@ -83,30 +83,18 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
         toast({ variant: 'destructive', title: 'Error', description: 'Could not identify administrator profile.' });
         return;
     }
-    setIsSubmitting(true);
-    
-    // Create a temporary Firebase app instance to create the user without affecting the admin's session.
-    const tempAppName = `user-creation-${Date.now()}`;
-    const secondaryApp = initializeApp(mainApp.options, tempAppName);
-    const secondaryAuth = getAuth(secondaryApp);
-
     try {
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, values.email, values.password);
-        await updateProfile(userCredential.user, { displayName: values.fullName });
-
-        const userDocRef = doc(firestore, 'users', userCredential.user.uid);
-        const newUserProfile: AppUser = {
-            id: userCredential.user.uid,
+        const res = await createUser({
             organizationId: adminProfile.organizationId,
             fullName: values.fullName,
             email: values.email,
+            password: values.password,
             roleId: values.roleId,
-            branchIds: [],
             status: 'active',
-            createdAt: new Date().toISOString(),
-        };
+            branchIds: [values.branchId],
+        });
         
-        await setDoc(userDocRef, newUserProfile);
+        if (!res.success) throw new Error(res.error);
 
         toast({ title: 'Success', description: `${values.fullName} has been added.` });
         form.reset();
@@ -114,13 +102,12 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
 
     } catch (error: any) {
         let description = 'An unexpected error occurred. Please try again.';
-        if (error.code === 'auth/email-already-in-use') {
+        if (error.message?.includes('Unique constraint failed on the fields: (`email`)')) {
             description = 'This email address is already in use by another account.';
         }
         console.error("Error creating staff user:", error);
         toast({ variant: 'destructive', title: 'Creation Failed', description });
     } finally {
-        await deleteApp(secondaryApp);
         setIsSubmitting(false);
     }
   };
@@ -167,6 +154,22 @@ export function AddStaffDialog({ open, onOpenChange, roles }: AddStaffDialogProp
                         <SelectContent>
                             {staffRoles.map(role => (
                                 <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}/>
+            <FormField control={form.control} name="branchId" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Branch</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Assign a branch" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {branches.map(branch => (
+                                <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

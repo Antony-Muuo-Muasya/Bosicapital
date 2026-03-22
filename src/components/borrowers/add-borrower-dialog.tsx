@@ -23,8 +23,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, useFirebaseApp } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { createBorrower } from '@/actions/borrowers';
+import { createUser } from '@/actions/users';
 import { Loader2, AlertTriangle, Camera, Image as LucideImage } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,10 +35,8 @@ import {
     SelectTrigger,
     SelectValue,
   } from "@/components/ui/select";
-import type { User as AppUser, Borrower } from '@/lib/types';
+import type { Borrower } from '@/lib/types';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Label } from '../ui/label';
 
 
@@ -62,8 +61,6 @@ interface AddBorrowerDialogProps {
 }
 
 export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps) {
-  const firestore = useFirestore();
-  const mainApp = useFirebaseApp();
   const { userProfile: staffProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -177,43 +174,34 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   });
 
   const onSubmit = async (values: BorrowerFormData) => {
-    if (!staffProfile || !firestore || !staffProfile.branchIds?.[0]) {
-        toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated, not assigned to a branch, or database not available.' });
+    if (!staffProfile || !staffProfile.branchIds?.[0]) {
+        toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or not assigned to a branch.' });
         return;
     }
     setIsSubmitting(true);
     
-    // Create a temporary Firebase app instance to create the user without affecting the admin's session.
-    const tempAppName = `user-creation-${Date.now()}`;
-    const secondaryApp = initializeApp(mainApp.options, tempAppName);
-    const secondaryAuth = getAuth(secondaryApp);
-
     try {
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, values.email, values.password);
-        await updateProfile(userCredential.user, { displayName: values.fullName });
-
-        const newUserId = userCredential.user.uid;
-        const createdAt = new Date().toISOString();
         const assignedBranchId = staffProfile.branchIds[0];
 
-        const batch = writeBatch(firestore);
-
-        const userDocRef = doc(firestore, 'users', newUserId);
-        const newUserProfile: AppUser = {
-            id: newUserId,
+        // 1. Create User in PostgreSQL (directly via Prisma)
+        const userRes = await createUser({
             organizationId: staffProfile.organizationId,
             fullName: values.fullName,
             email: values.email,
-            roleId: 'user',
+            password: values.password, // This will be hashed in the server action
+            roleId: 'borrower',
             branchIds: [assignedBranchId],
             status: 'active',
-            createdAt: createdAt,
-        };
-        batch.set(userDocRef, newUserProfile);
+        });
 
-        const newBorrowerRef = doc(collection(firestore, 'borrowers'));
-        const newBorrowerData: Borrower = {
-            id: newBorrowerRef.id,
+        if (!userRes.success || !userRes.user) {
+            throw new Error('Failed to create user in database: ' + userRes.error);
+        }
+
+        const newUserId = userRes.user.id;
+
+        // 2. Create Borrower in PostgreSQL
+        const borrowerData: any = {
             userId: newUserId,
             email: values.email,
             fullName: values.fullName,
@@ -226,31 +214,33 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             monthlyIncome: values.monthlyIncome,
             businessPhotoUrl: businessPhoto || '',
             homeAssetsPhotoUrl: homeAssetsPhoto || '',
-            photoUrl: `https://picsum.photos/seed/${newBorrowerRef.id}/400/400`,
+            photoUrl: `https://picsum.photos/seed/${newUserId}/400/400`,
             branchId: assignedBranchId,
             organizationId: staffProfile.organizationId,
             registrationFeeRequired: true,
             registrationFeeAmount: 800,
             registrationFeePaid: false,
-            registrationFeePaidAt: null,
-            registrationPaymentId: null,
         };
-        batch.set(newBorrowerRef, newBorrowerData);
 
-        await batch.commit();
+        const borrowerRes = await createBorrower(borrowerData);
+
+        if (!borrowerRes.success) {
+             throw new Error('Failed to create borrower in database: ' + borrowerRes.error);
+        }
 
         toast({ title: 'Success', description: 'Borrower account created successfully.' });
         form.reset();
         onOpenChange(false);
     } catch (error: any) {
         let description = 'An unexpected error occurred. Please try again.';
-        if (error.code === 'auth/email-already-in-use') {
+        if (error.message?.includes('Unique constraint failed on the fields: (`email`)')) {
             description = 'This email address is already in use by another account.';
+        } else if (error.message?.includes('Unique constraint failed on the fields: (`phone`)')) {
+            description = 'This phone number is already in use by another borrower.';
         }
         console.error("Error creating borrower account:", error);
         toast({ variant: 'destructive', title: 'Creation Failed', description });
     } finally {
-        await deleteApp(secondaryApp);
         setIsSubmitting(false);
     }
   };

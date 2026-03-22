@@ -1,9 +1,12 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getInstallments } from '@/actions/installments';
 import type { Loan, Borrower, Installment, LoanProduct } from '@/lib/types';
-import { useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startOfToday } from 'date-fns';
 import {
   ColumnDef,
@@ -140,55 +143,60 @@ function DefaultersTable<TData, TValue>({
 }
 
 export default function DefaultersPage() {
-    const firestore = useFirestore();
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
 
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
     const organizationId = userProfile?.organizationId;
-    const branchIds = userProfile?.branchIds;
+    const branchIds = userProfile?.branchIds || [];
 
     const today = startOfToday();
 
-    const allInstallmentsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        const installmentsCol = collectionGroup(firestore, 'installments');
-        
-        let q = query(installmentsCol);
+    const [isLoading, setIsLoading] = useState(true);
+    const [allInstallments, setAllInstallments] = useState<Installment[] | null>(null);
+    const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
+    const [allBorrowers, setAllBorrowers] = useState<Borrower[] | null>(null);
+    const [allProducts, setAllProducts] = useState<LoanProduct[] | null>(null);
 
-        if (!isSuperAdmin && organizationId) {
-            q = query(q, where('organizationId', '==', organizationId));
+    const fetchDefaultersData = useCallback(async () => {
+        if (!userProfile) return;
+        setIsLoading(true);
+        try {
+            // Fetch all installments
+            const instRes = await getInstallments(organizationId!);
+            if (instRes.success && instRes.installments) {
+                setAllInstallments(instRes.installments as any);
+            }
+
+            // Loans
+            const loansRes = await getLoans(organizationId!);
+            if (loansRes.success && loansRes.loans) {
+                setAllLoans(loansRes.loans as any);
+            }
+
+            // Borrowers
+            const borrowersRes = await getBorrowers(organizationId!);
+            if (borrowersRes.success && borrowersRes.borrowers) {
+                setAllBorrowers(borrowersRes.borrowers as any);
+            }
+
+            // Products
+            const productsRes = await getLoanProducts(organizationId!);
+            if (productsRes.success && productsRes.products) {
+                setAllProducts(productsRes.products as any);
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
         }
-        return q;
-    }, [firestore, organizationId, isSuperAdmin]);
+    }, [userProfile, organizationId]);
 
-    const { data: allInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(allInstallmentsQuery);
-    
-    // Fetch all related data for enrichment
-    const allLoansQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loans');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allLoans } = useCollection<Loan>(allLoansQuery);
-
-    const allBorrowersQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'borrowers');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allBorrowers } = useCollection<Borrower>(allBorrowersQuery);
-
-    const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loanProducts');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allProducts } = useCollection<LoanProduct>(allProductsQuery);
-
-    const isLoading = isProfileLoading || isLoadingInstallments;
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchDefaultersData();
+        }
+    }, [isProfileLoading, userProfile, fetchDefaultersData]);
 
     const defaulterLoans = useMemo(() => {
         if (!allInstallments || !allLoans || !allBorrowers || !allProducts) return [];

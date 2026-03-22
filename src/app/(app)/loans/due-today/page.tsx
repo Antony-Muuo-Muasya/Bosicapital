@@ -1,9 +1,12 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getInstallments } from '@/actions/installments';
 import type { Loan, Borrower, Installment, LoanProduct } from '@/lib/types';
-import { useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startOfToday } from 'date-fns';
 import {
   ColumnDef,
@@ -154,49 +157,60 @@ function DueTodayTable<TData, TValue>({
 }
 
 export default function DueTodayPage() {
-    const firestore = useFirestore();
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
 
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
     const organizationId = userProfile?.organizationId;
-    const branchIds = userProfile?.branchIds;
+    const branchIds = userProfile?.branchIds || [];
 
     const todayISO = startOfToday().toISOString().split('T')[0];
 
-    const dueTodayQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        const installmentsCol = collectionGroup(firestore, 'installments');
-        
-        return query(installmentsCol, where('dueDate', '==', todayISO));
-    }, [firestore, todayISO]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [dueInstallments, setDueInstallments] = useState<Installment[] | null>(null);
+    const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
+    const [allBorrowers, setAllBorrowers] = useState<Borrower[] | null>(null);
+    const [allProducts, setAllProducts] = useState<LoanProduct[] | null>(null);
 
-    const { data: dueInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(dueTodayQuery);
-    
-    const allLoansQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loans');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allLoans } = useCollection<Loan>(allLoansQuery);
+    const fetchDueTodayData = useCallback(async () => {
+        if (!userProfile) return;
+        setIsLoading(true);
+        try {
+            // Fetch installments due today
+            const instRes = await getInstallments(organizationId!, undefined, todayISO);
+            if (instRes.success && instRes.installments) {
+                setDueInstallments(instRes.installments as any);
+            }
 
-    const allBorrowersQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'borrowers');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allBorrowers } = useCollection<Borrower>(allBorrowersQuery);
+            // Loans
+            const loansRes = await getLoans(organizationId!);
+            if (loansRes.success && loansRes.loans) {
+                setAllLoans(loansRes.loans as any);
+            }
 
-    const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loanProducts');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allProducts } = useCollection<LoanProduct>(allProductsQuery);
+            // Borrowers
+            const borrowersRes = await getBorrowers(organizationId!);
+            if (borrowersRes.success && borrowersRes.borrowers) {
+                setAllBorrowers(borrowersRes.borrowers as any);
+            }
 
-    const isLoading = isProfileLoading || isLoadingInstallments;
+            // Products
+            const productsRes = await getLoanProducts(organizationId!);
+            if (productsRes.success && productsRes.products) {
+                setAllProducts(productsRes.products as any);
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [userProfile, organizationId, todayISO]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchDueTodayData();
+        }
+    }, [isProfileLoading, userProfile, fetchDueTodayData]);
 
     const dueTodayWithDetails = useMemo(() => {
         if (!dueInstallments || !allLoans || !allBorrowers || !allProducts || !userProfile) return [];

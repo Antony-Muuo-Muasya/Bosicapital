@@ -4,7 +4,6 @@ import React, { useState, useEffect, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase, firebaseConfig } from '@/firebase';
 import type { FirebaseApp } from 'firebase/app';
-import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
@@ -50,14 +49,12 @@ interface FirebaseClientProviderProps {
 
 interface FirebaseServices {
   firebaseApp: FirebaseApp | null;
-  auth: Auth | null;
   firestore: Firestore | null;
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const [services, setServices] = useState<FirebaseServices>({
     firebaseApp: null,
-    auth: null,
     firestore: null
   });
   const [isConfigValid, setIsConfigValid] = useState<boolean | null>(null);
@@ -74,7 +71,11 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
 
     if (isConfigCompleteAndValid) {
       const firebaseServices = initializeFirebase(firebaseConfig);
-      setServices(firebaseServices);
+      // firebaseServices might contain auth, but we ignore it for FirebaseProvider
+      setServices({
+        firebaseApp: firebaseServices.firebaseApp,
+        firestore: firebaseServices.firestore
+      });
       setIsConfigValid(true);
     } else {
       console.error("Firebase config is missing or invalid. Please provide the values in src/firebase/config.ts.");
@@ -101,7 +102,6 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   return (
     <FirebaseProvider
       firebaseApp={services.firebaseApp}
-      auth={services.auth}
       firestore={services.firestore}
     >
       {children}

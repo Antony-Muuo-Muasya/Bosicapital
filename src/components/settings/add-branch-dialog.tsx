@@ -7,8 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { createBranch } from '@/actions/branches';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,7 +25,6 @@ interface AddBranchDialogProps {
 }
 
 export function AddBranchDialog({ open, onOpenChange }: AddBranchDialogProps) {
-  const firestore = useFirestore();
   const { userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,28 +37,23 @@ export function AddBranchDialog({ open, onOpenChange }: AddBranchDialogProps) {
     },
   });
 
-  const onSubmit = (values: BranchFormData) => {
-    if (!userProfile || !firestore) return;
+  const onSubmit = async (values: BranchFormData) => {
+    if (!userProfile?.organizationId) return;
     setIsSubmitting(true);
 
-    const newBranchRef = doc(collection(firestore, 'branches'));
-    const newBranchData = {
+    const result = await createBranch({
       ...values,
-      id: newBranchRef.id,
       organizationId: userProfile.organizationId,
-      isMain: false,
-    };
+    });
 
-    setDocumentNonBlocking(newBranchRef, newBranchData, { merge: false })
-      .then(() => {
-        toast({ title: 'Success', description: 'Branch created.' });
-        form.reset();
-        onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not create branch.' });
-      })
-      .finally(() => setIsSubmitting(false));
+    if (result.success) {
+      toast({ title: 'Success', description: 'Branch created.' });
+      form.reset();
+      onOpenChange(false);
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error || 'Could not create branch.' });
+    }
+    setIsSubmitting(false);
   };
 
   return (

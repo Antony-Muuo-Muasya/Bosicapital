@@ -5,8 +5,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
 import { CheckCircle, XCircle, Eye } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking, useUserProfile } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { updateLoan } from '@/actions/loans';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -40,7 +40,6 @@ type LoanWithDetails = Loan & {
 };
 
 const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
-    const firestore = useFirestore();
     const { toast } = useToast();
     const { user, userRole } = useUserProfile();
 
@@ -59,7 +58,6 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
       if(isUpdating || !actionToConfirm || !canApprove || !user) return;
 
       setIsUpdating(true);
-      const loanDocRef = doc(firestore, 'loans', loan.id);
       
       const resetState = () => {
         setIsUpdating(false);
@@ -67,28 +65,22 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
         setActionToConfirm(null);
       }
 
-      if (actionToConfirm === 'Rejected') {
-          updateDocumentNonBlocking(loanDocRef, { status: 'Rejected' })
-            .then(() => {
-              toast({ title: 'Success', description: `Loan has been rejected.` });
-            })
-            .catch(() => {
-              toast({ variant: 'destructive', title: 'Error', description: 'Failed to reject loan.' });
-            })
-            .finally(resetState);
-          return;
-      }
+      try {
+          const res = await updateLoan(loan.id, {
+              status: actionToConfirm,
+              approvedById: actionToConfirm === 'Approved' ? user.uid : undefined
+          });
 
-      if (actionToConfirm === 'Approved') {
-          updateDocumentNonBlocking(loanDocRef, { status: 'Approved', approvedById: user.uid })
-            .then(() => {
-              toast({ title: 'Success', description: 'Loan approved and sent for disbursement.' });
-            })
-            .catch(() => {
-              toast({ variant: 'destructive', title: 'Error', description: 'Failed to approve loan.' });
-            })
-            .finally(resetState);
-          return;
+          if (res.success) {
+              toast({ title: 'Success', description: `Loan has been ${actionToConfirm.toLowerCase()}.` });
+          } else {
+              toast({ variant: 'destructive', title: 'Error', description: res.error || `Failed to ${actionToConfirm.toLowerCase()} loan.` });
+          }
+      } catch (err) {
+          console.error(err);
+          toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+      } finally {
+          resetState();
       }
     };
   

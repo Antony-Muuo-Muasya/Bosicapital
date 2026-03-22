@@ -3,27 +3,29 @@ import type { Branch } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { deleteBranch } from '@/actions/branches';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '../ui/badge';
 
-const BranchActions = ({ branch, onEdit }: { branch: Branch, onEdit: (branch: Branch) => void }) => {
-  const firestore = useFirestore();
+const BranchActions = ({ branch, onEdit, onRefresh }: { branch: Branch, onEdit: (branch: Branch) => void, onRefresh: () => void }) => {
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (branch.isMain) {
         toast({ variant: 'destructive', title: 'Action Prohibited', description: 'Cannot delete the main branch.' });
         return;
     }
     if (confirm(`Are you sure you want to delete the "${branch.name}" branch?`)) {
-      const branchDocRef = doc(firestore, 'branches', branch.id);
-      deleteDocumentNonBlocking(branchDocRef)
-        .then(() => toast({ title: 'Success', description: 'Branch deleted.' }))
-        .catch(err => toast({ variant: 'destructive', title: 'Error', description: 'Could not delete branch.' }));
+      const res = await deleteBranch(branch.id);
+      if (res.success) {
+        toast({ title: 'Success', description: 'Branch deleted.' });
+        onRefresh();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete branch.' });
+      }
     }
   };
 
@@ -50,7 +52,7 @@ const BranchActions = ({ branch, onEdit }: { branch: Branch, onEdit: (branch: Br
   );
 };
 
-export const getBranchColumns = (onEdit: (branch: Branch) => void): ColumnDef<Branch>[] => [
+export const getBranchColumns = (onEdit: (branch: Branch) => void, onRefresh: () => void): ColumnDef<Branch>[] => [
   {
     accessorKey: 'name',
     header: 'Branch Name',
@@ -72,7 +74,7 @@ export const getBranchColumns = (onEdit: (branch: Branch) => void): ColumnDef<Br
     id: 'actions',
     cell: ({ row }) => {
       const branch = row.original;
-      return <BranchActions branch={branch} onEdit={onEdit} />;
+      return <BranchActions branch={branch} onEdit={onEdit} onRefresh={onRefresh} />;
     },
   },
 ];

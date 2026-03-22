@@ -2,8 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDoc, useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/firebase';
+import { getBorrower } from '@/actions/borrowers';
+import { getLoans } from '@/actions/loans';
+import { getLoanProducts } from '@/actions/loan-products';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +17,7 @@ import { PlusCircle, Loader2, Phone, Mail, Fingerprint, Home as HomeIcon } from 
 import type { Borrower, Loan, LoanProduct } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEffect, useCallback } from 'react';
 import { InteractionHistory } from '@/components/borrowers/interaction-history';
 
 const getStatusVariant = (status: string) => {
@@ -31,34 +34,79 @@ export default function BorrowerDetailPage() {
   const params = useParams() as { borrowerId: string };
   const borrowerId = params.borrowerId;
   const router = useRouter();
-  const firestore = useFirestore();
   const { userProfile } = useUserProfile();
-  
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
+  const [borrower, setBorrower] = useState<any | null>(null);
+  const [loans, setLoans] = useState<any[]>([]);
+  const [allLoanProducts, setAllLoanProducts] = useState<any[]>([]);
+  const [isLoadingBorrower, setIsLoadingBorrower] = useState(true);
+  const [isLoadingLoans, setIsLoadingLoans] = useState(true);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
-  // --- Data Fetching ---
-  const borrowerRef = useMemoFirebase(() => doc(firestore, 'borrowers', borrowerId), [firestore, borrowerId]);
-  const { data: borrower, isLoading: isLoadingBorrower } = useDoc<Borrower>(borrowerRef);
+  const fetchBorrowerDetails = useCallback(async () => {
+      setIsLoadingBorrower(true);
+      try {
+         const res = await getBorrower(borrowerId);
+         if (res.success && res.borrower) {
+             setBorrower(res.borrower);
+         }
+      } catch (err) {
+         console.error(err);
+      } finally {
+         setIsLoadingBorrower(false);
+      }
+  }, [borrowerId]);
 
-  const loansQuery = useMemoFirebase(() => query(collection(firestore, 'loans'), where('borrowerId', '==', borrowerId)), [firestore, borrowerId]);
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
+  const fetchLoans = useCallback(async () => {
+      if (!userProfile?.organizationId) return;
+      setIsLoadingLoans(true);
+      try {
+         const res = await getLoans(userProfile.organizationId, borrowerId);
+         if (res.success && res.loans) {
+             setLoans(res.loans);
+         }
+      } catch (err) {
+         console.error(err);
+      } finally {
+         setIsLoadingLoans(false);
+      }
+  }, [userProfile?.organizationId, borrowerId]);
 
-  const allLoanProductsQuery = useMemoFirebase(() => {
-    if (!userProfile) return null;
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', userProfile.organizationId))
-  }, [firestore, userProfile]);
-  const { data: allLoanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(allLoanProductsQuery);
+  const fetchProducts = useCallback(async () => {
+      if (!userProfile?.organizationId) return;
+      setIsLoadingProducts(true);
+      try {
+         const res = await getLoanProducts(userProfile.organizationId);
+         if (res.success && res.products) {
+             setAllLoanProducts(res.products as any);
+         }
+      } catch (err) {
+         console.error(err);
+      } finally {
+         setIsLoadingProducts(false);
+      }
+  }, [userProfile?.organizationId]);
+
+  useEffect(() => {
+     fetchBorrowerDetails();
+  }, [fetchBorrowerDetails]);
+
+  useEffect(() => {
+     if (userProfile?.organizationId) {
+         fetchLoans();
+         fetchProducts();
+     }
+  }, [userProfile?.organizationId, fetchLoans, fetchProducts]);
 
   const isLoading = isLoadingBorrower || isLoadingLoans || isLoadingProducts;
 
   // --- Memos ---
   const loansWithDetails = useMemo(() => {
     if (!loans || !allLoanProducts) return [];
-    const productsMap = new Map(allLoanProducts.map(p => [p.id, p]));
-    return loans.map(loan => ({
+    return loans.map((loan: any) => ({
       ...loan,
-      loanProductName: productsMap.get(loan.loanProductId)?.name || 'Unknown Product',
-    })).sort((a,b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+      loanProductName: loan.loanProduct?.name || 'Unknown Product',
+    })).sort((a: any,b: any) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
   }, [loans, allLoanProducts]);
 
   const canInitiateNewLoan = useMemo(() => {
