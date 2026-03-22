@@ -10,8 +10,7 @@ import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } fr
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, Trophy, Lightbulb, User, Mail, Wallet, CalendarDays, Hourglass, Sparkles, BookOpen, ShieldCheck, History, PlusCircle, Info } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { Loader2, Trophy, Lightbulb, User, Mail, Wallet, CalendarDays, Hourglass, Sparkles, ShieldCheck, Info } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";

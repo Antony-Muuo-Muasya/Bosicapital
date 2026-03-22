@@ -161,9 +161,9 @@ export default function BorrowerProfilePage() {
     }
   }
 
-  const isLoading = isProfileLoading || isBorrowerLoading || isBranchLoading;
+  const combinedIsLoading = isProfileLoading || isLoading;
 
-  if (isLoading) {
+  if (combinedIsLoading) {
     return (
         <div className="flex h-full items-center justify-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
