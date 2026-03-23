@@ -1,18 +1,9 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
-import { FirebaseApp } from 'firebase/app';
-import { Firestore } from 'firebase/firestore';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import type { User as AppUser, Role, Organization } from '@/lib/types';
 import { getUserProfile } from '@/actions/users';
 import { useSession } from 'next-auth/react';
-
-// Combined state for the Firebase context
-export interface FirebaseContextState {
-  areServicesAvailable: boolean; 
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-}
 
 export interface UserProfileHookResult {
   user: { uid: string, email: string, displayName: string } | null;
@@ -24,56 +15,12 @@ export interface UserProfileHookResult {
 
 type WithId<T> = T & { id: string };
 
-// React Context
-export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
-
-export const FirebaseProvider: React.FC<{
-  children: ReactNode;
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-}> = ({ children, firebaseApp, firestore }) => {
-  const contextValue = useMemo((): FirebaseContextState => ({
-    areServicesAvailable: !!(firebaseApp && firestore),
-    firebaseApp,
-    firestore,
-  }), [firebaseApp, firestore]);
-
-  return (
-    <FirebaseContext.Provider value={contextValue}>
-      {children}
-    </FirebaseContext.Provider>
-  );
+// Dummy Context to prevent breaking imports of FirebaseClientProvider and FirebaseProvider
+// Many files use <FirebaseClientProvider> but it's really just a UserProfileProvider now.
+export const FirebaseClientProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return <>{children}</>;
 };
 
-export const useFirebase = () => {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error('useFirebase must be used within a FirebaseProvider.');
-  }
-  return context;
-};
-
-/** Hook to access Firestore instance. */
-export const useFirestore = (): Firestore => {
-  const { firestore } = useFirebase();
-  if (!firestore) throw new Error('Firestore not available');
-  return firestore;
-};
-
-/** Hook to access Firebase App instance. */
-export const useFirebaseApp = (): FirebaseApp => {
-  const { firebaseApp } = useFirebase();
-  if (!firebaseApp) throw new Error('FirebaseApp not available');
-  return firebaseApp;
-};
-
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
-  return useMemo(factory, deps);
-}
-
-/**
- * Hook to get the current user, their profile from Prisma, and their role.
- */
 export const useUserProfile = (): UserProfileHookResult => {
   const { data: session, status } = useSession();
   const isAuthLoading = status === 'loading';

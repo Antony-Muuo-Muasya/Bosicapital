@@ -3,7 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useAuth, useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
+import { signOut } from 'next-auth/react';
 import { LogOut, Loader2, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -24,7 +25,7 @@ export default function BorrowerLayout({
   children: React.ReactNode;
 }) {
   const { user, userProfile, organization, isLoading } = useUserProfile();
-  const auth = useAuth();
+
   const router = useRouter();
   const pathname = usePathname();
 
@@ -97,7 +98,7 @@ export default function BorrowerLayout({
                         <DropdownMenuTrigger asChild>
                         <Button variant="secondary" size="icon" className="rounded-full">
                             <Avatar className="h-8 w-8">
-                            <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
+                            <AvatarImage src={userProfile?.avatarUrl || undefined} alt={displayName || ''} />
                             <AvatarFallback>{fallback}</AvatarFallback>
                             </Avatar>
                             <span className="sr-only">Toggle user menu</span>
@@ -112,7 +113,7 @@ export default function BorrowerLayout({
                             <span>Help Center</span>
                         </Link></DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => auth.signOut()}>
+                        <DropdownMenuItem onClick={() => signOut()}>
                             <LogOut className="mr-2 h-4 w-4" />
                             <span>Log out</span>
                         </DropdownMenuItem>

@@ -3,7 +3,7 @@
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import type { Loan, Borrower, LoanProduct, User as AppUser } from '@/lib/types';
 import { getLoans } from '@/actions/loans';
 import { getBorrowers } from '@/actions/borrowers';

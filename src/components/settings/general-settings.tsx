@@ -1,5 +1,5 @@
 'use client';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getOrganization, updateOrganization } from '@/actions/organizations';
 import type { Organization } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { deleteBorrower } from '@/actions/borrowers';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';

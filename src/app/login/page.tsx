@@ -18,8 +18,9 @@ const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
+import { Suspense } from 'react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
@@ -128,5 +129,17 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    }>
+        <LoginForm />
+    </Suspense>
   );
 }

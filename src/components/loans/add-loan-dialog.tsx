@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { createLoan } from '@/actions/loans';
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

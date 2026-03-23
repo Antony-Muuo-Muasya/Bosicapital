@@ -1,6 +1,6 @@
 'use client';
 import { AppShell } from '@/components/app-shell';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';

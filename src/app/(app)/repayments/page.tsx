@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
 import type { Repayment, Borrower, Loan, LoanProduct } from '@/lib/types';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getRepayments } from '@/actions/repayments';
 import { getLoans } from '@/actions/loans';
 import { getBorrowers } from '@/actions/borrowers';

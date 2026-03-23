@@ -3,7 +3,7 @@ import type { Branch } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { deleteBranch } from '@/actions/branches';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';

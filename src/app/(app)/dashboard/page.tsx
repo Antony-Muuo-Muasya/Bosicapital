@@ -1,5 +1,5 @@
 'use client';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { DashboardSkeleton } from '@/components/dashboard/dashboard-skeleton';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { ManagerDashboard } from '@/components/dashboard/manager-dashboard';

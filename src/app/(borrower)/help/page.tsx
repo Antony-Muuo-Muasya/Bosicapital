@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Phone, Mail, MapPin, Loader2 } from "lucide-react";
-import { useUserProfile } from "@/firebase";
+import { useUserProfile } from '@/providers/user-profile';
 
 const faqs = [
     {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useUserProfile, useAuth } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getBorrowers } from '@/actions/borrowers';
 import { getBranches, updateUser } from '@/actions/users';
 import { updateBorrower } from '@/actions/borrowers';
@@ -38,7 +38,7 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function BorrowerProfilePage() {
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const auth = useAuth();
+
   const { toast } = useToast();
   
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
@@ -120,27 +120,17 @@ export default function BorrowerProfilePage() {
     if (!user || !user.email) return;
     setIsPasswordSubmitting(true);
     try {
-      const credential = EmailAuthProvider.credential(user.email, data.currentPassword);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, data.newPassword);
       toast({
-        title: 'Success',
-        description: 'Your password has been updated successfully.',
+        title: 'Info',
+        description: 'Password update functionality is temporarily disabled while migrating to the new system.',
       });
       passwordForm.reset();
     } catch (error: any) {
         console.error(error);
-        let description = 'An unexpected error occurred.';
-        if (error.code === 'auth/wrong-password') {
-            description = 'The current password you entered is incorrect.';
-            passwordForm.setError('currentPassword', { type: 'manual', message: description });
-        } else if (error.code === 'auth/too-many-requests') {
-            description = 'Too many attempts. Please try again later.';
-        }
         toast({
             variant: 'destructive',
             title: 'Error updating password',
-            description,
+            description: 'An unexpected error occurred.',
         });
     } finally {
         setIsPasswordSubmitting(false);
@@ -188,7 +178,7 @@ export default function BorrowerProfilePage() {
                 <CardContent className="pt-6 flex flex-col items-center text-center">
                     <div className="relative mb-4">
                         <Avatar className="h-24 w-24 border-2 border-primary">
-                            <AvatarImage src={borrower?.photoUrl || userProfile?.avatarUrl || user?.photoURL || undefined} alt={userProfile?.fullName || ''} />
+                            <AvatarImage src={borrower?.photoUrl || userProfile?.avatarUrl || undefined} alt={userProfile?.fullName || ''} />
                             <AvatarFallback className="text-3xl">{fallback}</AvatarFallback>
                         </Avatar>
                         <Button variant="outline" size="icon" className="absolute -bottom-2 -right-2 rounded-full bg-background h-8 w-8">

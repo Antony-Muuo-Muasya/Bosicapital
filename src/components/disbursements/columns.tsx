@@ -5,7 +5,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
 import { CheckCircle, XCircle } from 'lucide-react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { disburseLoan } from '@/actions/loans';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';

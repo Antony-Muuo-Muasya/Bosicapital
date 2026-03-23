@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getLoanProducts } from '@/actions/loan-products';
 import { useEffect, useCallback } from 'react';
 import { getLoanProductColumns } from './loan-product-columns';

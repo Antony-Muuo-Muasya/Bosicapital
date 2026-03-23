@@ -1,6 +1,6 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import type { User as AppUser, Role, Branch } from '@/lib/types';
 import { UsersDataTable } from '@/components/users/users-data-table';

@@ -1,6 +1,6 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getLoans } from '@/actions/loans';
 import { getBorrowers } from '@/actions/borrowers';
 import { getLoanProducts } from '@/actions/loan-products';

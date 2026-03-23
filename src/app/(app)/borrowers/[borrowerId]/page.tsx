@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getBorrower } from '@/actions/borrowers';
 import { getLoans } from '@/actions/loans';
 import { getLoanProducts } from '@/actions/loan-products';

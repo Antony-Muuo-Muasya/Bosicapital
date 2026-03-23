@@ -14,10 +14,13 @@ export async function getInstallmentsByOfficer(loanOfficerId: string) {
 export async function getAllInstallments() {
   return prisma.installment.findMany()
 }
-
-export async function updateInstallment(id: string, data: any) {
-  return prisma.installment.update({
-    where: { id },
-    data
-  })
+export async function getInstallments(organizationId?: string, loanId?: string) {
+  return {
+    success: true,
+    installments: await prisma.installment.findMany({
+      where: {
+         ...(loanId ? { loanId } : {}),
+      }
+    })
+  }
 }

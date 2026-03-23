@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { useEffect, useCallback } from 'react';
 import { getTargets } from '@/actions/targets';
 import { getBranches } from '@/actions/branches';

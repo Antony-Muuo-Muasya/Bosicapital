@@ -5,7 +5,7 @@ import { PlusCircle, UserPlus, Building } from 'lucide-react';
 import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
 import { AddBranchDialog } from '@/components/settings/add-branch-dialog';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getAdminDashboardStats } from '@/actions/dashboard';
 import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role, Installment, Repayment } from '@/lib/types';
 import { useEffect, useState, useCallback, useMemo } from 'react';

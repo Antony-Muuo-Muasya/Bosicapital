@@ -48,7 +48,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { ThemeToggle } from './theme-toggle';
 import { AppFooter } from './app-footer';
 import { signOut } from 'next-auth/react';
@@ -270,7 +270,7 @@ function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
+                <AvatarImage src={userProfile?.avatarUrl || undefined} alt={displayName || ''} />
                 <AvatarFallback>{fallback}</AvatarFallback>
               </Avatar>
               <span className="sr-only">Toggle user menu</span>

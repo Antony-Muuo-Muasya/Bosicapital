@@ -23,7 +23,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { createBorrower } from '@/actions/borrowers';
 import { createUser } from '@/actions/users';
 import { Loader2, AlertTriangle, Camera, Image as LucideImage } from 'lucide-react';

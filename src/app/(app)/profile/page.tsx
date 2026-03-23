@@ -1,6 +1,6 @@
 'use client';
 
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { getBranches, updateUser, updatePassword } from '@/actions/users';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -181,7 +181,7 @@ export default function ProfilePage() {
                 <CardContent className="pt-6 flex flex-col items-center text-center">
                     <div className="relative mb-4">
                         <Avatar className="h-24 w-24 border-2 border-primary">
-                            <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={userProfile?.fullName || ''} />
+                            <AvatarImage src={userProfile?.avatarUrl || undefined} alt={userProfile?.fullName || ''} />
                             <AvatarFallback className="text-3xl">{fallback}</AvatarFallback>
                         </Avatar>
                         <Button variant="outline" size="icon" className="absolute -bottom-2 -right-2 rounded-full bg-background h-8 w-8">
