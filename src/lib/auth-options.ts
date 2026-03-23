@@ -8,7 +8,10 @@ if (!process.env.NEXTAUTH_SECRET) {
   console.warn("[Auth] WARNING: NEXTAUTH_SECRET is not set in environment variables!");
 }
 
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+
 export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: "Credentials",

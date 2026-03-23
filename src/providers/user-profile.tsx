@@ -15,9 +15,7 @@ export interface UserProfileHookResult {
 
 type WithId<T> = T & { id: string };
 
-// Dummy Context to prevent breaking imports of FirebaseClientProvider and FirebaseProvider
-// Many files use <FirebaseClientProvider> but it's really just a UserProfileProvider now.
-export const FirebaseClientProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const UserProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 

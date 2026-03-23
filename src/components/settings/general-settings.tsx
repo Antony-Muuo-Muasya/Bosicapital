@@ -171,7 +171,7 @@ export function GeneralSettings() {
                                 <FormItem>
                                     <FormLabel>Logo URL</FormLabel>
                                     <FormControl><Input placeholder="https://..." {...field} /></FormControl>
-                                    <FormDescription>Must be a public HTTPS link. For Firebase Storage, use the "Download URL".</FormDescription>
+                                    <FormDescription>Must be a public HTTPS link (e.g. from an image hosting service or Cloudinary).</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}

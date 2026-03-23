@@ -23,7 +23,7 @@ import { TopBorrowers } from './loan-officer/TopBorrowers';
 import { PerformanceTracker } from './loan-officer/PerformanceTracker';
 import { LifetimeStats } from './loan-officer/LifetimeStats';
 import { CollectionEfficiencyGauge } from './loan-officer/CollectionEfficiencyGauge';
-import { CreateIndexCard } from './loan-officer/CreateIndexCard';
+
 
 
 export function LoanOfficerDashboard() {
@@ -209,7 +209,7 @@ export function LoanOfficerDashboard() {
       </PageHeader>
       
       <div className="p-4 md:p-6 grid gap-6">
-        {installmentsError && <CreateIndexCard />}
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="My Portfolio Value" value={formatCurrency(dashboardStats.portfolioValue, 'KES')} icon={Landmark} featured isLoading={isLoading} />
             <StatCard title="My Active Loans" value={dashboardStats.activeLoansCount} icon={Scale} isLoading={isLoading} />
