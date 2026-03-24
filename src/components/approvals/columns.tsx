@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Eye } from 'lucide-react';
 import { useUserProfile } from '@/providers/user-profile';
-import { updateLoan } from '@/actions/loans';
+import { updateApprovalStatus } from '@/actions/approvals';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -66,11 +66,12 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
       }
 
       try {
-          // Use Prisma-backed Server Action instead of direct Firestore update
-          const res = await updateLoan(loan.id, {
-              status: actionToConfirm,
-              approvedById: actionToConfirm === 'Approved' ? userProfile.id : undefined
-          });
+          // Trigger the Prisma Server Action instead of the legacy Firebase update
+          const res = await updateApprovalStatus(
+              loan.id, 
+              actionToConfirm, 
+              userProfile.id
+          );
 
           if (res.success) {
               toast({ title: 'Success', description: `Loan has been ${actionToConfirm.toLowerCase()}.` });
@@ -79,7 +80,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
           }
       } catch (err) {
           console.error(err);
-          toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred during status update.' });
       } finally {
           resetState();
       }
@@ -186,7 +187,7 @@ export const getApprovalColumns = (): ColumnDef<LoanWithDetails>[] => [
     },
   },
   {
-    accessorKey: 'loanProductName',
+    accessorKey: 'loanProduct.name',
     header: 'Loan Product',
   },
   {
