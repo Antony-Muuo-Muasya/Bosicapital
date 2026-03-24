@@ -2,7 +2,20 @@
 
 import prisma from '@/lib/db'
 
-export async function getInstallmentsByOfficer(loanOfficerId: string) {
+export const getInstallments = async (organizationId?: string, loanId?: string, dueDate?: string) => {
+  return {
+    success: true,
+    installments: await prisma.installment.findMany({
+      where: {
+         ...(loanId ? { loanId } : {}),
+         ...(organizationId ? { organizationId } : {}),
+         ...(dueDate ? { dueDate } : {}),
+      }
+    })
+  }
+}
+
+export const getInstallmentsByOfficer = async (loanOfficerId: string) => {
   if (!loanOfficerId) return []
   return prisma.installment.findMany({
     where: {
@@ -11,16 +24,7 @@ export async function getInstallmentsByOfficer(loanOfficerId: string) {
   })
 }
 
-export async function getAllInstallments() {
+export const getAllInstallments = async () => {
   return prisma.installment.findMany()
 }
-export async function getInstallments(organizationId?: string, loanId?: string) {
-  return {
-    success: true,
-    installments: await prisma.installment.findMany({
-      where: {
-         ...(loanId ? { loanId } : {}),
-      }
-    })
-  }
-}
+
