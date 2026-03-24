@@ -1,0 +1,7 @@
+{
+  "name": "domexception",
+  "version": "4.0.0",
+  "description": "Native DOMException shim for Node 18+",
+  "main": "index.js",
+  "license": "MIT"
+}
