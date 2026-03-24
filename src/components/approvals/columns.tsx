@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { Loan } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Eye } from 'lucide-react';
 import { useUserProfile } from '@/providers/user-profile';
 import { updateLoan } from '@/actions/loans';
