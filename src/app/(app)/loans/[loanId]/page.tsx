@@ -35,6 +35,7 @@ const getInstallmentStatusConfig = (status: string) => {
 };
 
 export default function LoanDetailPage() {
+    const router = useRouter();
     const params = useParams() as { loanId: string };
     const loanId = params.loanId;
     const [data, setData] = useState<any>(null);

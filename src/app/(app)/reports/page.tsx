@@ -98,48 +98,66 @@ function ReportDataTable<TData, TValue>({
 // Columns for Active Loans
 type LoanWithDetails = Loan & { borrowerName: string; loanProductName: string; borrowerPhotoUrl?: string };
 
-const activeLoansColumns: ColumnDef<LoanWithDetails>[] = [
-  {
-    accessorKey: 'borrowerName',
-    header: 'Borrower',
-    cell: ({ row }) => {
-      const loan = row.original;
-      const router = useRouter();
-      return (
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/borrowers/${loan.borrowerId}`)}>
-          <Avatar className="hidden h-9 w-9 sm:flex">
-            <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-            <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="grid gap-0.5">
-            <span className="font-medium hover:underline">{loan.borrowerName}</span>
-            <span className="text-xs text-muted-foreground">{loan.borrowerId}</span>
-          </div>
-        </div>
-      );
-    },
-  },
-  { accessorKey: 'loanProductName', header: 'Product' },
-  { 
-    accessorKey: 'principal', 
-    header: () => <div className="text-right">Principal</div>,
-    cell: ({ row }) => <div className="text-right font-medium">{formatCurrency(row.original.principal)}</div>,
-  },
-  { 
-    accessorKey: 'issueDate', 
-    header: 'Issue Date',
-    cell: ({ row }) => new Date(row.original.issueDate).toLocaleDateString(),
-  },
-];
+// Columns can be defined outside if they don't use hooks, 
+// but here we move them inside ReportsPage or use a separate Cell component.
+
 
 // Columns for Customers (Leads and Inactive)
-const customerColumns: ColumnDef<Borrower>[] = [
+// Placeholder for customerColumns - defined inside ReportsPage
+
+
+export default function ReportsPage() {
+  const router = useRouter();
+  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
+  const organizationId = userProfile?.organizationId;
+  const branchIds = userProfile?.branchIds;
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
+
+  // Move columns inside to utilize 'router' correctly
+  const activeLoansColumns = useMemo<ColumnDef<LoanWithDetails>[]>(() => [
+    {
+      accessorKey: 'borrowerName',
+      header: 'Borrower',
+      cell: ({ row }) => {
+        const loan = row.original;
+        return (
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/borrowers/${loan.borrowerId}`)}>
+            <Avatar className="hidden h-9 w-9 sm:flex">
+              <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
+              <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="grid gap-0.5">
+              <span className="font-medium hover:underline">{loan.borrowerName}</span>
+              <span className="text-xs text-muted-foreground">{loan.borrowerId}</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    { accessorKey: 'loanProductName', header: 'Product' },
+    { 
+      accessorKey: 'principal', 
+      header: () => <div className="text-right">Principal</div>,
+      cell: ({ row }) => <div className="text-right font-medium">{formatCurrency(row.original.principal)}</div>,
+    },
+    { 
+      accessorKey: 'issueDate', 
+      header: 'Issue Date',
+      cell: ({ row }) => new Date(row.original.issueDate).toLocaleDateString(),
+    },
+  ], [router]);
+
+  const customerColumns = useMemo<ColumnDef<Borrower>[]>(() => [
     {
       accessorKey: 'fullName',
       header: 'Name',
       cell: ({ row }) => {
         const borrower = row.original;
-        const router = useRouter();
         return (
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/borrowers/${borrower.id}`)}>
             <Avatar className="hidden h-9 w-9 sm:flex">
@@ -167,18 +185,7 @@ const customerColumns: ColumnDef<Borrower>[] = [
         )
       }
     },
-];
-
-export default function ReportsPage() {
-  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
-  const isSuperAdmin = userProfile?.roleId === 'superadmin';
-  const organizationId = userProfile?.organizationId;
-  const branchIds = userProfile?.branchIds;
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [borrowers, setBorrowers] = useState<Borrower[]>([]);
-  const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
+  ], [router]);
 
   const fetchReportsData = useCallback(async () => {
       if (!userProfile) return;
