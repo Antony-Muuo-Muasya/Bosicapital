@@ -1,4 +1,5 @@
 'use client';
+
 import { useState } from 'react';
 import type { Loan } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
@@ -29,7 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import Image from 'next/image';
 
-
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
@@ -41,13 +41,13 @@ type LoanWithDetails = Loan & {
 
 const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     const { toast } = useToast();
-    const { user, userRole } = useUserProfile();
+    const { userProfile } = useUserProfile();
 
     const [isUpdating, setIsUpdating] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [actionToConfirm, setActionToConfirm] = useState<'Approved' | 'Rejected' | null>(null);
 
-    const canApprove = userRole?.id === 'manager' || userRole?.id === 'superadmin';
+    const canApprove = userProfile?.roleId === 'manager' || userProfile?.roleId === 'superadmin';
 
     const handleActionConfirmation = (status: 'Approved' | 'Rejected') => {
         setActionToConfirm(status);
@@ -55,7 +55,7 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     };
   
     const handleUpdateStatus = async () => {
-      if(isUpdating || !actionToConfirm || !canApprove || !user) return;
+      if(isUpdating || !actionToConfirm || !canApprove || !userProfile) return;
 
       setIsUpdating(true);
       
@@ -66,9 +66,10 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
       }
 
       try {
+          // Use Prisma-backed Server Action instead of direct Firestore update
           const res = await updateLoan(loan.id, {
               status: actionToConfirm,
-              approvedById: actionToConfirm === 'Approved' ? user.uid : undefined
+              approvedById: actionToConfirm === 'Approved' ? userProfile.id : undefined
           });
 
           if (res.success) {

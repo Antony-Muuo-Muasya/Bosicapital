@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
 import withAuth from "next-auth/middleware";
 
-export default function proxy(req: NextRequest) {
+export function proxy(req: NextRequest) {
   return (withAuth as any)(req);
 }
+
+export default proxy;
 
 export const config = {
   matcher: [
