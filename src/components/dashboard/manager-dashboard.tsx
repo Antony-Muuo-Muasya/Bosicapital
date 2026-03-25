@@ -74,6 +74,13 @@ export function ManagerDashboard() {
   useEffect(() => {
      if (!isProfileLoading && userProfile) {
          fetchDashboardStats();
+
+         // Set up real-time polling every 30 seconds
+         const interval = setInterval(() => {
+             fetchDashboardStats();
+         }, 30000);
+
+         return () => clearInterval(interval);
      }
   }, [isProfileLoading, userProfile, fetchDashboardStats]);
 
@@ -245,7 +252,14 @@ export function ManagerDashboard() {
         title="Manager Dashboard"
         description="Overview of your branch loan portfolio."
       >
-          <div className='flex gap-2'>
+          <div className='flex items-center gap-4'>
+            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full border border-border animate-pulse-slow">
+                <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Live Updates</span>
+            </div>
             <Button onClick={() => setIsAddStaffOpen(true)}>
                 <Users className="mr-2 h-4 w-4" />
                 Add Staff

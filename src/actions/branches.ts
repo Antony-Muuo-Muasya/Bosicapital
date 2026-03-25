@@ -3,16 +3,22 @@
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-export async function getBranches(organizationId: string) {
-  try {
-    const branches = await prisma.branch.findMany({
-      where: { organizationId }
-    });
-    return { success: true, branches };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
+import { unstable_cache } from "next/cache";
+
+export const getBranches = unstable_cache(
+  async (organizationId: string) => {
+    try {
+      const branches = await prisma.branch.findMany({
+        where: { organizationId }
+      });
+      return { success: true, branches };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  },
+  ['branches-lookup'],
+  { revalidate: 3600, tags: ['branches'] }
+);
 
 export async function createBranch(data: { name: string, location: string, organizationId: string }) {
   try {

@@ -16,17 +16,58 @@ export async function getAdminDashboardStats(organizationId?: string) {
       regPayments,
       repayments,
       installments,
-      roles
+      roles,
+      loanPortfolio,
+      repaymentTotals,
+      totalBorrowers,
+      activeLoansCount
     ] = await Promise.all([
-      prisma.loan.findMany({ where: whereOrg }),
-      prisma.borrower.findMany({ where: whereOrg }),
-      prisma.loanProduct.findMany({ where: whereOrg }),
-      prisma.user.findMany({ where: whereOrg }),
-      prisma.branch.findMany({ where: whereOrg }),
-      prisma.registrationPayment.findMany({ where: whereOrg }),
-      prisma.repayment.findMany({ where: whereOrg }),
-      prisma.installment.findMany({ where: whereOrg }),
-      prisma.role.findMany()
+      prisma.loan.findMany({ 
+        where: whereOrg,
+        select: { id: true, status: true, principal: true, issueDate: true, loanProductId: true, loanOfficerId: true, totalPayable: true, borrowerId: true }
+      }),
+      prisma.borrower.findMany({ 
+        where: whereOrg,
+        select: { id: true, registrationFeePaidAt: true, organizationId: true, branchId: true }
+      }),
+      prisma.loanProduct.findMany({ 
+        where: whereOrg,
+        select: { id: true, category: true }
+      }),
+      prisma.user.findMany({ 
+        where: whereOrg,
+        select: { id: true, fullName: true, avatarUrl: true, roleId: true }
+      }),
+      prisma.branch.findMany({ 
+        where: whereOrg,
+        select: { id: true, name: true }
+      }),
+      prisma.registrationPayment.findMany({ 
+        where: whereOrg,
+        select: { id: true, amount: true, createdAt: true }
+      }),
+      prisma.repayment.findMany({ 
+        where: whereOrg,
+        select: { id: true, amount: true, paymentDate: true, loanId: true }
+      }),
+      prisma.installment.findMany({ 
+        where: whereOrg,
+        select: { id: true, status: true, expectedAmount: true, paidAmount: true, loanId: true, dueDate: true }
+      }),
+      prisma.role.findMany({
+        select: { id: true, name: true }
+      }),
+      // Aggregates for efficiency
+      prisma.loan.aggregate({
+        where: { ...whereOrg, status: 'Active' },
+        _sum: { totalPayable: true, principal: true }
+      }),
+      prisma.repayment.aggregate({
+        where: whereOrg,
+        _sum: { amount: true }
+      }),
+      prisma.borrower.count({ where: whereOrg }),
+      prisma.loan.count({ where: { ...whereOrg, status: 'Active' } })
     ])
 
     return {
@@ -40,7 +81,14 @@ export async function getAdminDashboardStats(organizationId?: string) {
         regPayments,
         repayments,
         installments,
-        roles
+        roles,
+        summary: {
+            totalDisbursed: loanPortfolio._sum.principal || 0,
+            totalPayable: loanPortfolio._sum.totalPayable || 0,
+            totalCollected: repaymentTotals._sum.amount || 0,
+            totalBorrowers,
+            activeLoans: activeLoansCount
+        }
       }
     }
   } catch (error: any) {
