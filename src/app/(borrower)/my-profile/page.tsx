@@ -96,7 +96,7 @@ export default function BorrowerProfilePage() {
     if (!user) return;
     setIsProfileSubmitting(true);
     try {
-        const updatePromises = [
+        const updatePromises: Promise<any>[] = [
             updateUser(user.uid, { fullName: data.fullName })
         ];
         if (borrower) {

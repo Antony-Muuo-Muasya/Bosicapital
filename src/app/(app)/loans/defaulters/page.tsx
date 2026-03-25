@@ -245,7 +245,7 @@ export default function DefaultersPage() {
                 ...loan,
                 borrowerName: borrower.fullName,
                 borrowerPhotoUrl: borrower.photoUrl || `https://picsum.photos/seed/${borrower.id}/400/400`,
-                loanProductName: product.name,
+                loanProductName: product,
                 overdueAmount: overdueInfo.overdueAmount,
                 daysOverdue: daysOverdue > 0 ? daysOverdue : 1,
             }

@@ -63,7 +63,7 @@ export function DualTrendChart({ data, isLoading }: DualTrendChartProps) {
                     <YAxis 
                         tickFormatter={(value) => formatCurrency(Number(value), 'KES').replace('KES', '').replace('.00', '')}
                     />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value), 'KES')} />} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value: any) => formatCurrency(Number(value), 'KES')} />} />
                     <ChartLegend content={<ChartLegendContent />} />
                     <Bar dataKey="disbursed" fill="var(--color-disbursed)" radius={4} />
                     <Line dataKey="collected" type="monotone" stroke="var(--color-collected)" strokeWidth={2} dot={false} />

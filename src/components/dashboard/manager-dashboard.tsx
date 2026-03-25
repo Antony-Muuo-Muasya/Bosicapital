@@ -5,7 +5,8 @@ import { getManagerDashboardStats } from '@/actions/dashboard';
 import { getLoanProducts } from '@/actions/loan-products';
 import { getBorrowers } from '@/actions/borrowers';
 import { getRoles } from '@/actions/roles';
-import type { Loan, Borrower, Installment, Repayment, LoanProduct, Role } from '@/lib/types';
+import { getBranches } from '@/actions/branches';
+import type { Loan, Borrower, Installment, Repayment, LoanProduct, Role, Branch } from '@/lib/types';
 import { useEffect, useState, useCallback } from 'react';
 import { DueLoansTable } from './due-loans-table';
 import { useMemo } from 'react';
@@ -35,6 +36,7 @@ export function ManagerDashboard() {
   const [allRepayments, setAllRepayments] = useState<Repayment[] | null>(null);
   const [allLoanProducts, setAllLoanProducts] = useState<LoanProduct[] | null>(null);
   const [allRoles, setAllRoles] = useState<Role[] | null>(null);
+  const [allBranches, setAllBranches] = useState<Branch[] | null>(null);
 
   const [isAddBorrowerOpen, setIsAddBorrowerOpen] = useState(false);
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
@@ -52,13 +54,15 @@ export function ManagerDashboard() {
               setAllRepayments(res.data.repayments as any);
           }
 
-          const [productsRes, rolesRes] = await Promise.all([
+          const [productsRes, rolesRes, branchesRes] = await Promise.all([
             getLoanProducts(organizationId),
-            getRoles(organizationId)
+            getRoles(organizationId),
+            getBranches(organizationId)
           ]);
 
           if (productsRes.success) setAllLoanProducts(productsRes.products as any);
           if (rolesRes.success) setAllRoles(rolesRes.roles as any);
+          if (branchesRes.success) setAllBranches(branchesRes.branches as any);
 
       } catch (e) {
           console.error(e);
@@ -292,7 +296,7 @@ export function ManagerDashboard() {
         </div>
       </div>
 
-      <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} roles={allRoles || []} />
+      <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} roles={allRoles || []} branches={allBranches || []} />
       <AddBorrowerDialog open={isAddBorrowerOpen} onOpenChange={setIsAddBorrowerOpen} />
       <AddLoanDialog
         open={isAddLoanOpen}

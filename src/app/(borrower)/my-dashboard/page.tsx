@@ -6,7 +6,7 @@ import { getLoans } from "@/actions/loans";
 import { getInstallments } from "@/actions/installments";
 import { getLoanProducts } from "@/actions/loan-products";
 import { getUserProfile } from "@/actions/users";
-import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } from '@/lib/types';
+import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } from '@prisma/client';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
@@ -133,9 +133,8 @@ export default function MyDashboardPage() {
         }
         
         const today = startOfToday();
-        const processedInstallments = installments.map(inst => {
-            const [year, month, day] = inst.dueDate.split('-').map(Number);
-            const dueDate = new Date(year, month - 1, day);
+        const processedInstallments = installments.map((inst: Installment) => {
+            const dueDate = new Date(inst.dueDate);
             const isOverdue = dueDate < today && inst.status !== 'Paid';
             return {
                 ...inst,

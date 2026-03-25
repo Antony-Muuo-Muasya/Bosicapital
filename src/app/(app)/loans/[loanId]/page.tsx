@@ -1,7 +1,7 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { getLoan } from "@/actions/loans";
-import type { Loan, LoanProduct, Installment, Borrower } from '@/lib/types';
+import type { Loan, LoanProduct, Installment, Borrower } from '@prisma/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, FileDown, Circle, CheckCircle, AlertCircle, User, Phone, Briefcase } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
@@ -38,7 +38,7 @@ export default function LoanDetailPage() {
     const router = useRouter();
     const params = useParams() as { loanId: string };
     const loanId = params.loanId;
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<Loan & { loanProduct: LoanProduct, borrower: Borrower, installments: Installment[] } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -77,9 +77,8 @@ export default function LoanDetailPage() {
     const sortedInstallments = useMemo(() => {
         if (!installments) return [];
         const today = startOfToday();
-        return installments.map(inst => {
-            const [year, month, day] = inst.dueDate.split('-').map(Number);
-            const dueDate = new Date(year, month - 1, day);
+        return installments.map((inst: Installment) => {
+            const dueDate = new Date(inst.dueDate);
             const isOverdue = dueDate < today && inst.status !== 'Paid';
             return {
                 ...inst,
@@ -135,7 +134,7 @@ export default function LoanDetailPage() {
                             <CardContent className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <Avatar className="h-12 w-12">
-                                        <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
+                                        <AvatarImage src={borrower.photoUrl || undefined} alt={borrower.fullName} />
                                         <AvatarFallback>{borrower.fullName.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div>

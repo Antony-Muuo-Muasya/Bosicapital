@@ -18,7 +18,7 @@ const targetSchema = z.object({
   name: z.string().min(3, 'Target name is required.'),
   branchId: z.string().min(1, 'A branch must be selected.'),
   userId: z.string().optional(),
-  type: z.enum(['disbursal_amount', 'new_borrowers', 'portfolio_value']),
+  type: z.enum(['disbursal_amount', 'new_borrowers', 'portfolio_value', 'collection_rate']),
   value: z.coerce.number().positive('Target value must be a positive number.'),
   startDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid start date is required.' }),
   endDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid end date is required.' }),
@@ -44,8 +44,13 @@ export function EditTargetDialog({ target, branches, users, open, onOpenChange }
   const form = useForm<TargetFormData>({
     resolver: zodResolver(targetSchema),
     defaultValues: {
-        ...target,
+        name: target.name,
+        branchId: target.branchId,
         userId: target.userId || '',
+        type: target.type as any,
+        value: target.value,
+        startDate: target.startDate,
+        endDate: target.endDate,
     },
   });
 
@@ -131,6 +136,7 @@ export function EditTargetDialog({ target, branches, users, open, onOpenChange }
                                 <SelectItem value="disbursal_amount">Disbursal Amount (KES)</SelectItem>
                                 <SelectItem value="new_borrowers">New Borrowers (Count)</SelectItem>
                                 <SelectItem value="portfolio_value">Portfolio Value (KES)</SelectItem>
+                                <SelectItem value="collection_rate">Collection Rate (%)</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />

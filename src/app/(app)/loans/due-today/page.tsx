@@ -73,7 +73,7 @@ export const dueTodayColumns: ColumnDef<DueInstallmentWithDetails>[] = [
       accessorKey: 'expectedAmount',
       header: () => <div className="text-right">Amount Due</div>,
       cell: ({ row }) => {
-        const amount = parseFloat(row.original.expectedAmount) - parseFloat(row.original.paidAmount);
+        const amount = row.original.expectedAmount - row.original.paidAmount;
         return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
       },
     },
