@@ -4,7 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import bcrypt from 'bcryptjs'
 
 const prismaClientSingleton = () => {
-  const pool = new Pool({ connectionString: "postgresql://postgres:Antonymuuo001%23@localhost:5432/postgres" })
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const adapter = new PrismaPg(pool as any)
   return new PrismaClient({ adapter })
 }

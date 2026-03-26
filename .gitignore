@@ -36,3 +36,4 @@ functions/.env
 .vercel
 
 /src/generated/prisma
+tsconfig.tsbuildinfo
