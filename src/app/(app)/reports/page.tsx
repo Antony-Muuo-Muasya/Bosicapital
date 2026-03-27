@@ -7,6 +7,7 @@ import { getLoans } from '@/actions/loans';
 import { getBorrowers } from '@/actions/borrowers';
 import { getLoanProducts } from '@/actions/loan-products';
 import type { Loan, Borrower, LoanProduct } from '@/lib/types';
+import { getBranchPerformance } from '@/actions/branches';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -96,7 +97,13 @@ function ReportDataTable<TData, TValue>({
 }
 
 // Columns for Active Loans
-type LoanWithDetails = Loan & { borrowerName: string; loanProductName: string; borrowerPhotoUrl?: string };
+type LoanWithDetails = Loan & { 
+    borrowerName: string; 
+    loanProductName: string; 
+    borrowerPhotoUrl?: string; 
+    nextPaymentDate?: string;
+    lastPaymentDate?: string;
+};
 
 // Columns can be defined outside if they don't use hooks, 
 // but here we move them inside ReportsPage or use a separate Cell component.
@@ -117,6 +124,7 @@ export default function ReportsPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
   const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
+  const [branchPerformance, setBranchPerformance] = useState<any[]>([]);
 
   // Move columns inside to utilize 'router' correctly
   const activeLoansColumns = useMemo<ColumnDef<LoanWithDetails>[]>(() => [
@@ -147,8 +155,24 @@ export default function ReportsPage() {
     },
     { 
       accessorKey: 'issueDate', 
-      header: 'Issue Date',
+      header: 'Disbursed',
       cell: ({ row }) => new Date(row.original.issueDate).toLocaleDateString(),
+    },
+    { 
+      accessorKey: 'lastPaymentDate', 
+      header: 'Last Repayment',
+      cell: ({ row }) => row.original.lastPaymentDate ? new Date(row.original.lastPaymentDate).toLocaleDateString() : 'None',
+    },
+    { 
+      accessorKey: 'nextPaymentDate', 
+      header: 'Next Due',
+      cell: ({ row }) => row.original.nextPaymentDate ? (
+        <Badge variant={new Date(row.original.nextPaymentDate) < new Date() ? 'destructive' : 'outline'}>
+            {new Date(row.original.nextPaymentDate).toLocaleDateString()}
+        </Badge>
+      ) : (
+        <Badge variant="secondary">Completed</Badge>
+      ),
     },
   ], [router]);
 
@@ -205,6 +229,10 @@ export default function ReportsPage() {
           const productsRes = await getLoanProducts(orgId);
           if (productsRes.success && productsRes.products) setLoanProducts(productsRes.products as any);
 
+          // Branch Performance
+          const performanceRes = await getBranchPerformance(organizationId || 'default');
+          if (performanceRes.success && performanceRes.data) setBranchPerformance(performanceRes.data);
+
       } catch (e) {
           console.error(e);
       } finally {
@@ -238,7 +266,10 @@ export default function ReportsPage() {
         ...loan,
         borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown',
         loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown',
-        borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl
+        borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl,
+        nextPaymentDate: (loan as any).installments
+            ?.filter((inst: any) => inst.status === 'Unpaid' || inst.status === 'Partial' || inst.status === 'Overdue')
+            .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0]?.dueDate
       }));
 
     // 2. Inactive Customers Report
@@ -254,15 +285,35 @@ export default function ReportsPage() {
 
   }, [loans, borrowers, loanProducts]);
 
+  const performanceTotal = useMemo(() => {
+    if (!branchPerformance.length) return null;
+    return branchPerformance.reduce((acc, p) => ({
+        totalBorrowers: acc.totalBorrowers + p.totalBorrowers,
+        totalLoans: acc.totalLoans + p.totalLoans,
+        activeLoans: acc.activeLoans + p.activeLoans,
+        totalPrincipal: acc.totalPrincipal + p.totalPrincipal,
+        totalCollected: acc.totalCollected + p.totalCollected,
+        overdueInstallments: acc.overdueInstallments + p.overdueInstallments,
+    }), {
+        totalBorrowers: 0,
+        totalLoans: 0,
+        activeLoans: 0,
+        totalPrincipal: 0,
+        totalCollected: 0,
+        overdueInstallments: 0,
+    });
+  }, [branchPerformance]);
+
   return (
     <>
       <PageHeader title="Reports" description="View detailed reports on your lending activities." />
       <div className="p-4 md:p-6">
         <Tabs defaultValue="active-loans">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="active-loans">Active Loans ({activeLoans.length})</TabsTrigger>
             <TabsTrigger value="inactive-customers">Inactive Customers ({inactiveCustomers.length})</TabsTrigger>
             <TabsTrigger value="leads">Leads ({leads.length})</TabsTrigger>
+            <TabsTrigger value="performance">Branch Performance</TabsTrigger>
           </TabsList>
 
           <TabsContent value="active-loans">
@@ -298,6 +349,67 @@ export default function ReportsPage() {
                 <CardContent>
                     <ReportDataTable columns={customerColumns} data={leads} emptyStateMessage="No leads found." />
                 </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="performance">
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle>Branch Performance Summary</CardTitle>
+                <CardDescription>Consolidated lending performance across all branches.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Branch</TableHead>
+                        <TableHead className="text-right">Borrowers</TableHead>
+                        <TableHead className="text-right">Active Loans</TableHead>
+                        <TableHead className="text-right">Total Disbursed</TableHead>
+                        <TableHead className="text-right">Total Collected</TableHead>
+                        <TableHead className="text-right">Arrears</TableHead>
+                        <TableHead className="text-right">Collection Rate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {branchPerformance.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell className="text-right">{p.totalBorrowers}</TableCell>
+                          <TableCell className="text-right">{p.activeLoans}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">{formatCurrency(p.totalPrincipal)}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">{formatCurrency(p.totalCollected)}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={p.overdueInstallments > 0 ? "destructive" : "outline"} className="text-[10px]">
+                              {p.overdueInstallments}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-xs font-bold">{p.collectionRate.toFixed(1)}%</span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {performanceTotal && (
+                        <TableRow className="bg-muted/50 font-bold border-t-2">
+                          <TableCell>Platform Total</TableCell>
+                          <TableCell className="text-right">{performanceTotal.totalBorrowers}</TableCell>
+                          <TableCell className="text-right">{performanceTotal.activeLoans}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">{formatCurrency(performanceTotal.totalPrincipal)}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">{formatCurrency(performanceTotal.totalCollected)}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={performanceTotal.overdueInstallments > 0 ? "destructive" : "outline"}>
+                              {performanceTotal.overdueInstallments}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {(performanceTotal.totalPrincipal > 0 ? (performanceTotal.totalCollected / performanceTotal.totalPrincipal) * 100 : 0).toFixed(1)}%
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
         </Tabs>

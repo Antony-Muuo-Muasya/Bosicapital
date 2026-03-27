@@ -20,7 +20,8 @@ export async function getLoans(organizationId: string, borrowerId?: string, bran
       where,
       orderBy: { issueDate: 'desc' },
       include: {
-        loanProduct: true
+        loanProduct: true,
+        installments: true
       }
     })
     return { success: true, loans }

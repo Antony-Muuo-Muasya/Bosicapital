@@ -99,6 +99,8 @@ model Borrower {
   photoUrl           String?
   businessPhotoUrl   String?
   homeAssetsPhotoUrl String?
+  loanApplicationUrl  String?
+  guarantorFormUrl    String?
   branchId           String
   branch             Branch       @relation(fields: [branchId], references: [id])
   userId             String

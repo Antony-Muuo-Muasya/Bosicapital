@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '../ui/badge';
 
-const BranchActions = ({ branch, onEdit, onRefresh }: { branch: Branch, onEdit: (branch: Branch) => void, onRefresh: () => void }) => {
+const BranchActions = ({ branch, onEdit, onViewUsers, onRefresh }: { branch: Branch, onEdit: (branch: Branch) => void, onViewUsers: (branch: Branch) => void, onRefresh: () => void }) => {
   const { toast } = useToast();
   const { userProfile } = useUserProfile();
 
@@ -39,6 +39,9 @@ const BranchActions = ({ branch, onEdit, onRefresh }: { branch: Branch, onEdit: 
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => onViewUsers(branch)}>
+          View Staff in Branch
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onEdit(branch)}>
           Edit Branch
         </DropdownMenuItem>
@@ -52,7 +55,7 @@ const BranchActions = ({ branch, onEdit, onRefresh }: { branch: Branch, onEdit: 
   );
 };
 
-export const getBranchColumns = (onEdit: (branch: Branch) => void, onRefresh: () => void): ColumnDef<Branch>[] => [
+export const getBranchColumns = (onEdit: (branch: Branch) => void, onViewUsers: (branch: Branch) => void, onRefresh: () => void): ColumnDef<Branch>[] => [
   {
     accessorKey: 'name',
     header: 'Branch Name',
@@ -74,7 +77,7 @@ export const getBranchColumns = (onEdit: (branch: Branch) => void, onRefresh: ()
     id: 'actions',
     cell: ({ row }) => {
       const branch = row.original;
-      return <BranchActions branch={branch} onEdit={onEdit} onRefresh={onRefresh} />;
+      return <BranchActions branch={branch} onEdit={onEdit} onViewUsers={onViewUsers} onRefresh={onRefresh} />;
     },
   },
 ];

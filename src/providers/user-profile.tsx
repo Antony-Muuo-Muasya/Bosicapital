@@ -15,11 +15,9 @@ export interface UserProfileHookResult {
 
 type WithId<T> = T & { id: string };
 
-export const UserProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  return <>{children}</>;
-};
+const UserProfileContext = createContext<UserProfileHookResult | undefined>(undefined);
 
-export const useUserProfile = (): UserProfileHookResult => {
+export const UserProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { data: session, status } = useSession();
   const isAuthLoading = status === 'loading';
   const sessionUser = session?.user as any;
@@ -49,12 +47,11 @@ export const useUserProfile = (): UserProfileHookResult => {
       return;
     }
     
-    let isMounted = true;
+    console.log(`[UserProfile] Fetching profile for ID: ${sessionUser.id}`);
     setIsProfileLoading(true);
     
     getUserProfile(sessionUser.id)
       .then(res => {
-        if (!isMounted) return;
         if (res.success && res.user) {
           const profile = {
             id: res.user.id,
@@ -64,7 +61,7 @@ export const useUserProfile = (): UserProfileHookResult => {
             roleId: res.user.roleId,
             branchIds: res.user.branchIds,
             status: res.user.status,
-            createdAt: res.user.createdAt.toISOString(),
+            createdAt: res.user.createdAt.toString(),
             avatarUrl: res.user.avatarUrl || undefined,
             marketingOptIn: res.user.marketingOptIn,
           } as WithId<AppUser>;
@@ -73,31 +70,39 @@ export const useUserProfile = (): UserProfileHookResult => {
           setUserRole(res.user.role as any);
           setOrganization(res.user.organization as any);
         } else {
-          setUserProfile(null);
-          setUserRole(null);
-          setOrganization(null);
+          console.error("[UserProfile] Profile fetch failed (Stale Session):", res.error);
+          import('next-auth/react').then(({ signOut }) => {
+            signOut({ redirect: true, callbackUrl: '/login' });
+          });
         }
       })
       .catch((err) => {
-        console.error("Failed to load user profile", err);
-        if (isMounted) {
-            setUserProfile(null);
-            setUserRole(null);
-            setOrganization(null);
-        }
+        console.error("[UserProfile] Failed to load user profile", err);
       })
       .finally(() => {
-        if (isMounted) setIsProfileLoading(false);
+        setIsProfileLoading(false);
       });
-      
-    return () => { isMounted = false; };
   }, [sessionUser?.id, isAuthLoading]);
 
-  return {
+  const value = useMemo(() => ({
     user,
     userProfile,
     userRole,
     organization: organization ? { ...organization, name: 'Bosi Capital Limited' } as any : null,
     isLoading: isAuthLoading || isProfileLoading,
-  };
+  }), [user, userProfile, userRole, organization, isAuthLoading, isProfileLoading]);
+
+  return (
+    <UserProfileContext.Provider value={value}>
+      {children}
+    </UserProfileContext.Provider>
+  );
+};
+
+export const useUserProfile = (): UserProfileHookResult => {
+  const context = useContext(UserProfileContext);
+  if (context === undefined) {
+    throw new Error('useUserProfile must be used within a UserProfileProvider');
+  }
+  return context;
 };

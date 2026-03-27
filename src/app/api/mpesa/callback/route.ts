@@ -202,11 +202,13 @@ export async function POST(req: Request) {
           return { newLoanStatus, balanceAfterPayment, loanId: loan!.id };
         });
 
+        /* 
         if (borrower.phone) {
           const { newLoanStatus, balanceAfterPayment, loanId } = finalLoanStatus;
           const smsMessage = `Payment Received: KES ${paymentAmount}.\nLoan ID: ${loanId.substring(0, 8)}...\nRemaining Balance: KES ${balanceAfterPayment.toFixed(2)}.\nStatus: ${newLoanStatus}.\nThank you for your payment. Bosi Capital.`;
           await sendSms(borrower.phone, smsMessage);
         }
+        */
       } else {
         status = "Failed";
         errorMessage = "Could not match to a borrower or active loan";

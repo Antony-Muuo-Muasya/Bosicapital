@@ -4,11 +4,15 @@ import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
-export async function getUsers(organizationId: string, roleId?: string) {
+export async function getUsers(organizationId: string, roleId?: string, branchId?: string) {
   try {
     const where: any = {};
     if (organizationId !== 'system') {
       where.organizationId = organizationId;
+    }
+
+    if (branchId) {
+      where.branchIds = { has: branchId };
     }
     
     // Add any specific role filters
@@ -44,9 +48,11 @@ export async function getUserProfile(userId: string) {
     });
     
     if (!user) {
+      console.log(`[UserProfile] User NOT FOUND in DB for ID: ${userId}`);
       return { success: false, error: 'User not found' };
     }
     
+    console.log(`[UserProfile] Found user: ${user.fullName} (${user.roleId})`);
     return { success: true, user };
   } catch (error: any) {
     console.error("Failed to fetch user profile:", error);

@@ -4,6 +4,7 @@ import prisma from '@/lib/db'
 
 export async function getAdminDashboardStats(organizationId?: string) {
   try {
+    console.log(`[Stats] Fetching Admin Dashboard Stats for Organization: ${organizationId || 'System'}`);
     const whereOrg: any = organizationId ? { organizationId } : {}
     
     // Perform parallel queries for efficiency
@@ -24,7 +25,7 @@ export async function getAdminDashboardStats(organizationId?: string) {
     ] = await Promise.all([
       prisma.loan.findMany({ 
         where: whereOrg,
-        select: { id: true, status: true, principal: true, issueDate: true, loanProductId: true, loanOfficerId: true, totalPayable: true, borrowerId: true }
+        select: { id: true, status: true, principal: true, issueDate: true, loanProductId: true, loanOfficerId: true, totalPayable: true, borrowerId: true, branchId: true }
       }),
       prisma.borrower.findMany({ 
         where: whereOrg,

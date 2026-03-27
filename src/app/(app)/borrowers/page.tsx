@@ -69,7 +69,7 @@ export default function BorrowersPage() {
   return (
     <>
       <PageHeader title="Borrowers" description="Manage your list of borrowers.">
-        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSuperAdmin}>
+        <Button onClick={() => setIsAddDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Borrower
         </Button>

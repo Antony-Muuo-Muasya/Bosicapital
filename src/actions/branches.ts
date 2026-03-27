@@ -67,3 +67,55 @@ export async function deleteBranch(id: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function getBranchPerformance(organizationId: string) {
+  try {
+    const branches = await prisma.branch.findMany({
+      where: { organizationId },
+      include: {
+          borrowers: { select: { id: true } },
+          loans: {
+              select: {
+                  id: true,
+                  principal: true,
+                  totalPayable: true,
+                  status: true,
+                  repayments: { select: { amount: true } }
+              }
+          },
+          installments: {
+              where: { status: 'Overdue' },
+              select: { id: true }
+          }
+      }
+    });
+
+    const performanceData = branches.map(branch => {
+      const totalBorrowers = branch.borrowers.length;
+      const totalLoans = branch.loans.length;
+      const activeLoans = branch.loans.filter(l => l.status === 'Active' || l.status === 'Approved').length;
+      const totalPrincipal = branch.loans.reduce((acc, l) => acc + l.principal, 0);
+      const totalCollected = branch.loans.reduce((acc, l) => {
+          const loanRepaid = l.repayments.reduce((rAcc, r) => rAcc + (r.amount || 0), 0);
+          return acc + loanRepaid;
+      }, 0);
+      const overdueInstallments = branch.installments.length;
+
+      return {
+          id: branch.id,
+          name: branch.name,
+          totalBorrowers,
+          totalLoans,
+          activeLoans,
+          totalPrincipal,
+          totalCollected,
+          overdueInstallments,
+          collectionRate: totalPrincipal > 0 ? (totalCollected / totalPrincipal) * 100 : 0
+      };
+    });
+
+    return { success: true, data: performanceData };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

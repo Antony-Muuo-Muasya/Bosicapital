@@ -13,11 +13,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { AddBranchDialog } from './add-branch-dialog';
 import { EditBranchDialog } from './edit-branch-dialog';
+import { BranchUsersDialog } from './branch-users-dialog';
 
 export function BranchManagement() {
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+    const [viewingUsersBranch, setViewingUsersBranch] = useState<Branch | null>(null);
 
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
@@ -58,8 +60,12 @@ export function BranchManagement() {
     const handleEdit = (branch: Branch) => {
         setEditingBranch(branch);
     }
+
+    const handleViewUsers = (branch: Branch) => {
+        setViewingUsersBranch(branch);
+    }
     
-    const columns = useMemo(() => getBranchColumns(handleEdit, fetchBranches), [fetchBranches]);
+    const columns = useMemo(() => getBranchColumns(handleEdit, handleViewUsers, fetchBranches), [fetchBranches]);
 
     const table = useReactTable({
         data: branches || [],
@@ -138,6 +144,17 @@ export function BranchManagement() {
                 if (!open) {
                     setEditingBranch(null);
                     fetchBranches();
+                }
+            }}
+        />
+    )}
+    {viewingUsersBranch && (
+        <BranchUsersDialog 
+            branch={viewingUsersBranch}
+            open={!!viewingUsersBranch}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setViewingUsersBranch(null);
                 }
             }}
         />
