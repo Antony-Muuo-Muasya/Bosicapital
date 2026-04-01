@@ -34,7 +34,7 @@ export default function LoansPage() {
   const roleId = userProfile?.roleId;
   const branchIds = userProfile?.branchIds;
   const organizationId = userProfile?.organizationId;
-  const userId = user?.uid;
+  const userId = user?.id;
 
   const [isLoadingLoans, setIsLoadingLoans] = useState(true);
   const [isLoadingBorrowers, setIsLoadingBorrowers] = useState(true);

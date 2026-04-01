@@ -85,7 +85,7 @@ export function InteractionHistory({ borrowerId }: InteractionHistoryProps) {
             borrowerId,
             organizationId: userProfile.organizationId,
             branchId: userProfile.branchIds[0],
-            recordedById: user.uid,
+            recordedById: user.id,
             recordedByName: userProfile.fullName,
             notes: values.notes,
         });

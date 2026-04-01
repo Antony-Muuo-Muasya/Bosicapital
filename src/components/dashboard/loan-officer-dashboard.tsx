@@ -47,7 +47,7 @@ export function LoanOfficerDashboard() {
       if (!userProfile || !user || !organizationId) return;
       setIsLoading(true);
       try {
-          const res = await getLoanOfficerDashboardStats(organizationId, user.uid);
+          const res = await getLoanOfficerDashboardStats(organizationId, user.id);
           if (res.success && res.data) {
               setLoans(res.data.loans as any);
               setRepayments(res.data.repayments as any);

@@ -50,7 +50,7 @@ const UserActions = ({ user, onEdit, onRefresh }: { user: UserWithRole, onEdit: 
     }
   };
 
-  const isCurrentUser = currentUser?.uid === user.id;
+  const isCurrentUser = currentUser?.id === user.id;
 
   return (
     <DropdownMenu>

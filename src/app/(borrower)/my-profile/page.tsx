@@ -52,7 +52,7 @@ export default function BorrowerProfilePage() {
       setIsLoading(true);
       try {
           // Borrower
-          const borrowersRes = await getBorrowers(undefined as any, user.uid);
+          const borrowersRes = await getBorrowers(undefined as any, user.id);
           if (borrowersRes.success && borrowersRes.borrowers && borrowersRes.borrowers.length > 0) {
               const b = borrowersRes.borrowers[0];
               setBorrower(b as any);
@@ -97,7 +97,7 @@ export default function BorrowerProfilePage() {
     setIsProfileSubmitting(true);
     try {
         const updatePromises: Promise<any>[] = [
-            updateUser(user.uid, { fullName: data.fullName })
+            updateUser(user.id, { fullName: data.fullName })
         ];
         if (borrower) {
             updatePromises.push(updateBorrower(borrower.id, { fullName: data.fullName }));
@@ -140,7 +140,7 @@ export default function BorrowerProfilePage() {
   const handleMarketingToggle = async (checked: boolean) => {
     if (!user) return;
     try {
-        const res = await updateUser(user.uid, { marketingOptIn: checked } as any);
+        const res = await updateUser(user.id, { marketingOptIn: checked } as any);
         if (res.success) {
             toast({ title: 'Preferences Updated', description: `You will ${checked ? '' : 'not '}receive marketing updates.` });
         } else {

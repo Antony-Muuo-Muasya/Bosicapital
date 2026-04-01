@@ -77,7 +77,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
             amount: registrationFeeAmount,
             paymentMethod: values.paymentMethod,
             reference: values.reference,
-            collectedBy: user.uid,
+            collectedBy: user.id,
         });
 
         if (!res.success) {

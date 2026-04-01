@@ -29,7 +29,7 @@ export default function RepaymentsPage() {
   const organizationId = userProfile?.organizationId;
   const roleId = userProfile?.roleId;
   const branchIds = userProfile?.branchIds;
-  const userId = user?.uid;
+  const userId = user?.id;
 
   const [visibleLoans, setVisibleLoans] = useState<Loan[] | null>(null);
   const [allRepayments, setAllRepayments] = useState<Repayment[] | null>(null);

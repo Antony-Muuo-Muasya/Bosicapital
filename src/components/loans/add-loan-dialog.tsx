@@ -137,7 +137,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       installmentAmount: installmentAmount,
       issueDate: new Date().toISOString().split('T')[0], // This is the request date
       status: 'Pending Approval',
-      loanOfficerId: user.uid,
+      loanOfficerId: user.id,
       branchId: userProfile.branchIds[0],
     };
     

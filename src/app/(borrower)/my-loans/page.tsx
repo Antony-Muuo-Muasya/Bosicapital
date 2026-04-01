@@ -36,7 +36,7 @@ export default function MyLoansPage() {
         setIsLoading(true);
         try {
             // Borrower
-            const borrowersRes = await getBorrowers(undefined as any, user.uid);
+            const borrowersRes = await getBorrowers(undefined as any, user.id);
             if (borrowersRes.success && borrowersRes.borrowers && borrowersRes.borrowers.length > 0) {
                 const b = borrowersRes.borrowers[0];
                 setBorrower(b as any);
