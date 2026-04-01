@@ -76,12 +76,12 @@ export default function MyLoanDetailPage() {
                 ...inst,
                 status: isOverdue ? 'Overdue' : inst.status,
             };
-        }).sort((a,b) => a.installmentNumber - b.installmentNumber);
+        }).sort((a: any, b: any) => a.installmentNumber - b.installmentNumber);
     }, [installments]);
     
     const { totalPaid, totalOutstanding } = useMemo(() => {
         if (!installments || !loan) return { totalPaid: 0, totalOutstanding: 0 };
-        const paid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
+        const paid = installments.reduce((acc: any, curr: any) => acc + curr.paidAmount, 0);
         return {
             totalPaid: paid,
             totalOutstanding: loan.totalPayable - paid
@@ -94,7 +94,7 @@ export default function MyLoanDetailPage() {
         if (!sortedInstallments || !loan || !product) return;
 
         const headers = ['Installment #', 'Due Date', 'Amount Due', 'Amount Paid', 'Status'];
-        const rows = sortedInstallments.map(inst => [
+        const rows = sortedInstallments.map((inst: any) => [
             inst.installmentNumber,
             new Date(inst.dueDate).toLocaleDateString(),
             inst.expectedAmount,
@@ -191,7 +191,7 @@ export default function MyLoanDetailPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedInstallments.map(inst => {
+                            {sortedInstallments.map((inst: any) => {
                                 const statusConfig = getInstallmentStatusConfig(inst.status);
                                 const Icon = statusConfig.icon;
                                 return (
