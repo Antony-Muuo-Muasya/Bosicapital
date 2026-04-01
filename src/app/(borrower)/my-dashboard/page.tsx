@@ -6,7 +6,7 @@ import { getLoans } from "@/actions/loans";
 import { getInstallments } from "@/actions/installments";
 import { getLoanProducts } from "@/actions/loan-products";
 import { getUserProfile } from "@/actions/users";
-import type { Borrower, Loan, Installment, User as LoanOfficer, LoanProduct } from '@prisma/client';
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
@@ -44,11 +44,11 @@ export default function MyDashboardPage() {
     const { user, userProfile } = useUserProfile();
     const [randomTip, setRandomTip] = useState<string | undefined>();
     const [isLoading, setIsLoading] = useState(true);
-    const [borrower, setBorrower] = useState<Borrower | null>(null);
-    const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
-    const [installments, setInstallments] = useState<Installment[] | null>(null);
-    const [loanProduct, setLoanProduct] = useState<LoanProduct | null>(null);
-    const [loanOfficer, setLoanOfficer] = useState<LoanOfficer | null>(null);
+    const [borrower, setBorrower] = useState<any | null>(null);
+    const [allLoans, setAllLoans] = useState<any[] | null>(null);
+    const [installments, setInstallments] = useState<any[] | null>(null);
+    const [loanProduct, setLoanProduct] = useState<any | null>(null);
+    const [loanOfficer, setLoanOfficer] = useState<any | null>(null);
 
     useEffect(() => {
         setRandomTip(financialTips[Math.floor(Math.random() * financialTips.length)]);
@@ -59,7 +59,7 @@ export default function MyDashboardPage() {
         setIsLoading(true);
         try {
             // Borrower
-            const borrowersRes = await getBorrowers(undefined as any, user.uid);
+            const borrowersRes = await getBorrowers(undefined as any, user.id);
             if (borrowersRes.success && borrowersRes.borrowers && borrowersRes.borrowers.length > 0) {
                 const b = borrowersRes.borrowers[0];
                 setBorrower(b as any);
@@ -133,7 +133,7 @@ export default function MyDashboardPage() {
         }
         
         const today = startOfToday();
-        const processedInstallments = installments.map((inst: Installment) => {
+        const processedInstallments = installments.map((inst: any) => {
             const dueDate = new Date(inst.dueDate);
             const isOverdue = dueDate < today && inst.status !== 'Paid';
             return {
