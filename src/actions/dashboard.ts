@@ -1,13 +1,13 @@
-'use server'
+'use server';
 
-import prisma from '@/lib/db'
+import { db } from '@/lib/db';
 
 export async function getAdminDashboardStats(organizationId?: string) {
   try {
-    console.log(`[Stats] Fetching Admin Dashboard Stats for Organization: ${organizationId || 'System'}`);
-    const whereOrg: any = organizationId ? { organizationId } : {}
-    
-    // Perform parallel queries for efficiency
+    const whereOrg = organizationId ? ` WHERE "organizationId" = $1` : '';
+    const params = organizationId ? [organizationId] : [];
+
+    // Parallel SQL queries
     const [
       loans,
       borrowers,
@@ -20,56 +20,25 @@ export async function getAdminDashboardStats(organizationId?: string) {
       roles,
       loanPortfolio,
       repaymentTotals,
-      totalBorrowers,
+      totalBorrowersCount,
       activeLoansCount
     ] = await Promise.all([
-      prisma.loan.findMany({ 
-        where: whereOrg,
-        select: { id: true, status: true, principal: true, issueDate: true, loanProductId: true, loanOfficerId: true, totalPayable: true, borrowerId: true, branchId: true }
-      }),
-      prisma.borrower.findMany({ 
-        where: whereOrg,
-        select: { id: true, registrationFeePaidAt: true, organizationId: true, branchId: true }
-      }),
-      prisma.loanProduct.findMany({ 
-        where: whereOrg,
-        select: { id: true, category: true }
-      }),
-      prisma.user.findMany({ 
-        where: whereOrg,
-        select: { id: true, fullName: true, avatarUrl: true, roleId: true }
-      }),
-      prisma.branch.findMany({ 
-        where: whereOrg,
-        select: { id: true, name: true }
-      }),
-      prisma.registrationPayment.findMany({ 
-        where: whereOrg,
-        select: { id: true, amount: true, createdAt: true }
-      }),
-      prisma.repayment.findMany({ 
-        where: whereOrg,
-        select: { id: true, amount: true, paymentDate: true, loanId: true }
-      }),
-      prisma.installment.findMany({ 
-        where: whereOrg,
-        select: { id: true, status: true, expectedAmount: true, paidAmount: true, loanId: true, dueDate: true }
-      }),
-      prisma.role.findMany({
-        select: { id: true, name: true }
-      }),
-      // Aggregates for efficiency
-      prisma.loan.aggregate({
-        where: { ...whereOrg, status: 'Active' },
-        _sum: { totalPayable: true, principal: true }
-      }),
-      prisma.repayment.aggregate({
-        where: whereOrg,
-        _sum: { amount: true }
-      }),
-      prisma.borrower.count({ where: whereOrg }),
-      prisma.loan.count({ where: { ...whereOrg, status: 'Active' } })
-    ])
+      db(`SELECT id, status, principal, "issueDate", "loanProductId", "loanOfficerId", "totalPayable", "borrowerId", "branchId" FROM "Loan" ${whereOrg}`, params),
+      db(`SELECT id, "registrationFeePaidAt", "organizationId", "branchId" FROM "Borrower" ${whereOrg}`, params),
+      db(`SELECT id, category FROM "LoanProduct" ${whereOrg}`, params),
+      db(`SELECT id, "fullName", "avatarUrl", "roleId" FROM "User" ${whereOrg}`, params),
+      db(`SELECT id, name FROM "Branch" ${whereOrg}`, params),
+      db(`SELECT id, amount, "createdAt" FROM "RegistrationPayment" ${whereOrg}`, params),
+      db(`SELECT id, amount, "paymentDate", "loanId" FROM "Repayment" ${whereOrg}`, params),
+      db(`SELECT id, status, "expectedAmount", "paidAmount", "loanId", "dueDate" FROM "Installment" ${whereOrg}`, params),
+      db(`SELECT id, name FROM "Role"`, []),
+      
+      // Aggregates
+      db(`SELECT COALESCE(SUM("totalPayable"), 0) as "totalPayable", COALESCE(SUM(principal), 0) as principal FROM "Loan" ${whereOrg} ${whereOrg ? 'AND' : 'WHERE'} status = 'Active'`, params),
+      db(`SELECT COALESCE(SUM(amount), 0) as amount FROM "Repayment" ${whereOrg}`, params),
+      db(`SELECT COUNT(*) as count FROM "Borrower" ${whereOrg}`, params),
+      db(`SELECT COUNT(*) as count FROM "Loan" ${whereOrg} ${whereOrg ? 'AND' : 'WHERE'} status = 'Active'`, params)
+    ]);
 
     return {
       success: true,
@@ -84,16 +53,17 @@ export async function getAdminDashboardStats(organizationId?: string) {
         installments,
         roles,
         summary: {
-            totalDisbursed: loanPortfolio._sum.principal || 0,
-            totalPayable: loanPortfolio._sum.totalPayable || 0,
-            totalCollected: repaymentTotals._sum.amount || 0,
-            totalBorrowers,
-            activeLoans: activeLoansCount
+            totalDisbursed: Number(loanPortfolio[0]?.principal || 0),
+            totalPayable: Number(loanPortfolio[0]?.totalPayable || 0),
+            totalCollected: Number(repaymentTotals[0]?.amount || 0),
+            totalBorrowers: Number(totalBorrowersCount[0]?.count || 0),
+            activeLoans: Number(activeLoansCount[0]?.count || 0)
         }
       }
-    }
+    };
   } catch (error: any) {
-    return { success: false, error: error.message }
+    console.error("Dashboard Stats Error:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -106,25 +76,19 @@ export async function getManagerDashboardStats(organizationId: string, branchIds
       repayments,
       targets
     ] = await Promise.all([
-      prisma.loan.findMany({ where: { branchId: { in: branchIds } } }),
-      prisma.borrower.findMany({ where: { organizationId } }),
-      prisma.installment.findMany({ where: { organizationId } }),
-      prisma.repayment.findMany({ where: { organizationId } }),
-      prisma.target.findMany({ where: { branchId: { in: branchIds }, userId: null } })
-    ])
+      db(`SELECT * FROM "Loan" WHERE "branchId" = ANY($1)`, [branchIds]),
+      db(`SELECT * FROM "Borrower" WHERE "organizationId" = $1`, [organizationId]),
+      db(`SELECT * FROM "Installment" WHERE "organizationId" = $1`, [organizationId]),
+      db(`SELECT * FROM "Repayment" WHERE "organizationId" = $1`, [organizationId]),
+      db(`SELECT * FROM "Target" WHERE "branchId" = ANY($1) AND "userId" IS NULL`, [branchIds])
+    ]);
 
     return {
       success: true,
-      data: {
-        loans,
-        borrowers,
-        installments,
-        repayments,
-        targets
-      }
-    }
+      data: { loans, borrowers, installments, repayments, targets }
+    };
   } catch (error: any) {
-    return { success: false, error: error.message }
+    return { success: false, error: error.message };
   }
 }
 
@@ -137,24 +101,18 @@ export async function getLoanOfficerDashboardStats(organizationId: string, loanO
       repayments,
       targets
     ] = await Promise.all([
-      prisma.loan.findMany({ where: { loanOfficerId } }),
-      prisma.borrower.findMany({ where: { organizationId } }),
-      prisma.installment.findMany({ where: { organizationId } }),
-      prisma.repayment.findMany({ where: { organizationId } }),
-      prisma.target.findMany({ where: { userId: loanOfficerId } })
-    ])
+      db(`SELECT * FROM "Loan" WHERE "loanOfficerId" = $1`, [loanOfficerId]),
+      db(`SELECT * FROM "Borrower" WHERE "organizationId" = $1`, [organizationId]),
+      db(`SELECT * FROM "Installment" WHERE "organizationId" = $1`, [organizationId]),
+      db(`SELECT * FROM "Repayment" WHERE "organizationId" = $1`, [organizationId]),
+      db(`SELECT * FROM "Target" WHERE "userId" = $1`, [loanOfficerId])
+    ]);
 
     return {
       success: true,
-      data: {
-        loans,
-        borrowers,
-        installments,
-        repayments,
-        targets
-      }
-    }
+      data: { loans, borrowers, installments, repayments, targets }
+    };
   } catch (error: any) {
-    return { success: false, error: error.message }
+    return { success: false, error: error.message };
   }
 }

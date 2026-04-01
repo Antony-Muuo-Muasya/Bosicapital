@@ -90,7 +90,7 @@ export default function ProfilePage() {
     if (!user) return;
     setIsProfileSubmitting(true);
     try {
-        const res = await updateUser(user.uid, { fullName: data.fullName });
+        const res = await updateUser(user.id, { fullName: data.fullName });
         if (res.success) {
             toast({ title: 'Success', description: 'Your name has been updated.' });
         } else {
@@ -109,7 +109,7 @@ export default function ProfilePage() {
     setIsPasswordSubmitting(true);
 
     try {
-      const res = await updatePassword(user.uid, { 
+      const res = await updatePassword(user.id, { 
         currentPassword: data.currentPassword, 
         newPassword: data.newPassword 
       });
@@ -145,7 +145,7 @@ export default function ProfilePage() {
   const handleMarketingToggle = async (checked: boolean) => {
     if (!user) return;
     try {
-        const res = await updateUser(user.uid, { marketingOptIn: checked } as any);
+        const res = await updateUser(user.id, { marketingOptIn: checked } as any);
         if (res.success) {
             toast({ title: 'Preferences Updated', description: `You will ${checked ? '' : 'not '}receive marketing updates.` });
         } else {

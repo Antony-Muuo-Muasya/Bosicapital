@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db";
 
 interface MpesaCallbackData {
   TransactionType?: string;
@@ -22,222 +22,120 @@ function normalizePhoneNumber(msisdn: string): string | null {
   return null;
 }
 
-async function sendSms(to: string, message: string): Promise<void> {
-  const username = process.env.AFRICAS_TALKING_USERNAME;
-  const apikey = process.env.AFRICAS_TALKING_APIKEY;
-
-  if (!username || !apikey) {
-    console.error("Africa's Talking credentials are missing in env");
-    return;
-  }
-
-  const payload = new URLSearchParams({ username, to, message });
-
-  try {
-    const response = await fetch("https://api.africastalking.com/version1/messaging", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "apikey": apikey,
-        "Accept": "application/json",
-      },
-      body: payload.toString(),
-    });
-    
-    if (!response.ok) {
-        console.error(`Failed to send SMS to ${to}: ${response.statusText}`);
-    } else {
-        console.log(`SMS sent to ${to}`);
-    }
-  } catch (error) {
-    console.error(`Failed to send SMS to ${to}:`, error);
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const callbackData: MpesaCallbackData = await req.json();
-
     const { TransID, BillRefNumber, MSISDN, TransAmount } = callbackData;
     const paymentAmount = parseFloat(TransAmount || "0");
-
-    let status = "Processed";
-    let errorMessage = null;
+    const mpesaId = `mpc_${Math.random().toString(36).substr(2, 9)}`;
 
     if (!TransID || isNaN(paymentAmount)) {
-      await prisma.mpesaCallback.create({
-        data: {
-          ...callbackData,
-          status: "Failed",
-          errorMessage: "Invalid TransID or TransAmount",
-        }
-      });
+      await db(`
+        INSERT INTO "MpesaCallback" (id, "TransID", "BillRefNumber", "MSISDN", "TransAmount", status, "errorMessage")
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [mpesaId, TransID, BillRefNumber, MSISDN, TransAmount, "Failed", "Invalid TransID or TransAmount"]);
       return NextResponse.json({ ResultCode: 1, ResultDesc: "Invalid data" }, { status: 400 });
     }
 
     try {
-      const existingPayment = await prisma.repayment.findFirst({
-        where: { transId: TransID }
-      });
-
-      if (existingPayment) {
-        // Already processed
-        await prisma.mpesaCallback.create({
-            data: {
-              ...callbackData,
-              status: "Processed",
-              errorMessage: "Duplicate transaction",
-            }
-        });
+      const existing = await db(`SELECT id FROM "Repayment" WHERE "transId" = $1`, [TransID]);
+      if (existing.length > 0) {
+        await db(`INSERT INTO "MpesaCallback" (id, "TransID", status, "errorMessage") VALUES ($1, $2, $3, $4)`, [mpesaId, TransID, "Processed", "Duplicate transaction"]);
         return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
       }
 
-      let loan = null;
-      let borrower = null;
+      let loan: any = null;
+      let borrower: any = null;
 
-      // Match by BillRefNumber as loanId
+      // 1. Match by BillRefNumber as Loan ID
       if (BillRefNumber) {
-        loan = await prisma.loan.findUnique({
-          where: { id: BillRefNumber },
-          include: { borrower: true }
-        });
-        if (loan) borrower = loan.borrower;
-      }
-
-      // Match by BillRefNumber as National ID if no loanId match
-      if (!loan && BillRefNumber) {
-        borrower = await prisma.borrower.findFirst({
-          where: { nationalId: BillRefNumber }
-        });
-        if (borrower) {
-          loan = await prisma.loan.findFirst({
-            where: { borrowerId: borrower.id, status: "Active" },
-            orderBy: { issueDate: 'desc' }
-          });
+        const matches = await db(`SELECT l.*, b.* FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id WHERE l.id = $1`, [BillRefNumber]);
+        if (matches.length > 0) {
+          loan = matches[0];
+          borrower = matches[0]; // Properties are merged in the join result
         }
       }
 
-      // Match by MSISDN if no BillRefNumber match
-      if (!loan && MSISDN) {
-        const normalizedPhone = normalizePhoneNumber(MSISDN);
-        if (normalizedPhone) {
-          borrower = await prisma.borrower.findFirst({
-            where: { phone: normalizedPhone }
-          });
+      // 2. Fallback to National ID
+      if (!loan && BillRefNumber) {
+        const bMatches = await db(`SELECT * FROM "Borrower" WHERE "nationalId" = $1`, [BillRefNumber]);
+        if (bMatches.length > 0) {
+          borrower = bMatches[0];
+          const lMatches = await db(`SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`, [borrower.id]);
+          if (lMatches.length > 0) loan = lMatches[0];
+        }
+      }
 
-          if (borrower) {
-            loan = await prisma.loan.findFirst({
-              where: { borrowerId: borrower.id, status: "Active" },
-              orderBy: { issueDate: 'desc' }
-            });
+      // 3. Fallback to Phone
+      if (!loan && MSISDN) {
+        const phone = normalizePhoneNumber(MSISDN);
+        if (phone) {
+          const bMatches = await db(`SELECT * FROM "Borrower" WHERE phone = $1`, [phone]);
+          if (bMatches.length > 0) {
+            borrower = bMatches[0];
+            const lMatches = await db(`SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`, [borrower.id]);
+            if (lMatches.length > 0) loan = lMatches[0];
           }
         }
       }
 
       if (loan && borrower) {
-        const finalLoanStatus = await prisma.$transaction(async (tx) => {
-          const unpaidInstallmentsQuery = await tx.installment.findMany({
-            where: {
-              loanId: loan!.id,
-              status: { in: ["Unpaid", "Partial", "Overdue"] }
-            },
-            orderBy: { dueDate: 'asc' }
-          });
+        // Handle installments logic
+        const unpaid = await db(`
+          SELECT * FROM "Installment" 
+          WHERE "loanId" = $1 AND status IN ('Unpaid', 'Partial', 'Overdue') 
+          ORDER BY "dueDate" ASC
+        `, [loan.id]);
 
-          let paymentRemaining = paymentAmount;
-          let totalPaidOnLoan = 0;
-
-          const allInstallments = await tx.installment.findMany({
-            where: { loanId: loan!.id }
-          });
-
-          allInstallments.forEach((inst) => {
-            totalPaidOnLoan += inst.paidAmount;
-          });
-
-          for (const inst of unpaidInstallmentsQuery) {
-            if (paymentRemaining <= 0) break;
-            const amountDue = inst.expectedAmount - inst.paidAmount;
-
-            if (paymentRemaining >= amountDue) {
-              await tx.installment.update({
-                where: { id: inst.id },
-                data: { paidAmount: inst.expectedAmount, status: "Paid" }
-              });
-              paymentRemaining -= amountDue;
-            } else {
-              await tx.installment.update({
-                where: { id: inst.id },
-                data: { paidAmount: inst.paidAmount + paymentRemaining, status: "Partial" }
-              });
-              paymentRemaining = 0;
-            }
+        let remaining = paymentAmount;
+        for (const inst of unpaid) {
+          if (remaining <= 0) break;
+          const due = Number(inst.expectedAmount) - Number(inst.paidAmount);
+          if (remaining >= due) {
+            await db(`UPDATE "Installment" SET "paidAmount" = $2, status = 'Paid' WHERE id = $1`, [inst.id, inst.expectedAmount]);
+            remaining -= due;
+          } else {
+            await db(`UPDATE "Installment" SET "paidAmount" = "paidAmount" + $2, status = 'Partial' WHERE id = $1`, [inst.id, remaining]);
+            remaining = 0;
           }
-
-          totalPaidOnLoan += paymentAmount;
-          const balanceAfterPayment = loan!.totalPayable - totalPaidOnLoan;
-          const newLoanStatus = balanceAfterPayment <= 0 ? "Completed" : "Active";
-
-          await tx.loan.update({
-            where: { id: loan!.id },
-            data: { status: newLoanStatus, lastPaymentDate: new Date().toISOString() }
-          });
-
-          const newRepayment = await tx.repayment.create({
-            data: {
-              organizationId: loan!.organizationId,
-              loanId: loan!.id,
-              loanOfficerId: loan!.loanOfficerId,
-              borrowerId: borrower!.id,
-              transId: TransID,
-              amount: paymentAmount,
-              paymentDate: new Date().toISOString(),
-              collectedById: "mpesa_system",
-              method: "Mobile Money",
-              phone: MSISDN,
-              balanceAfterPayment,
-            }
-          });
-
-          return { newLoanStatus, balanceAfterPayment, loanId: loan!.id };
-        });
-
-        /* 
-        if (borrower.phone) {
-          const { newLoanStatus, balanceAfterPayment, loanId } = finalLoanStatus;
-          const smsMessage = `Payment Received: KES ${paymentAmount}.\nLoan ID: ${loanId.substring(0, 8)}...\nRemaining Balance: KES ${balanceAfterPayment.toFixed(2)}.\nStatus: ${newLoanStatus}.\nThank you for your payment. Bosi Capital.`;
-          await sendSms(borrower.phone, smsMessage);
         }
-        */
+
+        const totals = await db(`SELECT SUM("paidAmount") as paid FROM "Installment" WHERE "loanId" = $1`, [loan.id]);
+        const totalPaid = Number(totals[0].paid || 0);
+        const balance = Number(loan.totalPayable) - totalPaid;
+        const newStatus = balance <= 0 ? "Completed" : "Active";
+
+        await db(`UPDATE "Loan" SET status = $2, "lastPaymentDate" = $3 WHERE id = $1`, [loan.id, newStatus, new Date().toISOString()]);
+
+        const repId = `rep_${Math.random().toString(36).substr(2, 9)}`;
+        await db(`
+          INSERT INTO "Repayment" (id, "organizationId", "loanId", "loanOfficerId", "borrowerId", "transId", amount, "paymentDate", "collectedById", method, phone, "balanceAfterPayment")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `, [repId, loan.organizationId, loan.id, loan.loanOfficerId, borrower.id, TransID, paymentAmount, new Date().toISOString(), 'mpesa_system', 'Mobile Money', MSISDN, balance]);
+
+        await db(`INSERT INTO "MpesaCallback" (id, "TransID", status) VALUES ($1, $2, $3)`, [mpesaId, TransID, "Processed"]);
+        
+        // Revalidate NextJs cache to update the UI
+        try {
+          const { revalidatePath } = require('next/cache');
+          revalidatePath('/repayments');
+          revalidatePath('/dashboard');
+          revalidatePath(`/loans/${loan.id}`);
+          revalidatePath('/loans');
+        } catch (e) {
+          console.error("Failed to revalidate paths:", e);
+        }
       } else {
-        status = "Failed";
-        errorMessage = "Could not match to a borrower or active loan";
+        await db(`INSERT INTO "MpesaCallback" (id, "TransID", "BillRefNumber", "MSISDN", status, "errorMessage") VALUES ($1, $2, $3, $4, $5, $6)`, [mpesaId, TransID, BillRefNumber, MSISDN, "Failed", "Could not match loan/borrower"]);
       }
 
-      await prisma.mpesaCallback.create({
-        data: {
-          ...callbackData,
-          status,
-          errorMessage,
-        }
-      });
-
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
-    } catch (error: any) {
-      console.error("Critical error in mpesaPaymentCallback:", error);
-      
-      await prisma.mpesaCallback.create({
-        data: {
-          ...callbackData,
-          status: "Failed",
-          errorMessage: error.message || "Internal server error during processing",
-        }
-      });
-
+    } catch (innerError: any) {
+      console.error("Callback processing error:", innerError);
       return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
     }
   } catch (e: any) {
     console.error("M-Pesa Webhook Error:", e);
-    return NextResponse.json({ ResultCode: 1, ResultDesc: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ ResultCode: 1, ResultDesc: "Error" }, { status: 500 });
   }
 }

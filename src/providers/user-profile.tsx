@@ -6,7 +6,7 @@ import { getUserProfile } from '@/actions/users';
 import { useSession } from 'next-auth/react';
 
 export interface UserProfileHookResult {
-  user: { uid: string, email: string, displayName: string } | null;
+  user: { id: string, email: string, displayName: string } | null;
   userProfile: WithId<AppUser> | null;
   userRole: WithId<Role> | null;
   organization: WithId<Organization> | null;
@@ -25,7 +25,7 @@ export const UserProfileProvider: React.FC<{ children: ReactNode }> = ({ childre
   const user = useMemo(() => {
     if (!sessionUser) return null;
     return {
-      uid: sessionUser.id,
+      id: sessionUser.id,
       email: sessionUser.email,
       displayName: sessionUser.name,
     };

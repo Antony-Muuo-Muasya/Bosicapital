@@ -1,7 +1,7 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { getLoan } from "@/actions/loans";
-import type { Loan, LoanProduct, Installment } from '@prisma/client';
+// import type { Loan, LoanProduct, Installment } from '@prisma/client';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, FileDown, Circle, CheckCircle, AlertCircle } from "lucide-react";
@@ -40,7 +40,7 @@ export default function MyLoanDetailPage() {
     const router = useRouter();
 
     const [isLoading, setIsLoading] = useState(true);
-    const [loan, setLoan] = useState<(Loan & { loanProduct: LoanProduct, installments: Installment[] }) | null>(null);
+    const [loan, setLoan] = useState<any>(null);
 
     const fetchLoanDetail = useCallback(async () => {
         if (!loanId) return;
@@ -69,7 +69,7 @@ export default function MyLoanDetailPage() {
     const sortedInstallments = useMemo(() => {
         if (!installments) return [];
         const today = startOfToday();
-        return installments.map((inst: Installment) => {
+        return installments.map((inst: any) => {
             const dueDate = new Date(inst.dueDate);
             const isOverdue = dueDate < today && inst.status !== 'Paid';
             return {

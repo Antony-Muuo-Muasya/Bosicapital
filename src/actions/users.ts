@@ -1,34 +1,41 @@
 'use server';
 
-import prisma from "@/lib/db";
+import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
 export async function getUsers(organizationId: string, roleId?: string, branchId?: string) {
   try {
-    const where: any = {};
+    let query = `
+      SELECT u.*, r.name as "roleName", r."systemRole" as "roleSystemRole"
+      FROM "User" u
+      LEFT JOIN "Role" r ON u."roleId" = r.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
     if (organizationId !== 'system') {
-      where.organizationId = organizationId;
+      query += ` AND u."organizationId" = $${params.length + 1}`;
+      params.push(organizationId);
     }
 
     if (branchId) {
-      where.branchIds = { has: branchId };
-    }
-    
-    // Add any specific role filters
-    if (roleId === 'admin' || roleId === 'manager') {
-       // Only get users in their organization
+      query += ` AND $${params.length + 1} = ANY(u."branchIds")`;
+      params.push(branchId);
     }
 
-    const users = await prisma.user.findMany({
-      where,
-      include: {
-        role: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
+    query += ` ORDER BY u."createdAt" DESC`;
+
+    const usersRaw = await db(query, params);
+    
+    const users = usersRaw.map((u: any) => ({
+      ...u,
+      role: {
+        id: u.roleId,
+        name: u.roleName,
+        systemRole: u.roleSystemRole
       }
-    });
+    }));
 
     return { success: true, users };
   } catch (error: any) {
@@ -39,20 +46,27 @@ export async function getUsers(organizationId: string, roleId?: string, branchId
 
 export async function getUserProfile(userId: string) {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-        organization: true,
-      }
-    });
+    const users = await db(`
+      SELECT u.*, 
+             r.name as "roleName", r."systemRole" as "roleSystemRole",
+             o.name as "orgName"
+      FROM "User" u
+      LEFT JOIN "Role" r ON u."roleId" = r.id
+      LEFT JOIN "Organization" o ON u."organizationId" = o.id
+      WHERE u.id = $1
+    `, [userId]);
     
-    if (!user) {
-      console.log(`[UserProfile] User NOT FOUND in DB for ID: ${userId}`);
+    const u = users[0];
+    if (!u) {
       return { success: false, error: 'User not found' };
     }
     
-    console.log(`[UserProfile] Found user: ${user.fullName} (${user.roleId})`);
+    const user: any = {
+      ...u,
+      role: { id: u.roleId, name: u.roleName, systemRole: u.roleSystemRole },
+      organization: { id: u.organizationId, name: u.orgName }
+    };
+    
     return { success: true, user };
   } catch (error: any) {
     console.error("Failed to fetch user profile:", error);
@@ -70,23 +84,29 @@ export async function createUser(data: {
   branchIds?: string[];
 }) {
   try {
-    const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : undefined;
-    const user = await prisma.user.create({
-      data: {
-        fullName: data.fullName,
-        email: data.email,
-        password: hashedPassword,
-        roleId: data.roleId,
-        organizationId: data.organizationId,
-        status: data.status,
-        branchIds: data.branchIds || [],
-      } as any
-    });
+    const id = `user_${Math.random().toString(36).substr(2, 9)}`;
+    const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : null;
+    const createdAt = new Date().toISOString();
+
+    await db(`
+      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+    `, [
+      id,
+      data.fullName,
+      data.email,
+      hashedPassword,
+      data.roleId,
+      data.organizationId,
+      data.status,
+      data.branchIds || [],
+      createdAt
+    ]);
     
     revalidatePath('/users');
-    return { success: true, user };
+    return { success: true, user: { id, email: data.email, fullName: data.fullName } };
   } catch (error: any) {
-    console.error("Failed to create user in Prisma:", error);
+    console.error("Failed to create user:", error);
     return { success: false, error: error.message };
   }
 }
@@ -98,82 +118,48 @@ export async function updateUser(id: string, data: {
   branchIds?: string[];
 }) {
   try {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        fullName: data.fullName,
-        roleId: data.roleId,
-        status: data.status,
-        branchIds: data.branchIds,
-      }
-    });
+    const updatedAt = new Date().toISOString();
+    
+    await db(`
+      UPDATE "User"
+      SET "fullName" = COALESCE($2, "fullName"),
+          "roleId" = COALESCE($3, "roleId"),
+          status = COALESCE($4, status),
+          "branchIds" = COALESCE($5, "branchIds"),
+          "updatedAt" = $6
+      WHERE id = $1
+    `, [id, data.fullName, data.roleId, data.status, data.branchIds, updatedAt]);
     
     revalidatePath('/users');
-    return { success: true, user };
+    return { success: true };
   } catch (error: any) {
-    console.error("Failed to update user in Prisma:", error);
+    console.error("Failed to update user:", error);
     return { success: false, error: error.message };
   }
 }
 
 export async function deleteUser(id: string) {
   try {
-    await prisma.user.delete({
-      where: { id }
-    });
-    
+    await db(`DELETE FROM "User" WHERE id = $1`, [id]);
     revalidatePath('/users');
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to delete user in Prisma:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-export async function updatePassword(userId: string, data: { currentPassword?: string, newPassword: string }) {
-  try {
-     const user = await prisma.user.findUnique({
-       where: { id: userId }
-     });
-
-     if (!user) {
-       return { success: false, error: 'User not found' };
-     }
-
-     if (data.currentPassword && (user as any).password) {
-        const isPasswordValid = await bcrypt.compare(data.currentPassword, (user as any).password);
-        if (!isPasswordValid) {
-          return { success: false, error: 'Incorrect current password' };
-        }
-     }
-
-     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-     await prisma.user.update({
-       where: { id: userId },
-       data: { password: hashedPassword } as any
-     });
-
-     return { success: true };
-  } catch (error: any) {
-    console.error("Failed to update password:", error);
+    console.error("Failed to delete user:", error);
     return { success: false, error: error.message };
   }
 }
 
 export async function getRoles(organizationId: string, isSuperAdmin: boolean) {
   try {
-    const where: any = {};
-    // Ideally we fetch generic roles and org specific roles
+    let query = `SELECT * FROM "Role" WHERE 1=1`;
+    const params: any[] = [];
+    
     if (!isSuperAdmin) {
-      where.OR = [
-        { organizationId: organizationId },
-        { organizationId: 'system' },
-        { organizationId: null }
-      ];
+      query += ` AND ("organizationId" = $1 OR "organizationId" = 'system' OR "organizationId" IS NULL)`;
+      params.push(organizationId);
     }
-    const roles = await prisma.role.findMany({
-      where
-    });
+    
+    const roles = await db(query, params);
     return { success: true, roles };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -182,74 +168,45 @@ export async function getRoles(organizationId: string, isSuperAdmin: boolean) {
 
 export async function getBranches(organizationId: string, isSuperAdmin: boolean) {
   try {
-    const where: any = {};
+    let query = `SELECT * FROM "Branch" WHERE 1=1`;
+    const params: any[] = [];
+    
     if (!isSuperAdmin) {
-      where.organizationId = organizationId;
+      query += ` AND "organizationId" = $1`;
+      params.push(organizationId);
     }
-    const branches = await prisma.branch.findMany({
-      where
-    });
+    
+    const branches = await db(query, params);
     return { success: true, branches };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
-export async function signupUser(data: { fullName: string, email: string, password?: string, organizationName: string }) {
-    try {
-        const result = await prisma.$transaction(async (tx) => {
-             // 1. Seed Roles if they don't exist
-             const rolesCount = await tx.role.count();
-             if (rolesCount === 0) {
-                 const rolesToSeed = [
-                    { id: 'superadmin', name: 'CEO / Business Developer', systemRole: true, permissions: ['*'], organizationId: 'system' },
-                    { id: 'admin', name: 'Head of Operations', systemRole: true, permissions: ['user.create', 'user.edit', 'user.delete', 'user.view', 'role.manage', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'], organizationId: 'system' },
-                    { id: 'manager', name: 'Manager / Head of Product', systemRole: true, permissions: ['user.view', 'branch.manage', 'loan.create', 'loan.approve', 'loan.view', 'repayment.create', 'reports.view'], organizationId: 'system' },
-                    { id: 'loan_officer', name: 'Loan Officer / Call Center', systemRole: true, permissions: ['loan.create', 'loan.view', 'repayment.create'], organizationId: 'system' },
-                    { id: 'user', name: 'Borrower', systemRole: true, permissions: ['borrower.view.own'], organizationId: 'system' },
-                 ];
-                 await tx.role.createMany({ data: rolesToSeed });
-             }
+export async function updatePassword(userId: string, data: { currentPassword?: string, newPassword: string }) {
+  try {
+    const users = await db(`SELECT password FROM "User" WHERE id = $1`, [userId]);
+    const user = users[0];
 
-             // 2. Create Organization
-             const organization = await tx.organization.create({
-                 data: {
-                     name: data.organizationName,
-                     createdAt: new Date().toISOString()
-                 }
-             });
-
-             // 3. Create Main Branch
-             const branch = await tx.branch.create({
-                 data: {
-                     name: 'Headquarters',
-                     location: 'Main Office',
-                     isMain: true,
-                     organizationId: organization.id
-                 }
-             });
-
-             // 4. Create User
-             const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : undefined;
-             const user = await tx.user.create({
-                 data: {
-                     fullName: data.fullName,
-                     email: data.email,
-                     password: hashedPassword,
-                     roleId: 'superadmin',
-                     organizationId: organization.id,
-                     branchIds: [branch.id],
-                     status: 'active',
-                     createdAt: new Date()
-                 } as any
-             });
-
-             return user;
-        });
-
-        return { success: true, user: result };
-    } catch (error: any) {
-        console.error("Signup failed:", error);
-        return { success: false, error: error.message };
+    if (!user) {
+      return { success: false, error: 'User not found' };
     }
+
+    if (data.currentPassword && user.password) {
+      const isPasswordValid = await bcrypt.compare(data.currentPassword, user.password);
+      if (!isPasswordValid) {
+        return { success: false, error: 'Incorrect current password' };
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+    const updatedAt = new Date().toISOString();
+
+    await db(`UPDATE "User" SET password = $2, "updatedAt" = $3 WHERE id = $1`, [userId, hashedPassword, updatedAt]);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to update password:", error);
+    return { success: false, error: error.message };
+  }
 }

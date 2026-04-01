@@ -1,58 +1,74 @@
-'use server'
+'use server';
 
-import prisma from '@/lib/db'
-import { revalidatePath } from 'next/cache'
+import { db } from '@/lib/db';
+import { revalidatePath } from 'next/cache';
 
 export async function getRepayments(organizationId: string, loanId?: string, borrowerId?: string) {
   try {
-    const where: any = { organizationId }
+    let query = `
+      SELECT r.*, 
+             l.status as "loanStatus", 
+             lp.name as "productName",
+             b."fullName" as "borrowerName"
+      FROM "Repayment" r
+      JOIN "Loan" l ON r."loanId" = l.id
+      JOIN "LoanProduct" lp ON l."loanProductId" = lp.id
+      JOIN "Borrower" b ON r."borrowerId" = b.id
+      WHERE r."organizationId" = $1
+    `;
+    const params: any[] = [organizationId];
+
     if (loanId) {
-      where.loanId = loanId
+      query += ` AND r."loanId" = $${params.length + 1}`;
+      params.push(loanId);
     }
     if (borrowerId) {
-      where.borrowerId = borrowerId
+      query += ` AND r."borrowerId" = $${params.length + 1}`;
+      params.push(borrowerId);
     }
 
-    const repayments = await prisma.repayment.findMany({
-      where,
-      orderBy: { paymentDate: 'desc' },
-      include: {
-        loan: {
-          include: {
-            loanProduct: true
-          }
-        },
-        borrower: true
-      }
-    })
-    return { success: true, repayments }
+    query += ` ORDER BY r."paymentDate" DESC`;
+
+    const repaymentsRaw = await db(query, params);
+    
+    const repayments = repaymentsRaw.map((r: any) => ({
+      ...r,
+      loan: { id: r.loanId, status: r.loanStatus, loanProduct: { name: r.productName } },
+      borrower: { id: r.borrowerId, fullName: r.borrowerName }
+    }));
+
+    return { success: true, repayments };
   } catch (error: any) {
-    return { success: false, error: error.message }
+    console.error("Failed to fetch repayments:", error);
+    return { success: false, error: error.message };
   }
 }
 
 export async function createRepayment(data: any) {
   try {
-    const repayment = await prisma.repayment.create({
-      data
-    })
+    const id = `rep_${Math.random().toString(36).substr(2, 9)}`;
+    const keys = Object.keys(data);
+    const columns = keys.map(k => `"${k}"`).join(", ");
+    const placeholders = keys.map((_, i) => `$${i + 2}`).join(", ");
+    const values = keys.map(k => data[k]);
+
+    const result = await db(`
+      INSERT INTO "Repayment" (id, ${columns})
+      VALUES ($1, ${placeholders})
+      RETURNING *
+    `, [id, ...values]);
 
     // Update loan last payment date
-    await prisma.loan.update({
-        where: { id: data.loanId },
-        data: { lastPaymentDate: data.paymentDate }
-    })
+    if (data.loanId) {
+        await db(`UPDATE "Loan" SET "lastPaymentDate" = $2 WHERE id = $1`, [data.loanId, data.paymentDate]);
+    }
 
-    // Also need to update installments. 
-    // This logic usually happens in the API route or a more complex service.
-    // For now, let's just revalidate.
-
-    revalidatePath('/repayments')
-    revalidatePath(`/loans/${data.loanId}`)
-    revalidatePath(`/borrowers/${data.borrowerId}`)
+    revalidatePath('/repayments');
+    if (data.loanId) revalidatePath(`/loans/${data.loanId}`);
+    if (data.borrowerId) revalidatePath(`/borrowers/${data.borrowerId}`);
     
-    return { success: true, repayment }
+    return { success: true, repayment: result[0] };
   } catch (error: any) {
-    return { success: false, error: error.message }
+    return { success: false, error: error.message };
   }
 }

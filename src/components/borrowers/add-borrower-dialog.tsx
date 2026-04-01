@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { useUserProfile } from '@/providers/user-profile';
 import { createBorrower } from '@/actions/borrowers';
 import { createUser } from '@/actions/users';
+import { registerBorrower } from '@/actions/borrower-registration';
 import { Loader2, AlertTriangle, Camera, Image as LucideImage, RefreshCcw, FileText, FileUp, Building2 } from 'lucide-react';
 import { getBranches } from '@/actions/users';
 import { useToast } from '@/hooks/use-toast';
@@ -245,28 +246,12 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             throw new Error('Please select a branch for this borrower.');
         }
 
-        // 1. Create User in PostgreSQL (directly via Prisma)
-        const userRes = await createUser({
+        // 1. Create User and Borrower in a single transaction
+        const res = await registerBorrower({
             organizationId: staffProfile.organizationId,
             fullName: values.fullName,
             email: values.email,
-            password: values.password, // This will be hashed in the server action
-            roleId: 'borrower',
-            branchIds: [assignedBranchId],
-            status: 'active',
-        });
-
-        if (!userRes.success || !userRes.user) {
-            throw new Error('Failed to create user in database: ' + userRes.error);
-        }
-
-        const newUserId = userRes.user.id;
-
-        // 2. Create Borrower in PostgreSQL
-        const borrowerData: any = {
-            userId: newUserId,
-            email: values.email,
-            fullName: values.fullName,
+            password: values.password,
             phone: values.phone,
             address: values.address,
             nationalId: values.nationalId,
@@ -278,32 +263,20 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             homeAssetsPhotoUrl: homeAssetsPhoto || '',
             loanApplicationUrl: loanApplicationFile || '',
             guarantorFormUrl: guarantorFormFile || '',
-            photoUrl: `https://picsum.photos/seed/${newUserId}/400/400`,
+            photoUrl: `https://picsum.photos/seed/${values.email}/400/400`,
             branchId: assignedBranchId,
-            organizationId: staffProfile.organizationId,
-            registrationFeeRequired: true,
-            registrationFeeAmount: 800,
-            registrationFeePaid: false,
-        };
+        });
 
-        const borrowerRes = await createBorrower(borrowerData);
-
-        if (!borrowerRes.success) {
-             throw new Error('Failed to create borrower in database: ' + borrowerRes.error);
+        if (!res.success) {
+            throw new Error(res.error);
         }
 
         toast({ title: 'Success', description: 'Borrower account created successfully.' });
         form.reset();
         onOpenChange(false);
     } catch (error: any) {
-        let description = 'An unexpected error occurred. Please try again.';
-        if (error.message?.includes('Unique constraint failed on the fields: (`email`)')) {
-            description = 'This email address is already in use by another account.';
-        } else if (error.message?.includes('Unique constraint failed on the fields: (`phone`)')) {
-            description = 'This phone number is already in use by another borrower.';
-        }
         console.error("Error creating borrower account:", error);
-        toast({ variant: 'destructive', title: 'Creation Failed', description });
+        toast({ variant: 'destructive', title: 'Creation Failed', description: error.message });
     } finally {
         setIsSubmitting(false);
     }

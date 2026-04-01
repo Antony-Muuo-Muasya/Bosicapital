@@ -1,17 +1,14 @@
-
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 if (!process.env.NEXTAUTH_SECRET) {
   console.warn("[Auth] WARNING: NEXTAUTH_SECRET is not set in environment variables!");
 }
 
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Removed PrismaAdapter as it's not needed for JWT + Credentials strategy without OAuth
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -24,21 +21,28 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password are required.");
         }
 
-        console.log("[Auth] Attempting authorize for:", credentials.email);
+        console.log("[Auth] Attempting direct SQL authorize for:", credentials.email);
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: { role: true, organization: true },
-        });
+        // Fetch user with JOINs
+        const users = await db(`
+          SELECT u.*, r.name as "roleName", r."systemRole" as "roleSystemRole",
+                 o.name as "orgName"
+          FROM "User" u
+          LEFT JOIN "Role" r ON u."roleId" = r.id
+          LEFT JOIN "Organization" o ON u."organizationId" = o.id
+          WHERE u.email = $1
+        `, [credentials.email]);
 
-        if (!user || !(user as any).password) {
+        const user = users[0];
+
+        if (!user || !user.password) {
           console.log("[Auth] User or password not found in DB");
           throw new Error("No user found with this email.");
         }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
-          (user as any).password
+          user.password
         );
 
         if (!isPasswordValid) {
@@ -54,7 +58,7 @@ export const authOptions: NextAuthOptions = {
           name: user.fullName,
           roleId: user.roleId,
           organizationId: user.organizationId,
-          role: user.role,
+          role: { id: user.roleId, name: user.roleName, systemRole: user.roleSystemRole },
         };
       },
     }),
@@ -62,7 +66,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        console.log("[Auth] Populating JWT token for user:", user.email);
         token.id = user.id;
         token.roleId = (user as any).roleId;
         token.organizationId = (user as any).organizationId;
@@ -72,7 +75,6 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (token) {
-        console.log("[Auth] Populating session for token ID:", token.id);
         (session.user as any).id = token.id;
         (session.user as any).roleId = token.roleId;
         (session.user as any).organizationId = token.organizationId;

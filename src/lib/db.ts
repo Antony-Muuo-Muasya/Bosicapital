@@ -1,20 +1,24 @@
-import { Pool } from 'pg'
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
+import { neon } from '@neondatabase/serverless';
 
-const prismaClientSingleton = () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const adapter = new PrismaPg(pool as any)
-  return new PrismaClient({ adapter })
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is not set in environment variables');
 }
 
-declare const globalThis: {
-  prismaGlobal: ReturnType<typeof prismaClientSingleton>;
-} & typeof global;
+const sql = neon(process.env.DATABASE_URL);
 
-const prisma = globalThis.prismaGlobal ?? prismaClientSingleton()
+/**
+ * Enhanced DB client that supports both:
+ * 1. Template literals: db`SELECT * FROM users WHERE id = ${id}`
+ * 2. Parameterized strings: db("SELECT * FROM users WHERE id = $1", [id])
+ */
+export const db = ((first: any, ...rest: any[]) => {
+  if (Array.isArray(first) && 'raw' in (first as any)) {
+    // Called as template literal
+    return (sql as any)(first, ...rest);
+  }
+  // Called as function with (query, params)
+  // The Neon driver requires the .query method for conventional calls
+  return (sql as any).query(first, rest[0]);
+}) as any;
 
-if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = prisma
-
-export { prisma }
-export default prisma
+export default db;
