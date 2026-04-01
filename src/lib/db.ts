@@ -16,9 +16,7 @@ export const db = ((first: any, ...rest: any[]) => {
     // Called as template literal
     return (sql as any)(first, ...rest);
   }
-  // Called as function with (query, params)
-  // The Neon driver requires the .query method for conventional calls
-  return (sql as any).query(first, rest[0]);
+  return (sql as any)(first, rest[0] || []);
 }) as any;
 
 export default db;
