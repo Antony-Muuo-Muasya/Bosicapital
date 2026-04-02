@@ -89,8 +89,8 @@ export async function createUser(data: {
     const createdAt = new Date().toISOString();
 
     await db(`
-      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [
       id,
       data.fullName,
@@ -118,17 +118,15 @@ export async function updateUser(id: string, data: {
   branchIds?: string[];
 }) {
   try {
-    const updatedAt = new Date().toISOString();
     
     await db(`
       UPDATE "User"
       SET "fullName" = COALESCE($2, "fullName"),
           "roleId" = COALESCE($3, "roleId"),
           status = COALESCE($4, status),
-          "branchIds" = COALESCE($5, "branchIds"),
-          "updatedAt" = $6
+          "branchIds" = COALESCE($5, "branchIds")
       WHERE id = $1
-    `, [id, data.fullName, data.roleId, data.status, data.branchIds, updatedAt]);
+    `, [id, data.fullName, data.roleId, data.status, data.branchIds]);
     
     revalidatePath('/users');
     return { success: true };
@@ -200,9 +198,8 @@ export async function updatePassword(userId: string, data: { currentPassword?: s
     }
 
     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-    const updatedAt = new Date().toISOString();
 
-    await db(`UPDATE "User" SET password = $2, "updatedAt" = $3 WHERE id = $1`, [userId, hashedPassword, updatedAt]);
+    await db(`UPDATE "User" SET password = $2 WHERE id = $1`, [userId, hashedPassword]);
 
     return { success: true };
   } catch (error: any) {

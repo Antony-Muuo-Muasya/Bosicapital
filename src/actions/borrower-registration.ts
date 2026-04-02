@@ -37,8 +37,8 @@ export async function registerBorrower(data: {
     // by using a single query block if the DB supports it, or sequential calls.
     
     await db(`
-      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [userId, data.fullName, data.email, hashedPassword, 'borrower', data.organizationId, 'active', [data.branchId], now]);
 
     await db(`
