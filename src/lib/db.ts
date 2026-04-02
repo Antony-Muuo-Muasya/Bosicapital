@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 
-const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+let sql: any = null;
 
 /**
  * Enhanced DB client that supports both:
@@ -9,10 +9,14 @@ const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
  */
 export const db = ((first: any, ...rest: any[]) => {
   if (!sql) {
-    if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
-       console.warn('DATABASE_URL is not set, database operations will fail.');
+    if (process.env.DATABASE_URL) {
+      sql = neon(process.env.DATABASE_URL);
+    } else {
+      if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+         console.warn('DATABASE_URL is not set, database operations will fail.');
+      }
+      return Promise.reject(new Error('DATABASE_URL is not set in environment variables'));
     }
-    return Promise.reject(new Error('DATABASE_URL is not set in environment variables'));
   }
   const promise = (Array.isArray(first) && 'raw' in (first as any))
     ? (sql as any)(first, ...rest) 

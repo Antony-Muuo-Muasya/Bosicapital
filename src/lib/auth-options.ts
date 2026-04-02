@@ -89,6 +89,6 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "bosi_capital_secret_key_1234567890",
   debug: true,
 };
