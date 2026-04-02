@@ -76,7 +76,7 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
         <div className="flex items-center gap-3">
           <Avatar className="hidden h-9 w-9 sm:flex">
             <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
-            <AvatarFallback>{borrower.fullName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
           </Avatar>
           <div className="grid gap-0.5">
             <span className="font-medium">{borrower.fullName}</span>

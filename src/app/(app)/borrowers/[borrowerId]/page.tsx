@@ -151,7 +151,7 @@ export default function BorrowerDetailPage() {
                 <CardHeader className="flex flex-row items-center gap-4">
                     <Avatar className="h-16 w-16 border">
                         <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
-                        <AvatarFallback className="text-xl">{borrower.fullName.charAt(0)}</AvatarFallback>
+                        <AvatarFallback className="text-xl">{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
                     </Avatar>
                     <div>
                         <CardTitle className="text-xl">{borrower.fullName}</CardTitle>

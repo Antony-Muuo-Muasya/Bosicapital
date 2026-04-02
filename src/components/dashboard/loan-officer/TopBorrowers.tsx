@@ -38,7 +38,7 @@ export function TopBorrowers({ data, isLoading }: TopBorrowersProps) {
                         {index === 0 ? <Crown className="h-6 w-6 text-amber-500" /> : <span className="font-semibold text-muted-foreground w-6 text-center">{index + 1}</span>}
                         <Avatar className="h-9 w-9">
                             <AvatarImage src={borrower.avatar} alt={borrower.name} />
-                            <AvatarFallback>{borrower.name.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{borrower.name?.charAt(0) ?? '?'}</AvatarFallback>
                         </Avatar>
                         <div className="grid gap-0.5 flex-1">
                             <p className="font-semibold text-sm">{borrower.name}</p>

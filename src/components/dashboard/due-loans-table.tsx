@@ -78,7 +78,7 @@ export function DueLoansTable({ dueInstallments, isLoading }: DueLoansTableProps
                                     <div className="flex items-center gap-3">
                                         <Avatar className="hidden h-9 w-9 sm:flex">
                                             <AvatarImage src={installment.borrowerPhotoUrl} alt={installment.borrowerName} />
-                                            <AvatarFallback>{installment.borrowerName.charAt(0)}</AvatarFallback>
+                                            <AvatarFallback>{installment.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
                                         </Avatar>
                                         <div className="grid gap-0.5">
                                             <span className="font-medium">{installment.borrowerName}</span>

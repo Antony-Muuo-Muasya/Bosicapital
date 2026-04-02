@@ -83,7 +83,7 @@ export const getColumns = (onEdit: (loan: LoanWithDetails) => void, onRefresh: (
         <div className="flex items-center gap-3">
           <Avatar className="hidden h-9 w-9 sm:flex">
             <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-            <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{loan.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
           </Avatar>
           <div className="grid gap-0.5">
             <span className="font-medium">{loan.borrowerName}</span>

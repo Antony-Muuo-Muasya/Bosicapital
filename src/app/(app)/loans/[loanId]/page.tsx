@@ -135,7 +135,7 @@ export default function LoanDetailPage() {
                                 <div className="flex items-center gap-4">
                                     <Avatar className="h-12 w-12">
                                         <AvatarImage src={borrower.photoUrl || undefined} alt={borrower.fullName} />
-                                        <AvatarFallback>{borrower.fullName.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback className="text-xl">{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
                                     </Avatar>
                                     <div>
                                         <p className="font-semibold">{borrower.fullName}</p>

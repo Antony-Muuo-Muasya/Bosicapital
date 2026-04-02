@@ -62,7 +62,7 @@ export function BranchUsersDialog({ branch, open, onOpenChange }: BranchUsersDia
                         <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                    {user.fullName.charAt(0).toUpperCase()}
+                                    {user.fullName?.charAt(0)?.toUpperCase() ?? '?'}
                                 </div>
                                 <div>
                                     <h4 className="text-sm font-semibold">{user.fullName}</h4>

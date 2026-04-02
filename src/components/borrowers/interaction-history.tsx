@@ -142,7 +142,7 @@ export function InteractionHistory({ borrowerId }: InteractionHistoryProps) {
             {!isLoadingInteractions && interactions?.map((interaction) => (
               <div key={interaction.id} className="flex gap-3">
                 <Avatar className="h-8 w-8">
-                    <AvatarFallback>{interaction.recordedByName.charAt(0)}</AvatarFallback>
+                    <AvatarFallback>{interaction.recordedByName?.charAt(0) ?? '?'}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="flex justify-between items-center">

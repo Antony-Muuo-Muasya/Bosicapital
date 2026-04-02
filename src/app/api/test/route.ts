@@ -1,43 +1,32 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { neon } from '@neondatabase/serverless';
 
-export async function GET() {
-  try {
-    const rawSql = neon(process.env.DATABASE_URL as string);
-    
-    // Test 1: template literal
-    const test1 = await rawSql`SELECT 1 as result`;
-    
-    // Test 2: through our db wrapper
-    const test2 = await db('SELECT 1 as result');
-    
-    // Test 3: with params?
-    let test3;
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const orgId = searchParams.get('orgId') || "default";
+
+  const results: Record<string, any> = {};
+
+  const queries: Record<string, [string, any[]]> = {
+    loans: [`SELECT id, status, principal FROM "Loan" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    borrowers: [`SELECT id FROM "Borrower" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    loanProducts: [`SELECT id, category FROM "LoanProduct" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    users: [`SELECT id, "fullName" FROM "User" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    branches: [`SELECT id, name FROM "Branch" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    regPayments: [`SELECT id, amount FROM "RegistrationPayment" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    repayments: [`SELECT id, amount FROM "Repayment" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    installments: [`SELECT id, status FROM "Installment" WHERE "organizationId" = $1 LIMIT 2`, [orgId]],
+    roles: [`SELECT id, name FROM "Role" LIMIT 5`, []],
+    loanPortfolio: [`SELECT COALESCE(SUM("totalPayable"), 0) as "totalPayable" FROM "Loan" WHERE "organizationId" = $1 AND status = 'Active'`, [orgId]],
+  };
+
+  for (const [key, [query, params]] of Object.entries(queries)) {
     try {
-        test3 = await db('SELECT $1::int as result', [1]);
+      results[key] = await db(query, params);
     } catch (e: any) {
-        test3 = { error: e.message, stack: e.stack };
+      results[key] = { ERROR: e.message };
     }
-
-    // Test 4: query object?
-    let test4;
-    try {
-        test4 = await (rawSql as any).query('SELECT 1');
-    } catch (e: any) {
-        test4 = { error: e.message };
-    }
-
-    // Test 5: raw function call with array?
-    let test5;
-    try {
-        test5 = await (rawSql as any)('SELECT $1::int', [1]);
-    } catch (e: any) {
-        test5 = { error: e.message };
-    }
-
-    return NextResponse.json({ test1, test2, test3, test4, test5 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 });
   }
+
+  return NextResponse.json(results);
 }

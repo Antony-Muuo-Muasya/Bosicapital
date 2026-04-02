@@ -85,7 +85,7 @@ export function RecentActivity({ loans, borrowers, isLoading }: RecentActivityPr
                         </div>
                          <Avatar className="h-8 w-8">
                             <AvatarImage src={activity.borrower?.photoUrl} alt={activity.borrower?.fullName || ''} />
-                            <AvatarFallback>{activity.borrower?.fullName.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{activity.borrower?.fullName?.charAt(0) ?? '?'}</AvatarFallback>
                         </Avatar>
                     </div>
                 ))}

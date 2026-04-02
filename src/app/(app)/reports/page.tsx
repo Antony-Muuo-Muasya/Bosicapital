@@ -137,7 +137,7 @@ export default function ReportsPage() {
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/borrowers/${loan.borrowerId}`)}>
             <Avatar className="hidden h-9 w-9 sm:flex">
               <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-              <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{loan.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
             </Avatar>
             <div className="grid gap-0.5">
               <span className="font-medium hover:underline">{loan.borrowerName}</span>
@@ -186,7 +186,7 @@ export default function ReportsPage() {
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/borrowers/${borrower.id}`)}>
             <Avatar className="hidden h-9 w-9 sm:flex">
               <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
-              <AvatarFallback>{borrower.fullName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
             </Avatar>
             <div className="grid gap-0.5">
               <span className="font-medium hover:underline">{borrower.fullName}</span>
