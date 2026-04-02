@@ -233,8 +233,8 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
   }, [open]);
 
   const onSubmit = async (values: BorrowerFormData) => {
-    if (!staffProfile || !staffProfile.branchIds?.[0]) {
-        toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated or not assigned to a branch.' });
+    if (!staffProfile) {
+        toast({ variant: 'destructive', title: 'Error', description: 'User not authenticated.' });
         return;
     }
     setIsSubmitting(true);
@@ -291,7 +291,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             Create a new borrower account. This will also create a user login for them.
           </DialogDescription>
         </DialogHeader>
-        {!staffProfile?.branchIds?.length && (
+        {(!staffProfile?.branchIds?.length && (staffProfile?.roleId !== 'admin' && staffProfile?.roleId !== 'superadmin')) && (
             <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Branch Assignment Required</AlertTitle>

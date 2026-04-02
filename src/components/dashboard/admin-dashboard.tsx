@@ -5,6 +5,7 @@ import { PlusCircle, UserPlus, Building } from 'lucide-react';
 import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
 import { AddBranchDialog } from '@/components/settings/add-branch-dialog';
+import { AddBorrowerDialog } from '@/components/borrowers/add-borrower-dialog';
 import { useUserProfile } from '@/providers/user-profile';
 import { getAdminDashboardStats } from '@/actions/dashboard';
 import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role, Installment, Repayment } from '@/lib/types';
@@ -29,6 +30,7 @@ export function AdminDashboard() {
   
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
+  const [isAddBorrowerOpen, setIsAddBorrowerOpen] = useState(false);
 
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
@@ -168,6 +170,10 @@ export function AdminDashboard() {
                 <Building className="mr-2 h-4 w-4" />
                 Create Branch
             </Button>
+            <Button variant="secondary" onClick={() => setIsAddBorrowerOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Borrower
+            </Button>
             <Button onClick={() => setIsAddProductOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Create Product
@@ -205,6 +211,10 @@ export function AdminDashboard() {
       </div>
       <AddLoanProductDialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen} />
       <AddBranchDialog open={isAddBranchOpen} onOpenChange={setIsAddBranchOpen} />
+      <AddBorrowerDialog open={isAddBorrowerOpen} onOpenChange={(open) => {
+          setIsAddBorrowerOpen(open);
+          if (!open) fetchDashboardStats();
+      }} />
     </>
   );
 }
