@@ -68,7 +68,7 @@ const allNavItems = [
       { href: '/loans/due-today', label: 'Due Today' },
     ]
   },
-  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['manager', 'superadmin'] },
+  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['admin', 'manager', 'superadmin'] },
   { href: '/disbursements', label: 'Disbursements', icon: FileKey, roles: ['admin', 'superadmin'] },
   { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },

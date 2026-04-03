@@ -15,6 +15,8 @@ export default function ApprovalsPage() {
     const organizationId = userProfile?.organizationId;
     const branchIds = userProfile?.branchIds || [];
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
+    const isOrgAdmin = userProfile?.roleId === 'admin';
+    const isManager = userProfile?.roleId === 'manager';
 
     const [isLoading, setIsLoading] = useState(true);
     const [pendingLoans, setPendingLoans] = useState<Loan[] | null>(null);
@@ -29,7 +31,7 @@ export default function ApprovalsPage() {
             const loansRes = await getLoans(
                 isSuperAdmin ? undefined as any : organizationId!,
                 undefined,
-                isSuperAdmin ? undefined : branchIds
+                isSuperAdmin || isOrgAdmin ? undefined : branchIds
             );
             if (loansRes.success && loansRes.loans) {
                 setPendingLoans(loansRes.loans.filter((l: any) => l.status === 'Pending Approval') as any);
@@ -52,7 +54,7 @@ export default function ApprovalsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [userProfile, isSuperAdmin, organizationId, JSON.stringify(branchIds)]);
+    }, [userProfile, isSuperAdmin, isOrgAdmin, organizationId, JSON.stringify(branchIds)]);
 
     useEffect(() => {
         if (!isProfileLoading && userProfile) {

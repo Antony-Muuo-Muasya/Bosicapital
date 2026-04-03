@@ -11,7 +11,7 @@ const routePermissions: Record<string, string[]> = {
     '/settings': ['superadmin', 'admin'],
     '/branches': ['superadmin', 'admin', 'manager'],
     '/loan-products': ['superadmin', 'admin'],
-    '/approvals': ['superadmin', 'manager'],
+    '/approvals': ['superadmin', 'admin', 'manager'],
     '/disbursements': ['superadmin', 'admin'],
     '/reports': ['superadmin', 'admin', 'manager'],
 };
