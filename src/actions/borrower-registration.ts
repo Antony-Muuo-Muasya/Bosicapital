@@ -47,7 +47,7 @@ export async function registerBorrower(data: {
       borrowerId, userId, data.email, data.fullName, data.phone, data.address, data.nationalId, data.dateOfBirth,
       data.gender, data.employmentStatus, data.monthlyIncome, data.businessPhotoUrl || '', data.homeAssetsPhotoUrl || '',
       data.loanApplicationUrl || '', data.guarantorFormUrl || '', data.photoUrl || '', data.branchId, data.organizationId,
-      true, 800, false, data.createdBy || null, now
+      true, 500, false, data.createdBy || null, now
     ]);
 
     revalidatePath('/borrowers');

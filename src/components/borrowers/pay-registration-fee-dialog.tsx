@@ -53,7 +53,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const registrationFeeAmount = borrower.registrationFeeAmount ?? 800;
+  const registrationFeeAmount = borrower.registrationFeeAmount ?? 500;
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
