@@ -37,7 +37,7 @@ export default function BorrowerLayout({
         return;
     }
     // If a staff member lands here, send them back to the main app
-    if (userProfile && userProfile.roleId !== 'user') {
+    if (userProfile && userProfile.roleId !== 'borrower') {
         router.replace('/dashboard');
     }
   }, [user, userProfile, isLoading, router]);
@@ -56,7 +56,7 @@ export default function BorrowerLayout({
   }
 
   // Double check role before rendering
-  if (userProfile.roleId !== 'user') {
+  if (userProfile.roleId !== 'borrower') {
     return (
         <div className="flex h-screen items-center justify-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />

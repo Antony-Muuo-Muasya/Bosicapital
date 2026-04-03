@@ -52,7 +52,7 @@ const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower, onRefresh 
           Copy borrower ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {!borrower.registrationFeePaid && userRole?.id !== 'user' && (
+        {!borrower.registrationFeePaid && userRole?.id !== 'borrower' && (
           <DropdownMenuItem onClick={() => onRecordPayment(borrower)}>
             Record Payment
           </DropdownMenuItem>

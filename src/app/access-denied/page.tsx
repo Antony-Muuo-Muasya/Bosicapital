@@ -12,7 +12,7 @@ export default function AccessDeniedPage() {
     const { userProfile } = useUserProfile();
 
     const handleReturn = () => {
-        if (userProfile?.roleId === 'user') {
+        if (userProfile?.roleId === 'borrower') {
             router.push('/my-dashboard');
         } else {
             router.push('/dashboard');
