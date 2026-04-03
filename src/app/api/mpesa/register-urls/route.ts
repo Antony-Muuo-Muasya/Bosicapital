@@ -10,8 +10,12 @@ export async function GET(req: Request) {
     const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
     const shortCode = process.env.MPESA_SHORTCODE;
 
-    // IMPORTANT: Swap this with your actual production Next.js domain (e.g., https://bosi-capital.vercel.app)
-    const BASE_URL = "https://your-production-url.vercel.app"; 
+    // Auto-detect BASE_URL
+    const protocol = req.headers.get('x-forwarded-proto') || 'http';
+    const host = req.headers.get('host');
+    const BASE_URL = process.env.MPESA_CALLBACK_URL?.replace('/api/mpesa/callback', '') || `${protocol}://${host}`;
+
+    console.log(`[M-Pesa] Using BASE_URL for registration: ${BASE_URL}`);
 
     if (!consumerKey || !consumerSecret || !shortCode) {
       return NextResponse.json({ error: "Missing M-Pesa environment variables in .env" }, { status: 500 });
@@ -27,7 +31,7 @@ export async function GET(req: Request) {
         },
       }
     );
-    
+
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok) {
       return NextResponse.json({ error: "Failed to get access token", details: tokenData }, { status: 500 });
