@@ -117,6 +117,11 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
     },
   },
   {
+    accessorKey: 'createdByStaffName',
+    header: 'Added By',
+    cell: ({ row }) => row.getValue('createdByStaffName') || 'System',
+  },
+  {
     id: 'actions',
     cell: ({ row }) => {
       const borrower = row.original;

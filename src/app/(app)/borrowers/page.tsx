@@ -27,17 +27,20 @@ export default function BorrowersPage() {
     if (!userProfile) return;
     setIsBorrowersLoading(true);
     try {
-      if (userProfile.roleId === 'superadmin') {
-         // Should add getAllBorrowers with org join maybe, but superadmin usually has orgId null in this app unless he's root
+      let res;
+      if (userProfile.roleId === 'admin' || userProfile.roleId === 'superadmin') {
+         res = await getBorrowers(userProfile.organizationId);
+      } else if (userProfile.roleId === 'manager') {
+         res = await getBorrowers(userProfile.organizationId, undefined, undefined, userProfile.branchIds);
+      } else if (userProfile.roleId === 'loan_officer') {
+         res = await getBorrowers(userProfile.organizationId, undefined, userProfile.id);
       } else {
-         const res = await getBorrowers(userProfile.organizationId);
-         if (res.success && res.borrowers) {
-             let filtered = res.borrowers;
-             if (userProfile.roleId === 'manager' || userProfile.roleId === 'loan_officer') {
-                 filtered = filtered.filter((b: any) => userProfile.branchIds?.includes(b.branchId));
-             }
-             setBorrowers(filtered);
-         }
+         // Generic fallback or empty
+         res = { success: true, borrowers: [] };
+      }
+
+      if (res.success && res.borrowers) {
+          setBorrowers(res.borrowers);
       }
     } catch (e) {
       console.error(e);

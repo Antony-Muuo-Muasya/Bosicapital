@@ -1,29 +1,29 @@
 'use server'
 
-import prisma from '@/lib/db'
+import { db } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
 /**
- * Updates the approval status of a loan in Prisma.
- * This replaces the old Firebase/Firestore update logic.
+ * Updates the approval status of a loan.
+ * Replacing Prisma logic with raw SQL for consistency and stability.
  */
 export async function updateApprovalStatus(loanId: string, status: 'Approved' | 'Rejected', approverId: string) {
   try {
-    const updatedLoan = await prisma.loan.update({
-      where: { id: loanId },
-      data: {
-        status: status,
-        approvedById: status === 'Approved' ? approverId : undefined,
-      },
-    })
+    const updatedLoan = await db(`
+      UPDATE "Loan" 
+      SET status = $2, 
+          "approvedById" = $3
+      WHERE id = $1
+      RETURNING *
+    `, [loanId, status, status === 'Approved' ? approverId : null]);
 
     // Revalidate relevant pages
     revalidatePath('/approvals')
     revalidatePath(`/loans/${loanId}`)
 
-    return { success: true, data: updatedLoan }
+    return { success: true, data: updatedLoan[0] }
   } catch (error: any) {
-    console.error('Prisma updateApprovalStatus error:', error)
+    console.error('UpdateApprovalStatus error:', error)
     return { success: false, error: error.message || 'Failed to update approval status' }
   }
 }

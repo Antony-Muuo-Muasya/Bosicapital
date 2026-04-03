@@ -192,13 +192,13 @@ export default function MyDashboardPage() {
     return (
         <div className="container max-w-7xl py-8">
             <div className="mb-8">
-                <h1 className="font-headline text-3xl font-semibold">Welcome back, {userProfile?.fullName.split(' ')[0]}!</h1>
+                <h1 className="font-headline text-3xl font-semibold">Welcome back, {userProfile?.fullName?.split(' ')[0] || 'Borrower'}!</h1>
                 <p className="text-muted-foreground">Here’s a summary of your financial dashboard.</p>
             </div>
             
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-6">
-                    {!activeLoan && !pendingLoan && (
+                    {!activeLoan && !pendingLoan && !isLoading && (
                         <Card className="text-center py-12">
                             <CardHeader>
                                 <CardTitle>No Active Loans</CardTitle>

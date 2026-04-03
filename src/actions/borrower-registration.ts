@@ -22,6 +22,7 @@ export async function registerBorrower(data: {
   photoUrl?: string;
   branchId: string;
   organizationId: string;
+  createdBy?: string;
 }) {
   try {
     const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
@@ -29,13 +30,6 @@ export async function registerBorrower(data: {
     const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : null;
     const now = new Date().toISOString();
 
-    // In raw Neon, transactions are managed via the driver if using a pool or specific client, 
-    // but for simple atomic ops we can just run them sequentially if no complex rollback logic is needed,
-    // OR use the .transaction method if supported by the adapter.
-    
-    // Note: Simple Neon doesn't have a broad $transaction like Prisma but we can ensure atomicity 
-    // by using a single query block if the DB supports it, or sequential calls.
-    
     await db(`
       INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt")
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -46,14 +40,14 @@ export async function registerBorrower(data: {
         id, "userId", email, "fullName", phone, address, "nationalId", "dateOfBirth", 
         gender, "employmentStatus", "monthlyIncome", "businessPhotoUrl", "homeAssetsPhotoUrl", 
         "loanApplicationUrl", "guarantorFormUrl", "photoUrl", "branchId", "organizationId", 
-        "registrationFeeRequired", "registrationFeeAmount", "registrationFeePaid"
+        "registrationFeeRequired", "registrationFeeAmount", "registrationFeePaid", "createdBy", "createdAt"
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
     `, [
       borrowerId, userId, data.email, data.fullName, data.phone, data.address, data.nationalId, data.dateOfBirth,
       data.gender, data.employmentStatus, data.monthlyIncome, data.businessPhotoUrl || '', data.homeAssetsPhotoUrl || '',
       data.loanApplicationUrl || '', data.guarantorFormUrl || '', data.photoUrl || '', data.branchId, data.organizationId,
-      true, 800, false
+      true, 800, false, data.createdBy || null, now
     ]);
 
     revalidatePath('/borrowers');

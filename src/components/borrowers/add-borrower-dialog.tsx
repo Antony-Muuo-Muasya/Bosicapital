@@ -265,6 +265,7 @@ export function AddBorrowerDialog({ open, onOpenChange }: AddBorrowerDialogProps
             guarantorFormUrl: guarantorFormFile || '',
             photoUrl: `https://picsum.photos/seed/${values.email}/400/400`,
             branchId: assignedBranchId,
+            createdBy: staffProfile.id,
         });
 
         if (!res.success) {

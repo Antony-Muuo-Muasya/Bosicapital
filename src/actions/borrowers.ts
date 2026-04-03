@@ -1,29 +1,52 @@
 'use server'
 
-import prisma from '@/lib/db'
+import { db } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 
-export async function getBorrowers(organizationId?: string, userId?: string) {
+export async function getBorrowers(organizationId?: string, userId?: string, createdBy?: string, branchIds?: string[]) {
   try {
-    const where: any = {};
-    if (organizationId) where.organizationId = organizationId;
-    if (userId) where.userId = userId;
+    let query = `
+      SELECT b.*, u."fullName" as "createdByStaffName"
+      FROM "Borrower" b
+      LEFT JOIN "User" u ON b."createdBy" = u.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
 
-    const borrowers = await prisma.borrower.findMany({
-      where,
-      orderBy: { fullName: 'asc' }
-    })
+    if (organizationId) {
+      query += ` AND b."organizationId" = $${params.length + 1}`;
+      params.push(organizationId);
+    }
+
+    if (userId) {
+      query += ` AND b."userId" = $${params.length + 1}`;
+      params.push(userId);
+    }
+
+    if (createdBy) {
+      query += ` AND b."createdBy" = $${params.length + 1}`;
+      params.push(createdBy);
+    }
+
+    if (branchIds && branchIds.length > 0) {
+      query += ` AND b."branchId" = ANY($${params.length + 1})`;
+      params.push(branchIds);
+    }
+
+    query += ` ORDER BY b."fullName" ASC`;
+
+    const borrowers = await db(query, params);
     return { success: true, borrowers }
   } catch (error: any) {
+    console.error("Error fetching borrowers:", error);
     return { success: false, error: error.message }
   }
 }
 
 export async function getBorrower(id: string) {
     try {
-      const borrower = await prisma.borrower.findUnique({
-        where: { id }
-      })
+      const borrowers = await db(`SELECT * FROM "Borrower" WHERE id = $1`, [id]);
+      const borrower = borrowers[0];
       if (!borrower) return { success: false, error: 'Borrower not found' }
       return { success: true, borrower }
     } catch (error: any) {
@@ -32,12 +55,22 @@ export async function getBorrower(id: string) {
 }
 
 export async function createBorrower(data: any) {
+  // This seems to be a generic create, but we usually use registerBorrower.
+  // Converting just in case it's used elsewhere.
   try {
-    const borrower = await prisma.borrower.create({
-      data
-    })
+    const keys = Object.keys(data);
+    const values = Object.values(data);
+    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+    const columns = keys.map(k => `"${k}"`).join(', ');
+
+    const results = await db(`
+      INSERT INTO "Borrower" (${columns})
+      VALUES (${placeholders})
+      RETURNING *
+    `, values);
+    
     revalidatePath('/borrowers')
-    return { success: true, borrower }
+    return { success: true, borrower: results[0] }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -45,12 +78,18 @@ export async function createBorrower(data: any) {
 
 export async function updateBorrower(id: string, data: any) {
   try {
-    const borrower = await prisma.borrower.update({
-      where: { id },
-      data
-    })
+    const keys = Object.keys(data);
+    const values = Object.values(data);
+    const setClause = keys.map((k, i) => `"${k}" = $${i + 2}`).join(', ');
+
+    await db(`
+      UPDATE "Borrower"
+      SET ${setClause}
+      WHERE id = $1
+    `, [id, ...values]);
+
     revalidatePath('/borrowers')
-    return { success: true, borrower }
+    return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -58,9 +97,7 @@ export async function updateBorrower(id: string, data: any) {
 
 export async function deleteBorrower(id: string) {
   try {
-    await prisma.borrower.delete({
-      where: { id }
-    })
+    await db(`DELETE FROM "Borrower" WHERE id = $1`, [id]);
     revalidatePath('/borrowers')
     return { success: true }
   } catch (error: any) {
@@ -77,29 +114,26 @@ export async function payRegistrationFee(data: {
   collectedBy: string;
 }) {
   try {
-    const payment = await prisma.registrationPayment.create({
-      data: {
-        organizationId: data.organizationId,
-        borrowerId: data.borrowerId,
-        amount: data.amount,
-        paymentMethod: data.paymentMethod,
-        reference: data.reference,
-        collectedBy: data.collectedBy,
-      }
-    });
+    const id = `reg_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
 
-    await prisma.borrower.update({
-      where: { id: data.borrowerId },
-      data: {
-        registrationFeePaid: true,
-        registrationFeePaidAt: new Date(),
-        registrationPaymentId: payment.id,
-      }
-    });
+    await db(`
+      INSERT INTO "RegistrationPayment" (id, "organizationId", "borrowerId", amount, "paymentMethod", reference, "collectedBy", "createdAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [id, data.organizationId, data.borrowerId, data.amount, data.paymentMethod, data.reference, data.collectedBy, now]);
+
+    await db(`
+      UPDATE "Borrower"
+      SET "registrationFeePaid" = true,
+          "registrationFeePaidAt" = $2,
+          "registrationPaymentId" = $3
+      WHERE id = $1
+    `, [data.borrowerId, now, id]);
 
     revalidatePath('/borrowers');
     return { success: true };
   } catch (error: any) {
+    console.error("Error paying registration fee:", error);
     return { success: false, error: error.message };
   }
 }
