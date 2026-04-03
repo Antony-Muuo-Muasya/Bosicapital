@@ -28,7 +28,7 @@ import { createBorrower } from '@/actions/borrowers';
 import { createUser } from '@/actions/users';
 import { registerBorrower } from '@/actions/borrower-registration';
 import { Loader2, AlertTriangle, Camera, Image as LucideImage, RefreshCcw, FileText, FileUp, Building2 } from 'lucide-react';
-import { getBranches } from '@/actions/users';
+import { getBranches } from '@/actions/branches';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,

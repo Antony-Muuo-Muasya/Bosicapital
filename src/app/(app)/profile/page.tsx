@@ -1,7 +1,8 @@
 'use client';
 
 import { useUserProfile } from '@/providers/user-profile';
-import { getBranches, updateUser, updatePassword } from '@/actions/users';
+import { updateUser, updatePassword } from '@/actions/users';
+import { getBranches } from '@/actions/branches';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

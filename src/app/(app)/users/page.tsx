@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import { EditUserDialog } from '@/components/users/edit-user-dialog';
 import { AddStaffDialog } from '@/components/users/add-staff-dialog';
-import { getUsers, getRoles, getBranches } from '@/actions/users';
+import { getUsers } from '@/actions/users';
+import { getRoles } from '@/actions/roles';
+import { getBranches } from '@/actions/branches';
 
 type UserWithRole = AppUser & { roleName: string };
 

@@ -2,7 +2,8 @@
 
 import { useUserProfile } from '@/providers/user-profile';
 import { getBorrowers } from '@/actions/borrowers';
-import { getBranches, updateUser } from '@/actions/users';
+import { updateUser } from '@/actions/users';
+import { getBranches } from '@/actions/branches';
 import { updateBorrower } from '@/actions/borrowers';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';

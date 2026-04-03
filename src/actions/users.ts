@@ -147,40 +147,6 @@ export async function deleteUser(id: string) {
   }
 }
 
-export async function getRoles(organizationId: string, isSuperAdmin: boolean) {
-  try {
-    let query = `SELECT * FROM "Role" WHERE 1=1`;
-    const params: any[] = [];
-    
-    if (!isSuperAdmin) {
-      query += ` AND ("organizationId" = $1 OR "organizationId" = 'system' OR "organizationId" IS NULL)`;
-      params.push(organizationId);
-    }
-    
-    const roles = await db(query, params);
-    return { success: true, roles };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
-export async function getBranches(organizationId: string, isSuperAdmin: boolean) {
-  try {
-    let query = `SELECT * FROM "Branch" WHERE 1=1`;
-    const params: any[] = [];
-    
-    if (!isSuperAdmin) {
-      query += ` AND "organizationId" = $1`;
-      params.push(organizationId);
-    }
-    
-    const branches = await db(query, params);
-    return { success: true, branches };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
 export async function updatePassword(userId: string, data: { currentPassword?: string, newPassword: string }) {
   try {
     const users = await db(`SELECT password FROM "User" WHERE id = $1`, [userId]);

@@ -12,6 +12,24 @@ export async function getTargets(organizationId: string) {
   }
 }
 
+export async function createMultipleTargets(targets: any[]) {
+  try {
+    for (const target of targets) {
+      const id = `target_${Math.random().toString(36).substr(2, 9)}`;
+      const keys = Object.keys(target);
+      const columns = keys.map(k => `"${k}"`).join(", ");
+      const placeholders = keys.map((_, i) => `$${i + 2}`).join(", ");
+      const values = keys.map(k => target[k]);
+      await db(`INSERT INTO "Target" (id, ${columns}) VALUES ($1, ${placeholders})`, [id, ...values]);
+    }
+    revalidatePath('/reports');
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error creating multiple targets:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function bulkUpdateTargets(targets: any[]) {
     try {
         for (const target of targets) {

@@ -3,11 +3,20 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-export async function getBranches(organizationId: string) {
+export async function getBranches(organizationId?: string, isSuperAdmin: boolean = false) {
   try {
-    const branches = await db(`SELECT * FROM "Branch" WHERE "organizationId" = $1`, [organizationId]);
+    let query = `SELECT * FROM "Branch" WHERE 1=1`;
+    const params: any[] = [];
+    
+    if (!isSuperAdmin && organizationId) {
+      query += ` AND "organizationId" = $1`;
+      params.push(organizationId);
+    }
+    
+    const branches = await db(query, params);
     return { success: true, branches };
   } catch (error: any) {
+    console.error("Failed to fetch branches:", error);
     return { success: false, error: error.message };
   }
 }
@@ -80,7 +89,6 @@ export async function getBranchPerformance(organizationId: string) {
       WHERE b."organizationId" = $1
     `, [organizationId]);
 
-    // Handle string to number conversion for aggregates
     const mappedData = performanceData.map((row: any) => ({
       ...row,
       totalBorrowers: Number(row.totalBorrowers),
