@@ -73,6 +73,7 @@
     "typescript": "^5"
   },
   "overrides": {
+    "next": "$next",
     "glob": "13.0.6",
     "node-fetch": "^3.3.2",
     "domexception": "file:./domexception-shim",
