@@ -2,6 +2,15 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from 'next/cache';
+import Pusher from 'pusher';
+
+const pusher = new Pusher({
+  appId: process.env.PUSHER_APP_ID!,
+  key: process.env.NEXT_PUBLIC_PUSHER_KEY!,
+  secret: process.env.PUSHER_SECRET!,
+  cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+  useTLS: true,
+});
 
 interface MpesaCallbackData {
   TransactionType?: string;
@@ -138,6 +147,18 @@ export async function POST(req: Request) {
 
         await db(`UPDATE "MpesaCallback" SET status = 'Processed' WHERE id = $1`, [mpesaId]);
         
+        // Trigger Pusher for real-time update
+        try {
+          await pusher.trigger('repayments-channel', 'new-payment', {
+            message: 'New payment received',
+            amount: paymentAmount,
+            borrowerName: `${borrower.firstName} ${borrower.lastName}`,
+            loanId: loan.id
+          });
+        } catch (pusherError) {
+          console.error("[Pusher] Error triggering event:", pusherError);
+        }
+
         // Final revalidation
         revalidatePath('/repayments');
         revalidatePath('/dashboard');

@@ -24,6 +24,7 @@ export function TopProducts({ loans, loanProducts, isLoading }: TopProductsProps
 
         return Object.entries(productCounts)
             .map(([id, count]) => ({
+                id,
                 name: productsMap.get(id) || 'Unknown Product',
                 count
             }))
@@ -58,7 +59,7 @@ export function TopProducts({ loans, loanProducts, isLoading }: TopProductsProps
            {topProducts.length > 0 ? (
             <div className="space-y-4">
                 {topProducts.map(product => (
-                    <div key={product.name} className="flex justify-between items-center text-sm">
+                    <div key={product.id} className="flex justify-between items-center text-sm">
                        <span>{product.name}</span>
                        <span className="font-semibold">{product.count} loans</span>
                     </div>

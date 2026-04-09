@@ -4,9 +4,11 @@ import './globals.css';
 import { UserProfileProvider } from '@/providers/user-profile';
 import { ThemeProvider } from '@/components/theme-provider';
 import AuthProvider from '@/components/providers/session-provider';
+import RealTimeListener from '@/components/real-time-listener';
+
 
 export const metadata: Metadata = {
-  title: 'Bosi Capital',
+  title: 'Bosi Capital Limited',
   description: 'Your trusted lending partner',
 };
 
@@ -58,6 +60,7 @@ export default function RootLayout({
           <AuthProvider>
             <UserProfileProvider>
                 {children}
+                <RealTimeListener />
                 <Toaster />
             </UserProfileProvider>
           </AuthProvider>

@@ -230,8 +230,8 @@ function Header() {
                 className="flex flex-col items-center gap-2 text-lg font-semibold mb-4 text-center"
               >
                 <Link href="/dashboard" className="flex flex-col items-center gap-1">
-                  <img src="/logo.png" alt="Bosi Capital" width="196" className="rounded-md h-auto" />
-                  <span className="font-headline text-xl">Bosi Capital</span>
+                  <img src="/logo.png" alt="Bosi Capital Limited" width="196" className="rounded-md h-auto" />
+                  <span className="font-headline text-xl">Bosi Capital Limited</span>
                 </Link>
                 {user?.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
               </div>
@@ -323,8 +323,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex flex-col items-center justify-center gap-2 border-b p-6">
             <Link href="/dashboard" className="flex flex-col items-center gap-1 font-semibold text-center">
-              <img src="/logo.png" alt="Bosi Capital" width="196" className="rounded-md h-auto" />
-              <span className="font-headline text-xl">Bosi Capital</span>
+              <img src="/logo.png" alt="Bosi Capital Limited" width="196" className="rounded-md h-auto" />
+              <span className="font-headline text-xl">Bosi Capital Limited</span>
             </Link>
             {user?.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
           </div>

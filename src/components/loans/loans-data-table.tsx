@@ -57,6 +57,14 @@ export function LoansDataTable<TData, TValue>({
     <div className='space-y-4'>
         <div className="flex items-center gap-4">
             <Input
+            placeholder="Search Loan ID..."
+            value={(table.getColumn("id")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+                table.getColumn("id")?.setFilterValue(event.target.value)
+            }
+            className="max-w-[150px]"
+            />
+            <Input
             placeholder="Filter by borrower name..."
             value={(table.getColumn("borrowerName")?.getFilterValue() as string) ?? ""}
             onChange={(event) =>

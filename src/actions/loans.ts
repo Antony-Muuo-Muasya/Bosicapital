@@ -77,7 +77,7 @@ export async function getLoan(id: string) {
 
 export async function createLoan(data: any) {
   try {
-    const id = `loan_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `L-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const keys = Object.keys(data);
     const columns = keys.map(k => `"${k}"`).join(", ");
     const placeholders = keys.map((_, i) => `$${i + 2}`).join(", ");

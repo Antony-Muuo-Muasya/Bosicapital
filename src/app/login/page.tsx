@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import Image from 'next/image';
 
@@ -26,6 +26,7 @@ function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
     const logoUrl = "/logo.png";
 
@@ -77,7 +78,7 @@ function LoginForm() {
         <div className="mb-6 flex justify-center">
           <Image
             src={logoUrl}
-            alt="Bosi Capital Logo"
+            alt="Bosi Capital Limited Logo"
             width={196}
             height={196}
             className="rounded-md"
@@ -113,7 +114,25 @@ function LoginForm() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <div className="relative">
+                          <Input 
+                            type={showPassword ? "text" : "password"} 
+                            {...field} 
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

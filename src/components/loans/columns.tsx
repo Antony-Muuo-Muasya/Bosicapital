@@ -75,6 +75,11 @@ const LoanActions = ({ loan, onEdit, onRefresh }: { loan: LoanWithDetails, onEdi
 
 export const getColumns = (onEdit: (loan: LoanWithDetails) => void, onRefresh: () => void): ColumnDef<LoanWithDetails>[] => [
   {
+    accessorKey: 'id',
+    header: 'Loan ID',
+    cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.getValue('id')}</span>,
+  },
+  {
     accessorKey: 'borrowerName',
     header: 'Borrower',
     cell: ({ row }) => {
