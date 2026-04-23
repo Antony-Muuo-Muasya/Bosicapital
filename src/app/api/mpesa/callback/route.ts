@@ -72,36 +72,49 @@ export async function POST(req: Request) {
       let loan: any = null;
       let borrower: any = null;
 
-      // 2. Match by BillRefNumber as National ID (most common) or Loan ID
+      // 2. Match by BillRefNumber as Loan ID (Account Number) - Priority
       if (BillRefNumber) {
         const cleanedRef = BillRefNumber.trim();
+        console.log(`[M-Pesa] Attempting to match BillRefNumber: ${cleanedRef}`);
         
-        // Search by National ID
-        const bByNational = await db(`SELECT * FROM "Borrower" WHERE "nationalId" = $1`, [cleanedRef]);
-        if (bByNational.length > 0) {
-          borrower = bByNational[0];
-          const lByBorrower = await db(`SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`, [borrower.id]);
-          if (lByBorrower.length > 0) loan = lByBorrower[0];
-        }
+        // Search by Loan ID directly
+        const lById = await db(`
+          SELECT l.*, b."fullName", b.phone as "borrowerPhone", b.email as "borrowerEmail", b.id as "bId"
+          FROM "Loan" l 
+          JOIN "Borrower" b ON l."borrowerId" = b.id 
+          WHERE l.id = $1
+        `, [cleanedRef]);
 
-        // Fallback search by Loan ID directly
-        if (!loan) {
-            const lById = await db(`SELECT l.*, b.* FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id WHERE l.id = $1`, [cleanedRef]);
-            if (lById.length > 0) {
-                loan = lById[0];
-                borrower = lById[0];
+        if (lById.length > 0) {
+          loan = lById[0];
+          borrower = { ...lById[0], id: lById[0].bId }; // Ensure borrower.id is the correct one
+          console.log(`[M-Pesa] Matched by Loan ID: ${loan.id}`);
+        } else {
+          // Fallback search by National ID
+          const bByNational = await db(`SELECT * FROM "Borrower" WHERE "nationalId" = $1`, [cleanedRef]);
+          if (bByNational.length > 0) {
+            borrower = bByNational[0];
+            const lByBorrower = await db(`SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`, [borrower.id]);
+            if (lByBorrower.length > 0) {
+              loan = lByBorrower[0];
+              console.log(`[M-Pesa] Matched by National ID through Borrower: ${borrower.id}`);
             }
+          }
         }
       }
 
-      // 3. Fallback to Phone Number
+      // 3. Last Fallback to Phone Number
       if (!loan && MSISDN) {
         const phone = normalizePhoneNumber(MSISDN);
+        console.log(`[M-Pesa] Falling back to Phone Number: ${phone}`);
         const bByPhone = await db(`SELECT * FROM "Borrower" WHERE phone = $1`, [phone]);
         if (bByPhone.length > 0) {
           borrower = bByPhone[0];
           const lByBorrower = await db(`SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`, [borrower.id]);
-          if (lByBorrower.length > 0) loan = lByBorrower[0];
+          if (lByBorrower.length > 0) {
+            loan = lByBorrower[0];
+            console.log(`[M-Pesa] Matched by Phone Number: ${phone}`);
+          }
         }
       }
 
@@ -152,7 +165,7 @@ export async function POST(req: Request) {
           await pusher.trigger('repayments-channel', 'new-payment', {
             message: 'New payment received',
             amount: paymentAmount,
-            borrowerName: `${borrower.firstName} ${borrower.lastName}`,
+            borrowerName: borrower.fullName || `${FirstName || ''} ${LastName || ''}`.trim() || 'Valued Customer',
             loanId: loan.id
           });
         } catch (pusherError) {

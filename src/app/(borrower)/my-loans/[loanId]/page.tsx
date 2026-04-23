@@ -91,31 +91,49 @@ export default function MyLoanDetailPage() {
     /* Redundant isLoading removal */
 
     const handleDownload = () => {
-        if (!sortedInstallments || !loan || !product) return;
+        if (!loan || !product || !sortedInstallments) return;
 
-        const headers = ['Installment #', 'Due Date', 'Amount Due', 'Amount Paid', 'Status'];
-        const rows = sortedInstallments.map((inst: any) => [
-            inst.installmentNumber,
-            new Date(inst.dueDate).toLocaleDateString(),
-            inst.expectedAmount,
-            inst.paidAmount,
-            inst.status
-        ].join(','));
+        const csvRows = [];
+        
+        // 1. Header & Loan Details
+        csvRows.push(`LOAN STATEMENT - ${product.name.toUpperCase()}`);
+        csvRows.push(`Organization,Bosi Capital Limited`);
+        csvRows.push(`Loan ID,${loan.id}`);
+        csvRows.push(`Date Generated,${new Date().toLocaleString()}`);
+        csvRows.push('');
 
-        const csvContent = [
-            `Loan Statement for ${product.name}`,
-            `Loan ID: ${loan.id}`,
-            `Date: ${new Date().toLocaleDateString()}`,
-            '',
-            headers.join(','),
-            ...rows
-        ].join('\n');
+        // 2. Summary
+        csvRows.push('SUMMARY');
+        csvRows.push(`Principal Amount,${loan.principal}`);
+        csvRows.push(`Total Payable,${loan.totalPayable}`);
+        csvRows.push(`Total Paid,${totalPaid}`);
+        csvRows.push(`Outstanding Balance,${totalOutstanding}`);
+        csvRows.push(`Status,${loan.status}`);
+        csvRows.push('');
 
+        // 3. Repayment Schedule
+        csvRows.push('REPAYMENT SCHEDULE');
+        csvRows.push('Installment #,Due Date,Expected Amount,Paid Amount,Status');
+        sortedInstallments.forEach((inst: any) => {
+            csvRows.push(`${inst.installmentNumber},${new Date(inst.dueDate).toLocaleDateString()},${inst.expectedAmount},${inst.paidAmount},${inst.status}`);
+        });
+        csvRows.push('');
+
+        // 4. Payment History
+        if (loan.repayments && loan.repayments.length > 0) {
+            csvRows.push('PAYMENT HISTORY');
+            csvRows.push('Payment Date,Transaction ID,Amount,Method');
+            loan.repayments.forEach((rep: any) => {
+                csvRows.push(`${new Date(rep.paymentDate).toLocaleDateString()},${rep.id},${rep.amount},${rep.method}`);
+            });
+        }
+
+        const csvContent = csvRows.join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `loan_statement_${loan.id.substring(0,6)}.csv`);
+        link.setAttribute('download', `Loan_Statement_${loan.id.substring(0,8)}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();

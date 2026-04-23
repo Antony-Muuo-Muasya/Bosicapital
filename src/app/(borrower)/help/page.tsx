@@ -8,7 +8,7 @@ import { useUserProfile } from '@/providers/user-profile';
 const faqs = [
     {
         question: "How do I make a payment via M-Pesa?",
-        answer: "Go to your M-Pesa menu and select 'Lipa na M-Pesa', then 'Pay Bill'. Enter Business Number: 4159879. For the Account Number, please enter your National ID number. Enter the amount you wish to pay and complete the transaction with your M-Pesa PIN."
+        answer: "Go to your M-Pesa menu and select 'Lipa na M-Pesa', then 'Pay Bill'. Enter Business Number: 4159879. For the Account Number, please enter your Loan ID number (found on your dashboard). Enter the amount you wish to pay and complete the transaction with your M-Pesa PIN."
     },
     {
         question: "What happens if I miss a payment?",

@@ -117,10 +117,59 @@ export default function LoanDetailPage() {
         )
     }
 
+    const handleDownload = () => {
+        if (!loan || !product || !sortedInstallments) return;
+
+        const csvRows = [];
+        
+        // 1. Header & Loan Details
+        csvRows.push(`LOAN STATEMENT - ${product.name.toUpperCase()}`);
+        csvRows.push(`Organization,Bosi Capital Limited`);
+        csvRows.push(`Loan ID,${loan.id}`);
+        csvRows.push(`Borrower,${borrower.fullName}`);
+        csvRows.push(`Date Generated,${new Date().toLocaleString()}`);
+        csvRows.push('');
+
+        // 2. Summary Stats
+        csvRows.push('SUMMARY');
+        csvRows.push(`Principal Amount,${loan.principal}`);
+        csvRows.push(`Total Payable,${loan.totalPayable}`);
+        csvRows.push(`Total Paid,${totalPaid}`);
+        csvRows.push(`Outstanding Balance,${totalOutstanding}`);
+        csvRows.push(`Status,${loan.status}`);
+        csvRows.push('');
+
+        // 3. Repayment Schedule
+        csvRows.push('REPAYMENT SCHEDULE');
+        csvRows.push('Installment #,Due Date,Expected Amount,Paid Amount,Status');
+        sortedInstallments.forEach((inst: any) => {
+            csvRows.push(`${inst.installmentNumber},${inst.dueDate},${inst.expectedAmount},${inst.paidAmount},${inst.status}`);
+        });
+        csvRows.push('');
+
+        // 4. Payment History (Actual Transactions)
+        if (loan.repayments && loan.repayments.length > 0) {
+            csvRows.push('PAYMENT HISTORY');
+            csvRows.push('Payment Date,Transaction ID,Amount,Method,Phone/Ref');
+            loan.repayments.forEach((rep: any) => {
+                csvRows.push(`${new Date(rep.paymentDate).toLocaleDateString()},${rep.id},${rep.amount},${rep.method},${rep.phone || rep.reference || ''}`);
+            });
+        }
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Statement_${loan.id.substring(0,8)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 md:px-6">
                  <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${loan.id.substring(0, 8)}`}>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleDownload}>
                         <FileDown className="mr-2 h-4 w-4" />
                         Download Statement
                     </Button>
@@ -172,6 +221,31 @@ export default function LoanDetailPage() {
                                 <span className="text-muted-foreground">Status</span>
                                 <Badge variant={getLoanStatusVariant(loan.status)}>{loan.status}</Badge>
                              </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader>
+                            <CardTitle className="text-primary flex items-center gap-2">
+                                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                                    <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+                                </svg>
+                                M-Pesa Repayment
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Paybill Number</p>
+                                <p className="text-lg font-bold tracking-tight text-primary">4159879</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Account Number (Loan ID)</p>
+                                <p className="text-lg font-bold tracking-tight text-primary select-all">{loan.id}</p>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground italic leading-relaxed">
+                                Enter the Loan ID above as the Account Number when paying via M-Pesa to ensure your payment is automatically recorded.
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
