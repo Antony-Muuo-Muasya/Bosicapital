@@ -44,7 +44,7 @@ async function getDarajaAccessToken(): Promise<string> {
 }
 
 /**
- * GET /api/mpesa/register-url
+ * GET /api/payments/register-url
  *
  * Registers your callback URL with Safaricom Daraja C2B API.
  * Only needs to be called ONCE to activate the webhook.

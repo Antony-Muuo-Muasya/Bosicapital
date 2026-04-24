@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 // To register your URLs, just run this GET endpoint in your browser:
-// http://localhost:9003/api/mpesa/register-urls
+// http://localhost:9003/api/payments/register-urls
 // Remember to deploy YOUR SITE first, and change `BASE_URL` to your Vercel domain!
 
 export async function GET(req: Request) {
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     // Auto-detect BASE_URL
     const protocol = req.headers.get('x-forwarded-proto') || 'http';
     const host = req.headers.get('host');
-    const BASE_URL = process.env.MPESA_CALLBACK_URL?.replace('/api/mpesa/callback', '') || `${protocol}://${host}`;
+    const BASE_URL = process.env.MPESA_CALLBACK_URL?.replace('/api/payments/callback', '') || `${protocol}://${host}`;
 
     console.log(`[M-Pesa] Using BASE_URL for registration: ${BASE_URL}`);
 
@@ -42,8 +42,8 @@ export async function GET(req: Request) {
     const registerData = {
       ShortCode: shortCode,
       ResponseType: "Completed", // Safaricom should complete the transaction even if our validation fails
-      ConfirmationURL: `${BASE_URL}/api/mpesa/callback`,
-      ValidationURL: `${BASE_URL}/api/mpesa/callback`,
+      ConfirmationURL: `${BASE_URL}/api/payments/callback`,
+      ValidationURL: `${BASE_URL}/api/payments/callback`,
     };
 
     const registerRes = await fetch(
