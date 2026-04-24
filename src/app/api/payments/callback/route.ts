@@ -32,6 +32,10 @@ function normalizePhoneNumber(msisdn: string): string | null {
   return msisdn; // Fallback to raw if not matching logic
 }
 
+export async function GET() {
+  return NextResponse.json({ message: "Callback endpoint is active and reachable." });
+}
+
 export async function POST(req: Request) {
   try {
     const callbackData: MpesaCallbackData = await req.json();
