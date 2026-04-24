@@ -96,6 +96,13 @@ export default function RepaymentsPage() {
          fetchRepayments();
          fetchBorrowers();
          fetchProducts();
+
+         // Auto-polling for real-time dashboard updates every 5 seconds
+         const interval = setInterval(() => {
+             fetchRepayments();
+         }, 5000);
+
+         return () => clearInterval(interval);
      }
   }, [isProfileLoading, userProfile, fetchLoans, fetchRepayments, fetchBorrowers, fetchProducts]);
 

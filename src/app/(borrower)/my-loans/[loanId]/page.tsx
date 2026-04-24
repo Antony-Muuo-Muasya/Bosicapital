@@ -61,6 +61,12 @@ export default function MyLoanDetailPage() {
 
     useEffect(() => {
         fetchLoanDetail();
+
+        const interval = setInterval(() => {
+            fetchLoanDetail();
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, [fetchLoanDetail]);
 
     const product = loan?.loanProduct;
