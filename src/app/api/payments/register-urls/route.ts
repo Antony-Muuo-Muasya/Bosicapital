@@ -8,7 +8,7 @@ const DARAJA_URLS = {
   },
   production: {
     auth: "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
-    register: "https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl",
+    register: "https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl",
   },
 };
 
