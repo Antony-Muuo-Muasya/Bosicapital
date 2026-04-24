@@ -24,7 +24,7 @@ export async function getAdminDashboardStats(organizationId?: string) {
       activeLoansCount
     ] = await Promise.all([
       db(`SELECT id, status, principal, "issueDate", "loanProductId", "loanOfficerId", "totalPayable", "borrowerId", "branchId" FROM "Loan" ${whereOrg}`, params),
-      db(`SELECT id, "registrationFeePaidAt", "organizationId", "branchId" FROM "Borrower" ${whereOrg}`, params),
+      db(`SELECT id, "fullName", "photoUrl", "registrationFeePaidAt", "organizationId", "branchId" FROM "Borrower" ${whereOrg}`, params),
       db(`SELECT id, category FROM "LoanProduct" ${whereOrg}`, params),
       db(`SELECT id, "fullName", "avatarUrl", "roleId" FROM "User" ${whereOrg}`, params),
       db(`SELECT id, name FROM "Branch" ${whereOrg}`, params),
