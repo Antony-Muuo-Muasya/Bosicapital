@@ -95,9 +95,12 @@ export async function GET(req: Request) {
       result = { error: "Non-JSON response from v2" };
     }
 
-    // If v2 fails because of registration issues, try v1 as fallback
-    if (result.errorCode === "500.003.1001" || registerV2Res.status !== 200) {
-      console.log("v2 registration failed, trying v1 fallback...");
+    let v1Result: any = null;
+    let v2Result: any = result;
+
+    // Trigger v1 fallback if v2 failed
+    if (result.errorCode === "500.003.1001" || result.errorCode === "401.003.01" || registerV2Res.status !== 200) {
+      console.log("Applying v1 fallback...");
       const v1Url = DARAJA_URLS[env].register.replace("/v2/", "/v1/");
       const registerV1Res = await fetch(v1Url, {
         method: "POST",
@@ -115,21 +118,21 @@ export async function GET(req: Request) {
       });
       const v1Text = await registerV1Res.text();
       try {
-        result = JSON.parse(v1Text);
+        v1Result = JSON.parse(v1Text);
       } catch {
-        // stick with v2 result if v1 also crashes
+        v1Result = { error: "v1 returned non-JSON" };
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Registration attempted (v2 + v1 fallback).",
+      message: "Detailed Registration Logs",
       environment: env,
-      callbackUrl,
-      shortCode,
-      result,
+      v2Response: v2Result,
+      v1Response: v1Result,
       config,
     });
+
 
 
   } catch (error: any) {
