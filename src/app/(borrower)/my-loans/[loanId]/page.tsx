@@ -167,6 +167,34 @@ export default function MyLoanDetailPage() {
         )
     }
 
+    const [isPaying, setIsPaying] = useState(false);
+    const [payPhone, setPayPhone] = useState("");
+    const [payAmount, setPayAmount] = useState("");
+
+    const handleStkPush = async () => {
+        if (!payPhone || !payAmount) return alert("Please enter phone and amount.");
+        setIsPaying(true);
+        try {
+            const res = await fetch("/api/payments/stk-push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("STK Push sent! Please check your phone (" + payPhone + ") and enter your M-Pesa PIN.");
+                setPayAmount("");
+            } else {
+                alert("Failed: " + (data.error || "Please try again later."));
+                console.error(data);
+            }
+        } catch (e) {
+            alert("Error sending request.");
+        } finally {
+            setIsPaying(false);
+        }
+    };
+
     return (
         <div className="container max-w-5xl py-8">
              <PageHeader title={product.name} description={`Details for loan #${loan.id.substring(0, 8)}`}>
@@ -194,6 +222,44 @@ export default function MyLoanDetailPage() {
                     <CardContent><p className="text-2xl font-semibold text-destructive">{formatCurrency(totalOutstanding, 'KES')}</p></CardContent>
                 </Card>
             </div>
+
+            {loan.status === 'Active' && totalOutstanding > 0 && (
+                <Card className="mt-8 border-primary bg-primary/5">
+                    <CardHeader>
+                        <CardTitle className="text-primary">Pay Automatically (M-Pesa STK Push)</CardTitle>
+                        <CardDescription>
+                            Enter your M-Pesa number and the amount you want to pay. A prompt will appear on your phone to enter your PIN.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-col sm:flex-row gap-4 items-end">
+                            <div className="flex-1 space-y-2">
+                                <label className="text-sm font-medium">M-Pesa Phone Number</label>
+                                <input 
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" 
+                                    placeholder="e.g. 0712345678"
+                                    value={payPhone}
+                                    onChange={(e) => setPayPhone(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex-1 space-y-2">
+                                <label className="text-sm font-medium">Amount to Pay (KES)</label>
+                                <input 
+                                    type="number"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" 
+                                    placeholder="Total outstanding: "
+                                    value={payAmount}
+                                    onChange={(e) => setPayAmount(e.target.value)}
+                                />
+                            </div>
+                            <Button className="h-10 px-8" onClick={handleStkPush} disabled={isPaying || !payPhone || !payAmount}>
+                                {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isPaying ? "Sending..." : "Send Prompt"}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Card className="mt-8">
                 <CardHeader>
