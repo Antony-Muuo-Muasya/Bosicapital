@@ -166,6 +166,42 @@ export default function LoanDetailPage() {
         document.body.removeChild(link);
     };
 
+    const [isPaying, setIsPaying] = useState(false);
+    const [payPhone, setPayPhone] = useState("");
+    const [payAmount, setPayAmount] = useState("");
+
+    // Automatically prefill the registered phone number once
+    useEffect(() => {
+        if (borrower?.phone) {
+            setPayPhone(borrower.phone);
+            setPayAmount(String(totalOutstanding));
+        }
+    }, [borrower?.phone, totalOutstanding]);
+
+    const handleStkPush = async () => {
+        if (!payPhone || !payAmount) return alert("Please enter phone and amount.");
+        setIsPaying(true);
+        try {
+            const res = await fetch("/api/payments/stk-push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id })
+            });
+            const d = await res.json();
+            if (d.success) {
+                alert("STK Push sent! Please check the phone (" + payPhone + ") and enter the M-Pesa PIN.");
+                setPayAmount("");
+            } else {
+                alert("Failed: " + (d.error || "Please try again later."));
+                console.error(d);
+            }
+        } catch (e) {
+            alert("Error sending request.");
+        } finally {
+            setIsPaying(false);
+        }
+    };
+
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 md:px-6">
                  <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${loan.id.substring(0, 8)}`}>
@@ -231,7 +267,7 @@ export default function LoanDetailPage() {
                                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
                                     <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
                                 </svg>
-                                M-Pesa Repayment
+                                M-Pesa Repayment (STK Push)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -246,6 +282,43 @@ export default function LoanDetailPage() {
                             <p className="text-[11px] text-muted-foreground italic leading-relaxed">
                                 Enter the Loan ID above as the Account Number when paying via M-Pesa to ensure your payment is automatically recorded.
                             </p>
+                            
+                            <hr className="my-2 border-border" />
+                            
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold flex justify-between w-full">
+                                    <span>Send STK Prompt to Borrower</span>
+                                    {borrower?.phone && payPhone !== borrower.phone && (
+                                        <Badge 
+                                            variant="secondary" 
+                                            className="text-[9px] cursor-pointer hover:bg-secondary/80 py-0 h-4"
+                                            onClick={() => setPayPhone(borrower.phone)}
+                                        >
+                                            Reset to '{borrower.phone}'
+                                        </Badge>
+                                    )}
+                                </label>
+                                <div className="space-y-2">
+                                     <input 
+                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
+                                        placeholder="Phone (e.g. 0712345678)"
+                                        value={payPhone}
+                                        onChange={(e) => setPayPhone(e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="number"
+                                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
+                                            placeholder="Amount"
+                                            value={payAmount}
+                                            onChange={(e) => setPayAmount(e.target.value)}
+                                        />
+                                        <Button size="sm" className="h-9 whitespace-nowrap" onClick={handleStkPush} disabled={isPaying || !payPhone || !payAmount}>
+                                            {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Send Prompt"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
