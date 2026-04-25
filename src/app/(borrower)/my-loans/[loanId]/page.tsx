@@ -204,98 +204,129 @@ export default function MyLoanDetailPage() {
     };
 
     return (
-        <div className="container max-w-5xl py-8">
-             <PageHeader title={product.name} description={`Details for loan #${loan.id.substring(0, 8)}`}>
-                <Button variant="outline" onClick={handleDownload} disabled={sortedInstallments.length === 0}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Download Statement
-                </Button>
-            </PageHeader>
+        <div className="container max-w-5xl py-8 space-y-8">
+             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <PageHeader 
+                    title={product.name} 
+                    description={`Loan #${loan.id.substring(0, 8)} • Issued on ${loan.issueDate ? new Date(loan.issueDate).toLocaleDateString() : 'N/A'}`} 
+                />
+                <div className="flex items-center gap-2">
+                    <Badge variant={getLoanStatusVariant(loan.status) as any} className="h-7 px-3 text-sm">
+                        {loan.status}
+                    </Badge>
+                    <Button variant="outline" size="sm" onClick={handleDownload} disabled={sortedInstallments.length === 0}>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Statement
+                    </Button>
+                </div>
+            </div>
 
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Principal Amount</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-semibold">{formatCurrency(loan.principal, 'KES')}</p></CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="bg-card/50 backdrop-blur">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Principal</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold">{formatCurrency(loan.principal, 'KES')}</p></CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Payable</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-semibold">{formatCurrency(loan.totalPayable, 'KES')}</p></CardContent>
+                 <Card className="bg-card/50 backdrop-blur">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Payable</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold">{formatCurrency(loan.totalPayable, 'KES')}</p></CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Amount Paid</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-semibold text-green-600">{formatCurrency(totalPaid, 'KES')}</p></CardContent>
+                 <Card className="bg-card/50 backdrop-blur border-green-500/20">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-green-600/70">Paid To Date</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold text-green-600">{formatCurrency(totalPaid, 'KES')}</p></CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Amount Outstanding</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-semibold text-destructive">{formatCurrency(totalOutstanding, 'KES')}</p></CardContent>
+                 <Card className="bg-card/50 backdrop-blur border-primary/20">
+                    <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-primary/70">Outstanding</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold text-primary">{formatCurrency(totalOutstanding, 'KES')}</p></CardContent>
                 </Card>
             </div>
 
-            {loan.status === 'Active' && totalOutstanding > 0 && (
-                <Card className="mt-8 border-primary bg-primary/5">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Pay Automatically (M-Pesa STK Push)</CardTitle>
-                        <CardDescription>
-                            Enter your M-Pesa number and the amount you want to pay. A prompt will appear on your phone to enter your PIN.
+            {/* STK Push Section - Made more prominent and always visible for active/pending loans */}
+            {['Active', 'Pending Approval', 'Approve'].includes(loan.status) && totalOutstanding > 0 && (
+                <Card className="relative overflow-hidden border-primary/30 shadow-lg shadow-primary/5">
+                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                        <svg className="w-24 h-24 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                        </svg>
+                    </div>
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="font-bold text-primary text-xs">M</span>
+                            </div>
+                            <CardTitle className="text-xl text-primary font-bold">Fast M-Pesa Repayment</CardTitle>
+                        </div>
+                        <CardDescription className="text-sm font-medium">
+                            Request a payment prompt directly to your phone. Simply enter your M-Pesa PIN when it appears.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col sm:flex-row gap-4 items-end">
-                            <div className="flex-1 space-y-2">
-                                <label className="text-sm font-medium flex justify-between w-full">
-                                    <span>M-Pesa Phone Number</span>
+                    <CardContent className="pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                            <div className="md:col-span-5 space-y-2">
+                                <label className="text-xs font-bold uppercase text-muted-foreground flex justify-between">
+                                    <span>Phone Number</span>
                                     {loan?.borrower?.phone && payPhone !== loan.borrower.phone && (
-                                        <Badge 
-                                            variant="secondary" 
-                                            className="text-[10px] cursor-pointer hover:bg-secondary/80 py-0 h-5"
+                                        <button 
+                                            className="text-primary hover:underline"
                                             onClick={() => setPayPhone(loan.borrower.phone)}
                                         >
-                                            Reset to '{loan.borrower.phone}'
-                                        </Badge>
+                                            Use registred phone
+                                        </button>
                                     )}
                                 </label>
                                 <input 
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" 
-                                    placeholder="e.g. 0712345678"
+                                    className="flex h-11 w-full rounded-lg border border-input bg-background/50 px-4 py-2 text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 transition-all" 
+                                    placeholder="07XXXXXXXX"
                                     value={payPhone}
                                     onChange={(e) => setPayPhone(e.target.value)}
                                 />
                             </div>
-                            <div className="flex-1 space-y-2">
-                                <label className="text-sm font-medium">Amount to Pay (KES)</label>
+                            <div className="md:col-span-4 space-y-2">
+                                <label className="text-xs font-bold uppercase text-muted-foreground">Amount (KES)</label>
                                 <input 
                                     type="number"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" 
-                                    placeholder="Total outstanding: "
+                                    className="flex h-11 w-full rounded-lg border border-input bg-background/50 px-4 py-2 text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 transition-all" 
+                                    placeholder="Amount to pay"
                                     value={payAmount}
                                     onChange={(e) => setPayAmount(e.target.value)}
                                 />
                             </div>
-                            <Button className="h-10 px-8" onClick={handleStkPush} disabled={isPaying || !payPhone || !payAmount}>
-                                {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {isPaying ? "Sending..." : "Send Prompt"}
-                            </Button>
+                            <div className="md:col-span-3">
+                                <Button 
+                                    className="w-full h-11 text-base font-bold shadow-md hover:shadow-lg transition-all" 
+                                    onClick={handleStkPush} 
+                                    disabled={isPaying || !payPhone || !payAmount}
+                                >
+                                    {isPaying ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                                    {isPaying ? "Wait for prompt..." : "Send Payment Prompt"}
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            <Card className="mt-8">
+            <Card>
                 <CardHeader>
-                    <CardTitle>Repayment Schedule</CardTitle>
-                    <CardDescription>
-                        Installments are {formatCurrency(loan.installmentAmount, 'KES')} per {product.repaymentCycle}.
-                         <Badge variant={getLoanStatusVariant(loan.status) as any} className="ml-2">{loan.status}</Badge>
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Repayment Schedule</CardTitle>
+                            <CardDescription>
+                                Installment payments are {formatCurrency(loan.installmentAmount, 'KES')} per {product.repaymentCycle}.
+                            </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="font-normal text-xs">
+                            {sortedInstallments.filter(i => i.status === 'Paid').length} / {sortedInstallments.length} Paid
+                        </Badge>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead>#</TableHead>
+                            <TableRow className="hover:bg-transparent border-none">
+                                <TableHead className="w-12">#</TableHead>
                                 <TableHead>Due Date</TableHead>
-                                <TableHead>Amount Due</TableHead>
-                                <TableHead>Amount Paid</TableHead>
+                                <TableHead>Expected</TableHead>
+                                <TableHead>Paid</TableHead>
                                 <TableHead className="text-right">Status</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -304,31 +335,32 @@ export default function MyLoanDetailPage() {
                                 const statusConfig = getInstallmentStatusConfig(inst.status);
                                 const Icon = statusConfig.icon;
                                 return (
-                                <TableRow key={inst.id} className={inst.status === 'Paid' ? 'bg-green-500/5' : ''}>
-                                    <TableCell>{inst.installmentNumber}</TableCell>
-                                    <TableCell>{new Date(inst.dueDate).toLocaleDateString()}</TableCell>
-                                    <TableCell>{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
-                                    <TableCell>{formatCurrency(inst.paidAmount, 'KES')}</TableCell>
+                                <TableRow key={inst.id} className={cn("transition-colors", inst.status === 'Paid' ? 'bg-green-500/5' : '')}>
+                                    <TableCell className="font-medium">{inst.installmentNumber}</TableCell>
+                                    <TableCell>{new Date(inst.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                                    <TableCell className="font-semibold">{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
+                                    <TableCell className={cn(inst.paidAmount > 0 ? "text-green-600 font-semibold" : "text-muted-foreground")}>
+                                        {formatCurrency(inst.paidAmount, 'KES')}
+                                    </TableCell>
                                     <TableCell className="text-right">
-                                        <Badge variant={statusConfig.variant as any} className={cn('gap-1.5', statusConfig.className)}>
+                                        <Badge variant={statusConfig.variant as any} className={cn('gap-1.5 font-medium', statusConfig.className)}>
                                             <Icon className="h-3 w-3" />
                                             {inst.status}
                                         </Badge>
                                     </TableCell>
                                 </TableRow>
                             )})}
-                            {!isLoading && sortedInstallments.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                        {loan.status === 'Pending Approval' ? `Repayment schedule will be generated upon loan approval.` : 'No installments found for this loan.'}
-                                    </TableCell>
-                                </TableRow>
-                            )}
                         </TableBody>
                     </Table>
+                    {sortedInstallments.length === 0 && (
+                        <div className="py-12 text-center">
+                            <p className="text-muted-foreground">
+                                {loan.status === 'Pending Approval' ? `Repayment schedule will be generated upon loan approval.` : 'No installments found for this loan.'}
+                            </p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
-
         </div>
     );
 }
