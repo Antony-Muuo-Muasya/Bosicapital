@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
     const shortCode = process.env.MPESA_SHORTCODE;
     const env = (process.env.MPESA_ENVIRONMENT || "sandbox") as "sandbox" | "production";
-    const callbackUrl = process.env.MPESA_CALLBACK_URL || "";
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || "https://bosicapital.com/api/payments/callback";
 
     // Show current config for debugging
     const config = {
