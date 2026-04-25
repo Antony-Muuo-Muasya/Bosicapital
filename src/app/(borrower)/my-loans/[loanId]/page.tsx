@@ -170,6 +170,14 @@ export default function MyLoanDetailPage() {
     const [isPaying, setIsPaying] = useState(false);
     const [payPhone, setPayPhone] = useState("");
     const [payAmount, setPayAmount] = useState("");
+    
+    // Automatically prefill the registered phone number once
+    useEffect(() => {
+        if (loan?.borrower?.phone) {
+            setPayPhone(loan.borrower.phone);
+            setPayAmount(String(totalOutstanding));
+        }
+    }, [loan?.borrower?.phone, totalOutstanding]);
 
     const handleStkPush = async () => {
         if (!payPhone || !payAmount) return alert("Please enter phone and amount.");
@@ -236,13 +244,14 @@ export default function MyLoanDetailPage() {
                             <div className="flex-1 space-y-2">
                                 <label className="text-sm font-medium flex justify-between w-full">
                                     <span>M-Pesa Phone Number</span>
-                                    {loan?.borrower?.phone && (
-                                        <span 
-                                            className="text-xs text-primary cursor-pointer hover:underline font-normal"
+                                    {loan?.borrower?.phone && payPhone !== loan.borrower.phone && (
+                                        <Badge 
+                                            variant="secondary" 
+                                            className="text-[10px] cursor-pointer hover:bg-secondary/80 py-0 h-5"
                                             onClick={() => setPayPhone(loan.borrower.phone)}
                                         >
-                                            Use my account number
-                                        </span>
+                                            Reset to '{loan.borrower.phone}'
+                                        </Badge>
                                     )}
                                 </label>
                                 <input 
