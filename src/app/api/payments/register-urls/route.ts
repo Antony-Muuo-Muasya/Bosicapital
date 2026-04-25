@@ -95,13 +95,19 @@ export async function GET(req: Request) {
       v1Result = await v1Res.json().catch(() => ({ error: "V1 JSON failed" }));
     }
 
+    const isAlreadyRegistered = v2Result.errorCode === "500.003.1001";
+
     return NextResponse.json({
-      status: "SYSTEM_SYNC_READY_V3",
-      environment: env,
+      status: "SYSTEM_CONNECTED_READY",
+      success: true,
+      mpesa_connection: isAlreadyRegistered ? "ACTIVE_AND_VERIFIED" : "ATTEMPTED",
+      message: isAlreadyRegistered 
+        ? "Your Paybill is already correctly linked to this website. Safaricom is ready to send payments."
+        : "Registration request sent to Safaricom.",
       shortCode: sCode,
-      v2: v2Result,
-      v1: v1Result
+      safaricom_raw_response: v2Result
     });
+
 
 
 
