@@ -53,18 +53,31 @@ export async function GET(req: Request) {
     const sCode = (shortCode || "4159879").toString().trim();
     const cUrl = (callbackUrl || "https://bosicapital.com/api/payments/callback").trim();
 
-    // Register V2
+    // FORCE RESET: Try registering a 'dummy' URL first to clear Safaricom's cache
+    await fetch(DARAJA_URLS[env].register, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ShortCode: sCode,
+        ResponseType: "Completed",
+        ConfirmationURL: "https://bosicapital.com/api/mpesa/reset",
+        ValidationURL: "https://bosicapital.com/api/mpesa/reset",
+      }),
+    });
+
+    // NOW REGISTER THE REAL ONE
     const v2Res = await fetch(DARAJA_URLS[env].register, {
       method: "POST",
       headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         ShortCode: sCode,
         ResponseType: "Completed",
-        ConfirmationURL: cUrl + "?type=conf",
-        ValidationURL: cUrl + "?type=val",
+        ConfirmationURL: cUrl,
+        ValidationURL: cUrl,
       }),
     });
     const v2Result = await v2Res.json().catch(() => ({ error: "V2 JSON failed" }));
+
 
     // Fallback to V1
     let v1Result = null;
