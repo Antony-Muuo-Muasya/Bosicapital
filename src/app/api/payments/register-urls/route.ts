@@ -82,8 +82,8 @@ export async function GET(req: Request) {
       body: JSON.stringify({
         ShortCode: shortCode,
         ResponseType: "Completed",
-        ConfirmationURL: callbackUrl,
-        ValidationURL: callbackUrl,
+        ConfirmationURL: callbackUrl + "?type=conf",
+        ValidationURL: callbackUrl + "?type=val",
       }),
     });
 
@@ -109,8 +109,8 @@ export async function GET(req: Request) {
         body: JSON.stringify({
           ShortCode: shortCode,
           ResponseType: "Completed",
-          ConfirmationURL: callbackUrl,
-          ValidationURL: callbackUrl,
+          ConfirmationURL: callbackUrl + "?type=conf",
+          ValidationURL: callbackUrl + "?type=val",
         }),
       });
       const v1Text = await registerV1Res.text();
