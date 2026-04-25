@@ -195,13 +195,6 @@ export default function RepaymentsPage() {
             </div>
           </div>
           <div className="h-9 w-[1px] bg-border mx-2 hidden md:block" />
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.href='/api/payments/register-urls'}
-            className="border-orange-500 text-orange-500 hover:bg-orange-50 h-9"
-          >
-            Fix Safaricom Connection
-          </Button>
           <Button variant="outline" onClick={handleExport} disabled={isLoading || !repaymentsWithDetails?.length} className="h-9">
             <FileDown className="mr-2 h-4 w-4" />
             Export Report
