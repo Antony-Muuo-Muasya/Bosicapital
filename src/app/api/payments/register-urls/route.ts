@@ -35,8 +35,8 @@ export async function GET(req: Request) {
       }, { status: 500 });
     }
 
-    // Step 1: Get token — read as text first to avoid JSON crash
-    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
+    // Step 1: Get token
+    const auth = Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString("base64");
     const tokenRes = await fetch(DARAJA_URLS[env].auth, {
       headers: { Authorization: `Basic ${auth}` },
       cache: "no-store",
@@ -44,94 +44,52 @@ export async function GET(req: Request) {
 
     const tokenText = await tokenRes.text();
     let tokenData: any;
-    try {
-      tokenData = JSON.parse(tokenText);
-    } catch {
-      return NextResponse.json({
-        error: "Safaricom OAuth returned non-JSON. This usually means your credentials are wrong for the selected environment.",
-        environment: env,
-        httpStatus: tokenRes.status,
-        rawResponse: tokenText.substring(0, 500),
-        config,
-        fix: env === "production"
-          ? "Your Consumer Key/Secret might be SANDBOX credentials. Log into developer.safaricom.co.ke, go to your production app, and copy the production keys."
-          : "Check your sandbox credentials on developer.safaricom.co.ke"
-      }, { status: 400 });
-    }
+    try { tokenData = JSON.parse(tokenText); } catch { tokenData = { error: "OAuth failed", raw: tokenText.substring(0, 50) }; }
 
     if (!tokenData.access_token) {
-      return NextResponse.json({
-        error: "Failed to get M-Pesa access token.",
-        environment: env,
-        darajaResponse: tokenData,
-        config,
-        fix: env === "production"
-          ? "Credentials rejected. Make sure you are using PRODUCTION Consumer Key/Secret from your live Daraja app."
-          : "Check credentials on developer.safaricom.co.ke"
-      }, { status: 401 });
+      return NextResponse.json({ error: "Auth Failed", daraja: tokenData, config }, { status: 401 });
     }
 
-    // Step 2: Register URLs (Try v2 first)
-    const registerV2Res = await fetch(DARAJA_URLS[env].register, {
+    const sCode = (shortCode || "4159879").toString().trim();
+    const cUrl = (callbackUrl || "https://bosicapital.com/api/payments/callback").trim();
+
+    // Register V2
+    const v2Res = await fetch(DARAJA_URLS[env].register, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
+      headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        ShortCode: shortCode,
+        ShortCode: sCode,
         ResponseType: "Completed",
-        ConfirmationURL: callbackUrl + "?type=conf",
-        ValidationURL: callbackUrl + "?type=val",
+        ConfirmationURL: cUrl + "?type=conf",
+        ValidationURL: cUrl + "?type=val",
       }),
     });
+    const v2Result = await v2Res.json().catch(() => ({ error: "V2 JSON failed" }));
 
-    let registerText = await registerV2Res.text();
-    let result: any;
-    try {
-      result = JSON.parse(registerText);
-    } catch {
-      result = { error: "Non-JSON response from v2" };
-    }
-
-    let v1Result: any = null;
-    let v2Result: any = result;
-
-    // Trigger v1 fallback if v2 failed
-    if (result.errorCode === "500.003.1001" || result.errorCode === "401.003.01" || registerV2Res.status !== 200) {
-      console.log("Applying v1 fallback...");
-      const v1Url = DARAJA_URLS[env].register.replace("/v2/", "/v1/");
-      const registerV1Res = await fetch(v1Url, {
+    // Fallback to V1
+    let v1Result = null;
+    if (v2Result.errorCode === "401.003.01" || v2Result.errorCode === "500.003.1001" || v2Res.status !== 200) {
+      const v1Res = await fetch(DARAJA_URLS[env].register.replace("/v2/", "/v1/"), {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
+        headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          ShortCode: shortCode,
+          ShortCode: sCode,
           ResponseType: "Completed",
-          ConfirmationURL: callbackUrl + "?type=conf",
-          ValidationURL: callbackUrl + "?type=val",
+          ConfirmationURL: cUrl,
+          ValidationURL: cUrl,
         }),
       });
-      const v1Text = await registerV1Res.text();
-      try {
-        v1Result = JSON.parse(v1Text);
-      } catch {
-        v1Result = { error: "v1 returned non-JSON" };
-      }
+      v1Result = await v1Res.json().catch(() => ({ error: "V1 JSON failed" }));
     }
 
     return NextResponse.json({
-      success: true,
-      message: "Detailed Registration Logs",
+      status: "SYSTEM_SYNC_READY_V3",
       environment: env,
-      v2Response: v2Result,
-      v1Response: v1Result,
-      config,
+      shortCode: sCode,
+      v2: v2Result,
+      v1: v1Result
     });
+
 
 
 

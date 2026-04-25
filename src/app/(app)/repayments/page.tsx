@@ -167,11 +167,21 @@ export default function RepaymentsPage() {
   return (
     <>
       <PageHeader title="Repayments" description="Record and track all incoming payments.">
-        <Button variant="outline" onClick={handleExport} disabled={isLoading || !repaymentsWithDetails?.length}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Export Report
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.href='/api/payments/register-urls'}
+            className="border-orange-500 text-orange-500 hover:bg-orange-50"
+          >
+            Fix Safaricom Connection
+          </Button>
+          <Button variant="outline" onClick={handleExport} disabled={isLoading || !repaymentsWithDetails?.length}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Export Report
+          </Button>
+        </div>
       </PageHeader>
+
       <div className="p-4 md:p-6">
         <Card>
           <CardHeader>
