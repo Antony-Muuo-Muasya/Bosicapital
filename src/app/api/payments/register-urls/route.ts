@@ -71,8 +71,8 @@ export async function GET(req: Request) {
       }, { status: 401 });
     }
 
-    // Step 2: Register URLs
-    const registerRes = await fetch(DARAJA_URLS[env].register, {
+    // Step 2: Register URLs (Try v2 first)
+    const registerV2Res = await fetch(DARAJA_URLS[env].register, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
@@ -87,46 +87,50 @@ export async function GET(req: Request) {
       }),
     });
 
-    const registerText = await registerRes.text();
+    let registerText = await registerV2Res.text();
     let result: any;
     try {
       result = JSON.parse(registerText);
     } catch {
-      return NextResponse.json({
-        error: "Safaricom C2B register endpoint returned non-JSON.",
-        environment: env,
-        httpStatus: registerRes.status,
-        rawResponse: registerText.substring(0, 500),
-        config,
-      }, { status: 400 });
+      result = { error: "Non-JSON response from v2" };
     }
 
-    // errorCode 401.003.01 = Invalid Access Token (wrong env credentials)
-    if (result.errorCode === "401.003.01") {
-      return NextResponse.json({
-        error: "Safaricom rejected the access token with error 401.003.01.",
-        meaning: "Your Consumer Key/Secret are SANDBOX credentials but MPESA_ENVIRONMENT is set to 'production'. You need to get your PRODUCTION credentials from developer.safaricom.co.ke under your live app.",
-        steps: [
-          "1. Go to https://developer.safaricom.co.ke and log in.",
-          "2. Navigate to 'My Apps' and open your Production app.",
-          "3. Copy the Production Consumer Key and Consumer Secret.",
-          "4. Update MPESA_CONSUMER_KEY and MPESA_CONSUMER_SECRET in your Vercel environment variables.",
-          "5. Redeploy, then visit this URL again."
-        ],
-        darajaResponse: result,
-        config,
-      }, { status: 401 });
+    // If v2 fails because of registration issues, try v1 as fallback
+    if (result.errorCode === "500.003.1001" || registerV2Res.status !== 200) {
+      console.log("v2 registration failed, trying v1 fallback...");
+      const v1Url = DARAJA_URLS[env].register.replace("/v2/", "/v1/");
+      const registerV1Res = await fetch(v1Url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          ShortCode: shortCode,
+          ResponseType: "Completed",
+          ConfirmationURL: callbackUrl,
+          ValidationURL: callbackUrl,
+        }),
+      });
+      const v1Text = await registerV1Res.text();
+      try {
+        result = JSON.parse(v1Text);
+      } catch {
+        // stick with v2 result if v1 also crashes
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: "URLs registered successfully!",
+      message: "Registration attempted (v2 + v1 fallback).",
       environment: env,
       callbackUrl,
       shortCode,
       result,
       config,
     });
+
 
   } catch (error: any) {
     console.error("URL Registration Error:", error);

@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-04-25T06:00:36.677Z",
+  "recentCallbacks": [
+    {
+      "id": "mpc_1o4oe1jao",
+      "transactionType": "Pay Bill",
+      "transId": "SUCCESS_TEST_001",
+      "transTime": "202604162110",
+      "transAmount": "500",
+      "businessShortCode": "4159879",
+      "billRefNumber": "40307366",
+      "msisdn": "254114611857",
+      "firstName": "John",
+      "middleName": null,
+      "lastName": "Doe",
+      "status": "Processed",
+      "errorMessage": null,
+      "createdAt": "2026-04-16T15:13:39.447Z"
+    },
+    {
+      "id": "mpc_l1kjw66j5",
+      "transactionType": "Pay Bill",
+      "transId": "TEST_DB_REFRESH_99",
+      "transTime": "202604090748",
+      "transAmount": "500",
+      "businessShortCode": "4159879",
+      "billRefNumber": "L-XXXXXX",
+      "msisdn": "254712345678",
+      "firstName": "John",
+      "middleName": "Doe",
+      "lastName": "Client",
+      "status": "Failed",
+      "errorMessage": "Could not match loan/borrower",
+      "createdAt": "2026-04-16T15:08:47.546Z"
+    }
+  ],
+  "recentRepayments": [
+    {
+      "id": "rep_6ckp12gf3",
+      "organizationId": "default",
+      "loanId": "cmnfsnr8t000fl404lf4tvoo6",
+      "borrowerId": "cmnfs3uom0003l40494mvbare",
+      "loanOfficerId": "cmn727x9x0005l5049owso5id",
+      "transId": "SUCCESS_TEST_001",
+      "amount": 500,
+      "paymentDate": "2026-04-16T18:13:39.486Z",
+      "collectedById": "mpesa_system",
+      "method": "Mobile Money",
+      "phone": "254114611857",
+      "balanceAfterPayment": 5750
+    }
+  ]
+}
