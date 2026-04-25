@@ -234,7 +234,17 @@ export default function MyLoanDetailPage() {
                     <CardContent>
                         <div className="flex flex-col sm:flex-row gap-4 items-end">
                             <div className="flex-1 space-y-2">
-                                <label className="text-sm font-medium">M-Pesa Phone Number</label>
+                                <label className="text-sm font-medium flex justify-between w-full">
+                                    <span>M-Pesa Phone Number</span>
+                                    {loan?.borrower?.phone && (
+                                        <span 
+                                            className="text-xs text-primary cursor-pointer hover:underline font-normal"
+                                            onClick={() => setPayPhone(loan.borrower.phone)}
+                                        >
+                                            Use my account number
+                                        </span>
+                                    )}
+                                </label>
                                 <input 
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" 
                                     placeholder="e.g. 0712345678"
