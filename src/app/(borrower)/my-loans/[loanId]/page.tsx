@@ -315,7 +315,7 @@ export default function MyLoanDetailPage() {
                             </CardDescription>
                         </div>
                         <Badge variant="outline" className="font-normal text-xs">
-                            {sortedInstallments.filter(i => i.status === 'Paid').length} / {sortedInstallments.length} Paid
+                            {sortedInstallments.filter((i: any) => i.status === 'Paid').length} / {sortedInstallments.length} Paid
                         </Badge>
                     </div>
                 </CardHeader>
