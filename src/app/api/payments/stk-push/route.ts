@@ -23,7 +23,6 @@ export async function POST(req: Request) {
     const consumerKey = (process.env.MPESA_CONSUMER_KEY || "").trim();
     const consumerSecret = (process.env.MPESA_CONSUMER_SECRET || "").trim();
     const shortCode = (process.env.MPESA_SHORTCODE || "4159879").trim();
-    const passkey = (process.env.MPESA_PASSKEY || "").trim();
     const env = ((process.env.MPESA_ENVIRONMENT || "production").trim()) as "sandbox" | "production";
 
     if (!consumerKey || !consumerSecret) {
@@ -31,11 +30,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Server M-Pesa credentials are not configured" }, { status: 500 });
     }
 
-    // FIX 2: Don't fallback to sandbox passkey in production — fail clearly instead
+    // Passkey: In sandbox, use the well-known sandbox passkey as fallback. In production, it MUST be set.
+    let passkey = (process.env.MPESA_PASSKEY || "").trim();
+    const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+    
     if (!passkey) {
-      console.error("[STK Push] MPESA_PASSKEY is not set in environment variables");
-      return NextResponse.json({ error: "MPESA_PASSKEY is not configured on the server" }, { status: 500 });
+      if (env === "sandbox") {
+        passkey = SANDBOX_PASSKEY;
+        console.warn("[STK Push] MPESA_PASSKEY not set — using default sandbox passkey");
+      } else {
+        console.error("[STK Push] MPESA_PASSKEY is EMPTY in production Vercel env vars.",
+          "Key length:", consumerKey.length, "Secret length:", consumerSecret.length);
+        return NextResponse.json({
+          error: "MPESA_PASSKEY is not configured on the server. Please add it in Vercel → Settings → Environment Variables, then REDEPLOY.",
+        }, { status: 500 });
+      }
     }
+    console.log("[STK Push] Passkey loaded, length:", passkey.length, "env:", env);
 
     // FIX 3: Build the callback URL directly — do NOT use string replace (it breaks if URL format changes)
     const baseUrl = (process.env.MPESA_CALLBACK_URL || "https://bosicapital.com/api/payments/callback")
