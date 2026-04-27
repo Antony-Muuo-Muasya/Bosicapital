@@ -96,6 +96,9 @@ export default function LoanDetailPage() {
         }
     }, [installments, loan]);
 
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
     if (isLoading) {
         return (
             <div className="flex h-[calc(100vh-200px)] items-center justify-center">
@@ -115,6 +118,10 @@ export default function LoanDetailPage() {
                 </Card>
              </div>
         )
+    }
+
+    if (!mounted) {
+        return <div className="flex items-center justify-center h-screen"><Loader2 className="h-10 w-10 animate-spin" /></div>;
     }
 
     const handleDownload = () => {
@@ -204,7 +211,7 @@ export default function LoanDetailPage() {
 
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 md:px-6">
-                 <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${loan.id.substring(0, 8)}`}>
+                 <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${String(loan.id).substring(0, 8)}`}>
                     <Button variant="outline" onClick={handleDownload}>
                         <FileDown className="mr-2 h-4 w-4" />
                         Download Statement

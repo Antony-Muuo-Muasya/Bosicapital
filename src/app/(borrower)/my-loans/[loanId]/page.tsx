@@ -201,14 +201,47 @@ export default function MyLoanDetailPage() {
         } finally {
             setIsPaying(false);
         }
-    };
+    };    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    if (!loan || !product) {
+        return (
+             <div className="container max-w-5xl py-8">
+                <PageHeader title="Loan Not Found" />
+                <Card className="mt-6">
+                    <CardContent className="pt-6">
+                        <p className="text-center text-muted-foreground">The requested loan could not be found or you do not have permission to view it.</p>
+                    </CardContent>
+                </Card>
+             </div>
+        )
+    }
+
+    if (!mounted) {
+        return (
+            <div className="container max-w-5xl py-8 space-y-8 animate-pulse">
+                <div className="h-10 w-48 bg-muted rounded" />
+                <div className="grid grid-cols-4 gap-4">
+                    {[1,2,3,4].map(i => <div key={i} className="h-24 bg-muted rounded" />)}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container max-w-5xl py-8 space-y-8">
              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <PageHeader 
-                    title={product.name} 
-                    description={`Loan #${loan.id.substring(0, 8)} • Issued on ${loan.issueDate ? new Date(loan.issueDate).toLocaleDateString() : 'N/A'}`} 
+                    title={product.name || 'Personal Loan'} 
+                    description={`Loan #${String(loan.id).substring(0, 8)} • Issued on ${loan.issueDate ? new Date(loan.issueDate).toLocaleDateString() : 'N/A'}`} 
                 />
                 <div className="flex items-center gap-2">
                     <Badge variant={getLoanStatusVariant(loan.status) as any} className="h-7 px-3 text-sm">
@@ -269,7 +302,7 @@ export default function MyLoanDetailPage() {
                                             className="text-primary hover:underline"
                                             onClick={() => setPayPhone(loan.borrower.phone)}
                                         >
-                                            Use registred phone
+                                            Use registered phone
                                         </button>
                                     )}
                                 </label>
@@ -337,7 +370,7 @@ export default function MyLoanDetailPage() {
                                 return (
                                 <TableRow key={inst.id} className={cn("transition-colors", inst.status === 'Paid' ? 'bg-green-500/5' : '')}>
                                     <TableCell className="font-medium">{inst.installmentNumber}</TableCell>
-                                    <TableCell>{new Date(inst.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                                    <TableCell>{new Date(inst.dueDate).toLocaleDateString()}</TableCell>
                                     <TableCell className="font-semibold">{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
                                     <TableCell className={cn(inst.paidAmount > 0 ? "text-green-600 font-semibold" : "text-muted-foreground")}>
                                         {formatCurrency(inst.paidAmount, 'KES')}
