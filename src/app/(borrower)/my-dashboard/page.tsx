@@ -186,7 +186,7 @@ export default function MyDashboardPage() {
             const res = await fetch("/api/payments/stk-push", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: activeLoan.id })
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: activeLoan.id, nationalId: borrower?.nationalId })
             });
             const data = await res.json();
             if (data.success) {

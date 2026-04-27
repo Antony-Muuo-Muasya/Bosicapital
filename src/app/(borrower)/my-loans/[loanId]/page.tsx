@@ -186,7 +186,7 @@ export default function MyLoanDetailPage() {
             const res = await fetch("/api/payments/stk-push", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id })
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id, nationalId: loan.borrower?.nationalId })
             });
             const data = await res.json();
             if (data.success) {

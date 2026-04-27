@@ -13,7 +13,7 @@ const DARAJA_URLS = {
 
 export async function POST(req: Request) {
   try {
-    const { phone, amount, loanId } = await req.json();
+    const { phone, amount, loanId, nationalId } = await req.json();
 
     if (!phone || !amount || !loanId) {
       return NextResponse.json({ error: "Missing required fields: phone, amount, or loanId" }, { status: 400 });
@@ -71,8 +71,8 @@ export async function POST(req: Request) {
         PartyB: shortCode,
         PhoneNumber: formattedPhone,
         CallBackURL: callbackUrl,
-        AccountReference: loanId.substring(0, 12),
-        TransactionDesc: "Loan Repayment"
+        AccountReference: (nationalId || loanId).substring(0, 12),
+        TransactionDesc: `LoanRepayment-${loanId.substring(0, 8)}`
       }),
     });
 

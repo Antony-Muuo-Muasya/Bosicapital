@@ -192,7 +192,7 @@ export default function LoanDetailPage() {
             const res = await fetch("/api/payments/stk-push", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id })
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id, nationalId: borrower?.nationalId })
             });
             const d = await res.json();
             if (d.success) {
@@ -283,11 +283,15 @@ export default function LoanDetailPage() {
                                 <p className="text-lg font-bold tracking-tight text-primary">4159879</p>
                             </div>
                             <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground uppercase font-semibold">Account Number (Loan ID)</p>
-                                <p className="text-lg font-bold tracking-tight text-primary select-all">{loan.id}</p>
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Account Number (National ID)</p>
+                                <p className="text-lg font-bold tracking-tight text-primary select-all">{borrower?.nationalId || 'N/A'}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Loan ID (Reference)</p>
+                                <p className="text-sm font-mono text-muted-foreground select-all">{loan.id}</p>
                             </div>
                             <p className="text-[11px] text-muted-foreground italic leading-relaxed">
-                                Enter the Loan ID above as the Account Number when paying via M-Pesa to ensure your payment is automatically recorded.
+                                Use the National ID as the Account Number when paying via M-Pesa. The payment will be matched to this loan automatically.
                             </p>
                             
                             <hr className="my-2 border-border" />
