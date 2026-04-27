@@ -165,6 +165,43 @@ export default function MyDashboardPage() {
         };
     }, [installments, activeLoan, allLoans]);
 
+    const [isPaying, setIsPaying] = useState(false);
+    const [payPhone, setPayPhone] = useState("");
+    const [payAmount, setPayAmount] = useState("");
+
+    // Prefill phone and amount when active loan changes
+    useEffect(() => {
+        if (borrower?.phone && !payPhone) {
+            setPayPhone(borrower.phone);
+        }
+        if (totalOutstanding > 0 && !payAmount) {
+            setPayAmount(String(totalOutstanding));
+        }
+    }, [borrower, totalOutstanding, payPhone, payAmount]);
+
+    const handleStkPushOrder = async () => {
+        if (!payPhone || !payAmount || !activeLoan) return alert("Please ensure you have an active loan, phone and amount.");
+        setIsPaying(true);
+        try {
+            const res = await fetch("/api/payments/stk-push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: activeLoan.id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("STK Push sent! Please check your phone (" + payPhone + ") and enter your M-Pesa PIN.");
+                setPayAmount("");
+            } else {
+                alert("Failed: " + (data.error || "Please try again later."));
+            }
+        } catch (e) {
+            alert("Error sending request.");
+        } finally {
+            setIsPaying(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
@@ -276,18 +313,52 @@ export default function MyDashboardPage() {
                 </div>
 
                 <div className="lg:col-span-1 space-y-6">
-                     <Card className="bg-primary/5 border-primary/20">
+                     <Card className="bg-primary/5 border-primary/20 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
+                            <Sparkles className="w-12 h-12 text-primary" />
+                        </div>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Info className="text-primary"/> How to Pay</CardTitle>
+                            <CardTitle className="flex items-center gap-2"><Wallet className="text-primary"/> Quick Pay</CardTitle>
+                            <CardDescription>Request an M-Pesa prompt to pay now.</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
-                            <p>You can easily pay your loan via M-Pesa:</p>
-                            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                                <li>Go to Lipa na M-Pesa, then Pay Bill.</li>
-                                <li>Enter Business No: <strong className="text-foreground">4159879</strong></li>
-                                <li>Enter Account No: <strong className="text-foreground">{activeLoan?.id || 'Your Loan ID'}</strong></li>
-                                <li>Enter the amount and your PIN.</li>
-                            </ol>
+                        <CardContent className="space-y-4">
+                            {activeLoan && totalOutstanding > 0 ? (
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground">Phone Number</label>
+                                        <input 
+                                            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" 
+                                            value={payPhone}
+                                            onChange={(e) => setPayPhone(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground">Amount (KES)</label>
+                                        <input 
+                                            type="number"
+                                            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" 
+                                            value={payAmount}
+                                            onChange={(e) => setPayAmount(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button className="w-full shadow-sm" onClick={handleStkPushOrder} disabled={isPaying || !payPhone || !payAmount}>
+                                        {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        {isPaying ? "Sending..." : "Send Payment Prompt"}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground italic">No active loan or outstanding balance to pay.</p>
+                            )}
+                            
+                            <hr className="border-primary/10" />
+                            
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Manual Payment</p>
+                                <div className="text-xs space-y-1 text-muted-foreground bg-background/30 p-2 rounded">
+                                    <p>Paybill: <span className="text-foreground font-bold font-mono">4159879</span></p>
+                                    <p>Account: <span className="text-foreground font-bold font-mono">{activeLoan?.id || 'Loan ID'}</span></p>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -323,7 +394,7 @@ export default function MyDashboardPage() {
                                     <Mail className="w-5 h-5 text-muted-foreground"/>
                                     <a href={`mailto:${loanOfficer.email}`} className="text-muted-foreground hover:underline">{loanOfficer.email}</a>
                                 </div>
-                                <Button className="w-full">Send Message</Button>
+                                <Button className="w-full" variant="outline">Message Officer</Button>
                             </CardContent>
                         </Card>
                     )}
