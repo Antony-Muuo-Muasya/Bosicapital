@@ -19,73 +19,124 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields: phone, amount, or loanId" }, { status: 400 });
     }
 
-    const consumerKey = process.env.MPESA_CONSUMER_KEY;
-    const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
-    const shortCode = process.env.MPESA_SHORTCODE || "4159879";
-    const passkey = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"; // Default sandbox passkey
-    const env = (process.env.MPESA_ENVIRONMENT || "production") as "sandbox" | "production";
-    
-    // Need a specific STK callback URL
-    const callbackUrl = (process.env.MPESA_CALLBACK_URL || "https://bosicapital.com/api/payments/callback").replace("/callback", "/stk-callback");
+    // FIX 1: Trim all env vars to avoid whitespace issues from "Needs Attention" Vercel warnings
+    const consumerKey = (process.env.MPESA_CONSUMER_KEY || "").trim();
+    const consumerSecret = (process.env.MPESA_CONSUMER_SECRET || "").trim();
+    const shortCode = (process.env.MPESA_SHORTCODE || "4159879").trim();
+    const passkey = (process.env.MPESA_PASSKEY || "").trim();
+    const env = ((process.env.MPESA_ENVIRONMENT || "production").trim()) as "sandbox" | "production";
 
     if (!consumerKey || !consumerSecret) {
-      return NextResponse.json({ error: "Server M-Pesa Credentials missing" }, { status: 500 });
+      console.error("[STK Push] Missing MPESA_CONSUMER_KEY or MPESA_CONSUMER_SECRET");
+      return NextResponse.json({ error: "Server M-Pesa credentials are not configured" }, { status: 500 });
     }
 
-    // 1. Get Token
-    const auth = Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString("base64");
+    // FIX 2: Don't fallback to sandbox passkey in production — fail clearly instead
+    if (!passkey) {
+      console.error("[STK Push] MPESA_PASSKEY is not set in environment variables");
+      return NextResponse.json({ error: "MPESA_PASSKEY is not configured on the server" }, { status: 500 });
+    }
+
+    // FIX 3: Build the callback URL directly — do NOT use string replace (it breaks if URL format changes)
+    const baseUrl = (process.env.MPESA_CALLBACK_URL || "https://bosicapital.com/api/payments/callback")
+      .trim()
+      .replace(/\/$/, ""); // strip trailing slash
+    // Always point to /stk-callback regardless of what MPESA_CALLBACK_URL is set to
+    const callbackUrl = baseUrl.includes("stk-callback")
+      ? baseUrl
+      : baseUrl.replace(/\/callback$/, "/stk-callback");
+
+    // FIX 4: Robust phone number formatting — handle 07xx, 254xx, +254xx, 7xx
+    let formattedPhone = phone.toString().replace(/\s+/g, "").replace(/^\+/, "").trim();
+    if (formattedPhone.startsWith("0")) {
+      formattedPhone = "254" + formattedPhone.slice(1);
+    } else if (formattedPhone.startsWith("7") && formattedPhone.length === 9) {
+      formattedPhone = "254" + formattedPhone;
+    }
+    // Validate final format: must be 12 digits starting with 254
+    if (!/^254\d{9}$/.test(formattedPhone)) {
+      return NextResponse.json({ error: `Invalid phone number format: ${phone}. Use format 07XXXXXXXX.` }, { status: 400 });
+    }
+
+    // FIX 5: Amount must be a whole integer (Safaricom rejects decimals)
+    const amountInt = Math.ceil(Number(amount));
+    if (isNaN(amountInt) || amountInt < 1) {
+      return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 });
+    }
+
+    // FIX 6: AccountReference max 12 chars, no special chars (Safaricom strict)
+    const rawRef = (nationalId || loanId || "").toString().replace(/[^a-zA-Z0-9]/g, "").substring(0, 12);
+    const accountRef = rawRef || "BosCapital";
+
+    // FIX 7: TransactionDesc max 13 chars (Safaricom strict limit)
+    const transDesc = "LoanRepayment";
+
+    // 1. Get OAuth token
+    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
     const tokenRes = await fetch(DARAJA_URLS[env].auth, {
       headers: { Authorization: `Basic ${auth}` },
       cache: "no-store",
     });
 
-    const tokenData = await tokenRes.json().catch(() => null);
-    if (!tokenData?.access_token) {
-      return NextResponse.json({ error: "Failed to authenticate with Safaricom", detail: tokenData }, { status: 401 });
+    if (!tokenRes.ok) {
+      const tokenErr = await tokenRes.text().catch(() => "");
+      console.error("[STK Push] Token fetch failed:", tokenRes.status, tokenErr);
+      return NextResponse.json({ error: "Failed to connect to Safaricom. Check your Consumer Key/Secret.", detail: tokenErr }, { status: 502 });
     }
 
-    // 2. Generate Password
+    const tokenData = await tokenRes.json().catch(() => null);
+    if (!tokenData?.access_token) {
+      console.error("[STK Push] No access_token in token response:", tokenData);
+      return NextResponse.json({ error: "Safaricom authentication failed. Credentials may be wrong.", detail: tokenData }, { status: 401 });
+    }
+
+    // 2. Generate password
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
     const password = Buffer.from(`${shortCode}${passkey}${timestamp}`).toString("base64");
 
-    // Format phone to 254...
-    let formattedPhone = phone.replace("+", "").trim();
-    if (formattedPhone.startsWith("0")) {
-      formattedPhone = "254" + formattedPhone.slice(1);
-    }
-    
     // 3. Send STK Push
+    const stkPayload = {
+      BusinessShortCode: shortCode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: "CustomerPayBillOnline",
+      Amount: amountInt,
+      PartyA: formattedPhone,
+      PartyB: shortCode,
+      PhoneNumber: formattedPhone,
+      CallBackURL: callbackUrl,
+      AccountReference: accountRef,
+      TransactionDesc: transDesc,
+    };
+
+    console.log("[STK Push] Sending to Safaricom:", JSON.stringify({ ...stkPayload, Password: "***" }));
+
     const stkRes = await fetch(DARAJA_URLS[env].stk, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        BusinessShortCode: shortCode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: "CustomerPayBillOnline", // "CustomerBuyGoodsOnline" for till
-        Amount: Math.ceil(Number(amount)),
-        PartyA: formattedPhone,
-        PartyB: shortCode,
-        PhoneNumber: formattedPhone,
-        CallBackURL: callbackUrl,
-        AccountReference: (nationalId || loanId).substring(0, 12),
-        TransactionDesc: `LoanRepayment-${loanId.substring(0, 8)}`
-      }),
+      body: JSON.stringify(stkPayload),
     });
 
     const stkData = await stkRes.json().catch(() => null);
+    console.log("[STK Push] Safaricom response:", JSON.stringify(stkData));
 
     if (stkData?.ResponseCode === "0") {
-      return NextResponse.json({ success: true, message: "STK push sent to your phone! Please enter your PIN.", data: stkData });
+      return NextResponse.json({
+        success: true,
+        message: "STK Push sent! Please check your phone and enter your M-Pesa PIN.",
+        checkoutRequestId: stkData.CheckoutRequestID,
+      });
     } else {
-      return NextResponse.json({ error: "Failed to send STK push", detail: stkData }, { status: 400 });
+      const errMsg = stkData?.errorMessage || stkData?.ResponseDescription || stkData?.CustomerMessage || "STK Push rejected by Safaricom";
+      console.error("[STK Push] Rejected:", stkData);
+      return NextResponse.json({ error: errMsg, detail: stkData }, { status: 400 });
     }
 
   } catch (error: any) {
-    console.error("STK Push error: ", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[STK Push] Unexpected error:", error);
+    return NextResponse.json({ error: error.message || "Unexpected server error" }, { status: 500 });
   }
 }
