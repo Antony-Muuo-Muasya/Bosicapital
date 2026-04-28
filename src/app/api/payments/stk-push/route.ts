@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
 
 const DARAJA_URLS = {
   sandbox: {
@@ -30,8 +31,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Server M-Pesa credentials are not configured" }, { status: 500 });
     }
 
-    // Passkey: In sandbox, use the well-known sandbox passkey as fallback. In production, it MUST be set.
-    let passkey = (process.env.MPESA_PASSKEY || "").trim();
+    // Passkey: Support both MPESA_PASSKEY and the legacy PASSKEY name from older examples
+    let passkey = (process.env.MPESA_PASSKEY || process.env.PASSKEY || "").trim();
     const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
     
     if (!passkey) {
@@ -135,6 +136,29 @@ export async function POST(req: Request) {
     console.log("[STK Push] Safaricom response:", JSON.stringify(stkData));
 
     if (stkData?.ResponseCode === "0") {
+      // SAVE THE CHECKOUT REQUEST ID TO DB! 
+      // This is the "secret sauce" to matching payments even if the user pays with a different phone number.
+      try {
+        const mpcId = `mpc_stk_${Date.now()}`;
+        await db(
+          `INSERT INTO "MpesaCallback" (
+            id, "checkoutRequestId", msisdn, "transAmount", status, "transactionType", "billRefNumber"
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            mpcId, 
+            stkData.CheckoutRequestID, 
+            formattedPhone, 
+            String(amountInt), 
+            "Requested", 
+            "STK Push", 
+            loanId.toString()
+          ]
+        );
+        console.log("[STK Push] Saved checkout request:", stkData.CheckoutRequestID, "for loan:", loanId);
+      } catch (dbErr: any) {
+        console.error("[STK Push] Failed to save checkout request to DB:", dbErr.message);
+      }
+
       return NextResponse.json({
         success: true,
         message: "STK Push sent! Please check your phone and enter your M-Pesa PIN.",

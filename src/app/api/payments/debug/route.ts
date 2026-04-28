@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   const consumerKey = process.env.MPESA_CONSUMER_KEY || "";
   const consumerSecret = process.env.MPESA_CONSUMER_SECRET || "";
-  const passkey = process.env.MPESA_PASSKEY || "";
+  const passkey = process.env.MPESA_PASSKEY || process.env.PASSKEY || "";
   const shortCode = process.env.MPESA_SHORTCODE || "";
   const environment = process.env.MPESA_ENVIRONMENT || "";
   const callbackUrl = process.env.MPESA_CALLBACK_URL || "";

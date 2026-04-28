@@ -177,17 +177,16 @@ export async function POST(req: Request) {
     let loan: any = null;
     let borrower: any = null;
 
-    // 3A. Match by BillRefNumber → Loan ID (primary method for auto-detected M-Pesa payments)
+    // 3A. Match by BillRefNumber → Loan ID
     if (BillRefNumber) {
-      const cleanedRef = BillRefNumber.trim().toUpperCase();
-      const cleanedRefRaw = BillRefNumber.trim();
-
+      const cleanedRef = BillRefNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      
       // Try exact loan ID match (case-insensitive)
       try {
         const lById = await db(
           `SELECT l.*, b."fullName", b.phone as "borrowerPhone", b.email as "borrowerEmail", b.id as "bId"
            FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id
-           WHERE UPPER(l.id) = $1 AND l.status = 'Active'`,
+           WHERE UPPER(REPLACE(l.id, ' ', '')) = $1 AND l.status = 'Active'`,
           [cleanedRef]
         );
         if (lById.length > 0) {
@@ -201,8 +200,8 @@ export async function POST(req: Request) {
       if (!loan) {
         try {
           const bByNational = await db(
-            `SELECT * FROM "Borrower" WHERE "nationalId" = $1`,
-            [cleanedRefRaw]
+            `SELECT * FROM "Borrower" WHERE REPLACE("nationalId", ' ', '') = $1`,
+            [cleanedRef]
           );
           if (bByNational.length > 0) {
             borrower = bByNational[0];
@@ -212,7 +211,7 @@ export async function POST(req: Request) {
             );
             if (lByBorrower.length > 0) {
               loan = lByBorrower[0];
-              console.log(`[M-Pesa] Matched by National ID: ${cleanedRefRaw}`);
+              console.log(`[M-Pesa] Matched by National ID: ${cleanedRef}`);
             }
           }
         } catch (e: any) { console.error("[M-Pesa] National ID match error:", e.message); }
@@ -221,13 +220,15 @@ export async function POST(req: Request) {
 
     // 3C. Fallback: match by phone number (MSISDN)
     if (!loan && MSISDN) {
-      const phone0 = normalizePhoneNumber(MSISDN);           // 07XXXXXXXX
-      const phone254 = MSISDN.startsWith('+') ? MSISDN.slice(1) : MSISDN; // 254XXXXXXXX
-      const phonePlus = MSISDN.startsWith('+') ? MSISDN : '+' + MSISDN;   // +254XXXXXXXX
+      const phoneRaw = MSISDN.replace(/[^0-9]/g, "");
+      const phone0 = phoneRaw.startsWith("254") ? "0" + phoneRaw.slice(3) : 
+                     phoneRaw.startsWith("0") ? phoneRaw : "0" + phoneRaw;
+      const phone254 = phoneRaw.startsWith("254") ? phoneRaw : "254" + phoneRaw.replace(/^0/, "");
+      
       try {
         const bByPhone = await db(
-          `SELECT * FROM "Borrower" WHERE phone IN ($1, $2, $3, $4)`,
-          [phone0, MSISDN, phone254, phonePlus]
+          `SELECT * FROM "Borrower" WHERE phone IN ($1, $2, $3, $4, $5)`,
+          [phone0, MSISDN, phoneRaw, phone254, "+" + phone254]
         );
         if (bByPhone.length > 0) {
           borrower = bByPhone[0];
