@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 // Diagnostic endpoint — checks which env vars are loaded at runtime
 // Visit: https://bosicapital.com/api/payments/debug
 export async function GET() {
