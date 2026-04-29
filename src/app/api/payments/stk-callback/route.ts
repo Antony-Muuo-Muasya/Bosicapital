@@ -154,28 +154,36 @@ export async function POST(req: Request) {
       const newBalance = Math.max(0, Number(loan.totalPayable) - totalPaid);
       const newStatus = newBalance <= 0 ? "Completed" : "Active";
 
-      const repId = `rep_${Date.now()}`;
-      await db(
-        `INSERT INTO "Repayment" (
-          id, "organizationId", "loanId", "borrowerId", "loanOfficerId", "transId",
-          amount, "paymentDate", "collectedById", method, phone, "balanceAfterPayment"
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [
-          repId, loan.organizationId, loan.id, loan.borrowerId, loan.loanOfficerId || 'mpesa_system',
-          mpesaReceipt, amount, new Date(), "mpesa_system", "Mobile Money", phone, newBalance,
-        ]
-      );
+      try {
+        const repId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        await db(
+          `INSERT INTO "Repayment" (
+            id, "organizationId", "loanId", "borrowerId", "loanOfficerId", "transId",
+            amount, "paymentDate", "collectedById", method, phone, "balanceAfterPayment"
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [
+            repId, loan.organizationId, loan.id, loan.borrowerId, loan.loanOfficerId,
+            mpesaReceipt, amount, new Date(), "mpesa_system", "Mobile Money", phone, newBalance,
+          ]
+        );
 
-      await db(`UPDATE "Loan" SET balance = $1, status = $2, "lastPaymentDate" = $3 WHERE id = $4`, [newBalance, newStatus, new Date(), loan.id]);
-      await db(`UPDATE "MpesaCallback" SET status = 'Processed' WHERE "transId" = $1`, [mpesaReceipt]);
+        await db(`UPDATE "Loan" SET balance = $1, status = $2, "lastPaymentDate" = $3 WHERE id = $4`, [newBalance, newStatus, new Date(), loan.id]);
+        await db(`UPDATE "MpesaCallback" SET status = 'Processed' WHERE "transId" = $1`, [mpesaReceipt]);
 
-      console.log("[M-Pesa STK Callback] ✅ Processed successfully. Receipt:", mpesaReceipt);
+        console.log("[M-Pesa STK Callback] ✅ Processed successfully. Receipt:", mpesaReceipt);
 
-      // Revalidate paths for real-time updates
-      revalidatePath('/repayments');
-      revalidatePath('/dashboard');
-      revalidatePath(`/loans/${loan.id}`);
-      revalidatePath('/borrowers/' + borrower.id);
+        // Revalidate paths for real-time updates
+        revalidatePath('/repayments');
+        revalidatePath('/dashboard');
+        revalidatePath(`/loans/${loan.id}`);
+        revalidatePath('/borrowers/' + borrower.id);
+      } catch (procErr: any) {
+        console.error("[M-Pesa STK Callback] Failed to record repayment:", procErr.message);
+        await db(
+          `UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE "transId" = $1`,
+          [mpesaReceipt, "Database error: " + procErr.message]
+        ).catch(() => {});
+      }
 
     } else {
       const reason = !borrower ? "No borrower matched" : "No active loan found";
@@ -187,7 +195,6 @@ export async function POST(req: Request) {
 
   } catch (err: any) {
     console.error("[M-Pesa STK Callback] Unexpected error:", err.message);
-    // Always return 200 to Safaricom so they don't retry indefinitely
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
   }
 }

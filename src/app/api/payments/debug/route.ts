@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
 
 export const dynamic = 'force-dynamic';
 
@@ -12,20 +13,22 @@ export async function GET() {
   const environment = process.env.MPESA_ENVIRONMENT || "";
   const callbackUrl = process.env.MPESA_CALLBACK_URL || "";
 
-  // List all available MPESA keys (for identifying typos in Vercel Dashboard)
+  // List all available MPESA keys
   const allKeys = Object.keys(process.env).filter(key => key.startsWith("MPESA_") || key === "PASSKEY");
+
+  // Fetch last 10 callbacks for status check
+  const recentCallbacks = await db(`SELECT * FROM "MpesaCallback" ORDER BY id DESC LIMIT 10`, []);
 
   return NextResponse.json({
     status: "ok",
     mpesa: {
-      MPESA_CONSUMER_KEY: consumerKey ? `SET (${consumerKey.length} chars, starts: ${consumerKey.substring(0,4)}...)` : "❌ MISSING OR EMPTY",
-      MPESA_CONSUMER_SECRET: consumerSecret ? `SET (${consumerSecret.length} chars, starts: ${consumerSecret.substring(0,4)}...)` : "❌ MISSING OR EMPTY",
-      MPESA_PASSKEY: passkey ? `SET (${passkey.length} chars, starts: ${passkey.substring(0,4)}...)` : "❌ MISSING OR EMPTY",
-      MPESA_SHORTCODE: shortCode || "❌ MISSING OR EMPTY",
-      MPESA_ENVIRONMENT: environment || "❌ MISSING OR EMPTY",
-      MPESA_CALLBACK_URL: callbackUrl || "❌ MISSING OR EMPTY",
+      MPESA_CONSUMER_KEY: consumerKey ? `SET (${consumerKey.length} chars)` : "❌ MISSING",
+      MPESA_PASSKEY: passkey ? `SET (${passkey.length} chars)` : "❌ MISSING",
+      MPESA_ENVIRONMENT: environment || "❌ MISSING",
+      MPESA_CALLBACK_URL: callbackUrl || "❌ MISSING",
     },
-    detected_keys_in_vercel: allKeys,
-    readyForStkPush: !!(consumerKey && consumerSecret && passkey && shortCode),
+    detected_keys: allKeys,
+    recent_callbacks: recentCallbacks,
+    ready: !!(consumerKey && consumerSecret && passkey && shortCode),
   });
 }
