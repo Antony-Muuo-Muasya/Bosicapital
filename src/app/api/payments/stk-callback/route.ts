@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { sendSMS } from "@/lib/sms";
 
 export async function POST(req: Request) {
   try {
@@ -177,6 +178,15 @@ export async function POST(req: Request) {
         revalidatePath('/dashboard');
         revalidatePath(`/loans/${loan.id}`);
         revalidatePath('/borrowers/' + borrower.id);
+
+        // 5. Send SMS Confirmation (Africa's Talking)
+        try {
+          const smsMessage = `Hello ${borrower.fullName.split(' ')[0]}, we have received your payment of KES ${amount}. Receipt: ${mpesaReceipt}. Your new loan balance is KES ${newBalance}. Thank you for choosing Bosi Capital.`;
+          await sendSMS(phone, smsMessage);
+        } catch (smsErr: any) {
+          console.error("[M-Pesa STK Callback] SMS failure:", smsErr.message);
+        }
+
       } catch (procErr: any) {
         console.error("[M-Pesa STK Callback] Failed to record repayment:", procErr.message);
         await db(

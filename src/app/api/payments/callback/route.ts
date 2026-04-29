@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from 'next/cache';
+import { sendSMS } from '@/lib/sms';
 
 // -------------------------------------------------------
 // Safaricom C2B Production Confirmation Callback Structure:
@@ -347,6 +348,15 @@ export async function POST(req: Request) {
         revalidatePath(`/loans/${loan.id}`);
         revalidatePath('/borrowers');
         revalidatePath('/borrowers/' + borrower.id);
+
+        // Send SMS Confirmation
+        try {
+          const firstName = borrower.fullName?.split(' ')[0] || FirstName || 'Customer';
+          const smsMessage = `Hello ${firstName}, we have received your payment of KES ${paymentAmount}. Receipt: ${TransID}. Your new loan balance is KES ${balance}. Thank you for choosing Bosi Capital.`;
+          await sendSMS(MSISDN || '', smsMessage);
+        } catch (smsErr: any) {
+          console.error("[M-Pesa Webhook] SMS failure:", smsErr.message);
+        }
 
       } catch (processErr: any) {
         console.error("[M-Pesa] Error processing payment:", processErr.message);
