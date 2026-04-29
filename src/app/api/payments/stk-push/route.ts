@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 });
     }
 
-    // FIX 6: AccountReference max 12 chars, no special chars (Safaricom strict)
+    // AccountReference: Prioritize National ID as requested for easy matching. Max 12 chars.
     const rawRef = (nationalId || loanId || "").toString().replace(/[^a-zA-Z0-9]/g, "").substring(0, 12);
     const accountRef = rawRef || "BosCapital";
 
@@ -151,10 +151,10 @@ export async function POST(req: Request) {
             String(amountInt), 
             "Requested", 
             "STK Push", 
-            loanId.toString()
+            accountRef
           ]
         );
-        console.log("[STK Push] Saved checkout request:", stkData.CheckoutRequestID, "for loan:", loanId);
+        console.log("[STK Push] Saved checkout request:", stkData.CheckoutRequestID, "for account:", accountRef);
       } catch (dbErr: any) {
         console.error("[STK Push] Failed to save checkout request to DB:", dbErr.message);
       }

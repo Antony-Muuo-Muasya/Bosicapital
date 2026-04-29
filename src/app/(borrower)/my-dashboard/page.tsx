@@ -356,7 +356,7 @@ export default function MyDashboardPage() {
                                 <p className="text-[10px] font-bold uppercase text-muted-foreground">Manual Payment</p>
                                 <div className="text-xs space-y-1 text-muted-foreground bg-background/30 p-2 rounded">
                                     <p>Paybill: <span className="text-foreground font-bold font-mono">4159879</span></p>
-                                    <p>Account: <span className="text-foreground font-bold font-mono">{activeLoan?.id || 'Loan ID'}</span></p>
+                                    <p>Account: <span className="text-foreground font-bold font-mono">{borrower?.nationalId || activeLoan?.id || 'National ID'}</span></p>
                                 </div>
                             </div>
                         </CardContent>
