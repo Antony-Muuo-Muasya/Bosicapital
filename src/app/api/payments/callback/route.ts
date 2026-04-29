@@ -180,28 +180,37 @@ export async function POST(req: Request) {
 
     // 3A. Match by BillRefNumber → Loan ID
     if (BillRefNumber) {
-      const cleanedRef = BillRefNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-      
-      // Try exact loan ID match (case-insensitive)
+      // Preserve hyphens so "L-XXXXXX" stays "L-XXXXXX" (only strip whitespace/special chars other than hyphen)
+      const rawRef = BillRefNumber.trim();
+      // Strip spaces and hyphens for DB comparison on BOTH sides
+      const cleanedRef = rawRef.toUpperCase().replace(/[\s\-]/g, "");
+
+      console.log(`[M-Pesa] BillRefNumber raw="${rawRef}" cleaned="${cleanedRef}"`);
+
+      // Try loan ID match: normalize both sides by stripping spaces AND hyphens
       try {
         const lById = await db(
           `SELECT l.*, b."fullName", b.phone as "borrowerPhone", b.email as "borrowerEmail", b.id as "bId"
            FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id
-           WHERE UPPER(REPLACE(l.id, ' ', '')) = $1 AND l.status = 'Active'`,
+           WHERE UPPER(REGEXP_REPLACE(l.id, '[\\s\\-]', '', 'g')) = $1 AND l.status = 'Active'`,
           [cleanedRef]
         );
         if (lById.length > 0) {
           loan = lById[0];
           borrower = { ...lById[0], id: lById[0].bId };
           console.log(`[M-Pesa] Matched by Loan ID: ${loan.id}`);
+        } else {
+          console.log(`[M-Pesa] No loan found for cleaned ref "${cleanedRef}"`);
         }
       } catch (e: any) { console.error("[M-Pesa] Loan ID match error:", e.message); }
 
       // 3B. If not found by loan ID, try National ID
+      // BillRefNumber may be a numeric national ID (strip non-numeric to compare)
       if (!loan) {
+        const numericRef = rawRef.replace(/[^0-9]/g, "");
         try {
           const bByNational = await db(
-            `SELECT * FROM "Borrower" WHERE REPLACE("nationalId", ' ', '') = $1`,
+            `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1`,
             [cleanedRef]
           );
           if (bByNational.length > 0) {
@@ -212,7 +221,26 @@ export async function POST(req: Request) {
             );
             if (lByBorrower.length > 0) {
               loan = lByBorrower[0];
-              console.log(`[M-Pesa] Matched by National ID: ${cleanedRef}`);
+              console.log(`[M-Pesa] Matched by National ID: "${rawRef}" → borrower: ${borrower.id}`);
+            } else {
+              console.log(`[M-Pesa] National ID match found borrower but no active loan: ${borrower.id}`);
+            }
+          } else if (numericRef) {
+            // Fallback: try matching national ID purely by numeric portion
+            const bByNumeric = await db(
+              `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $1`,
+              [numericRef]
+            );
+            if (bByNumeric.length > 0) {
+              borrower = bByNumeric[0];
+              const lByBorrower = await db(
+                `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`,
+                [borrower.id]
+              );
+              if (lByBorrower.length > 0) {
+                loan = lByBorrower[0];
+                console.log(`[M-Pesa] Matched by numeric National ID: "${numericRef}" → borrower: ${borrower.id}`);
+              }
             }
           }
         } catch (e: any) { console.error("[M-Pesa] National ID match error:", e.message); }
@@ -369,11 +397,11 @@ export async function POST(req: Request) {
       }
     } else {
       // No match found — log it clearly for debugging
-      const errorMsg = `No loan/borrower match. BillRef="${BillRefNumber}", MSISDN="${MSISDN}", TransID="${TransID}"`;
+      const errorMsg = `Could not match loan/borrower. BillRef="${BillRefNumber}", MSISDN="${MSISDN}", TransID="${TransID}". Tip: ensure borrower's National ID or Loan ID matches the BillRefNumber exactly.`;
       console.warn(`[M-Pesa] ⚠️ ${errorMsg}`);
       try {
         await db(
-          `UPDATE "MpesaCallback" SET status = 'Unmatched', "errorMessage" = $2 WHERE id = $1`,
+          `UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE id = $1`,
           [mpesaId, errorMsg]
         );
       } catch { /* ignore */ }
