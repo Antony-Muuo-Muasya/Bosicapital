@@ -173,69 +173,47 @@ export async function POST(req: Request) {
 
     // ---------------------------------------------------
     // Step 3: Match borrower and loan
-    // Strategy: BillRefNumber → Loan ID → National ID → Phone
+    // Strategy: Account Number (National ID) → Phone Number
     // ---------------------------------------------------
     let loan: any = null;
     let borrower: any = null;
     let isRegistrationFee = false;
 
-    // A. Match by BillRefNumber (Flexible)
+    // A. Match by Account Number (provided by user in the field Safaricom calls BillRefNumber)
     if (BillRefNumber) {
-      const rawRef = BillRefNumber.trim();
-      const cleanedRef = rawRef.toUpperCase().replace(/[\s\-]/g, ""); // "L-123" -> "L123"
-      const numericRef = rawRef.replace(/[^0-9]/g, ""); // "L-123" -> "123"
+      const rawAccount = BillRefNumber.trim();
+      const cleanedAccount = rawAccount.toUpperCase().replace(/[\s\-]/g, ""); // "123 456" -> "123456"
+      const numericAccount = rawAccount.replace(/[^0-9]/g, ""); // "ID123" -> "123"
 
-      console.log(`[M-Pesa] BillRefNumber raw="${rawRef}" cleaned="${cleanedRef}" numeric="${numericRef}"`);
+      console.log(`[M-Pesa] Account Number received: raw="${rawAccount}" cleaned="${cleanedAccount}" numeric="${numericAccount}"`);
 
-      // 1. Try matching against Loan ID (L-XXXXXX)
+      // Try matching against National ID
       try {
-        // Match either "L-XXXXXX", "LXXXXXX", or just "XXXXXX"
-        const lById = await db(
-          `SELECT l.*, b."fullName", b.phone as "borrowerPhone", b.email as "borrowerEmail", b.id as "bId", b."organizationId" as "bOrgId",
-                  b."registrationFeePaid", b."registrationFeeRequired", b."registrationFeeAmount"
-           FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id
-           WHERE (
-             UPPER(REGEXP_REPLACE(l.id, '[\\s\\-]', '', 'g')) = $1 OR 
-             UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $2 OR
-             UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $1
-           ) AND l.status IN ('Active', 'Approved', 'Pending Approval')`,
-          [cleanedRef, numericRef]
+        const bByNational = await db(
+          `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
+          [cleanedAccount, numericAccount]
         );
-        if (lById.length > 0) {
-          loan = lById[0];
-          borrower = { ...lById[0], id: lById[0].bId, organizationId: lById[0].bOrgId };
-          console.log(`[M-Pesa] Matched by Loan ID: ${loan.id}`);
-        }
-      } catch (e: any) { console.error("[M-Pesa] Loan ID match error:", e.message); }
+        if (bByNational.length > 0) {
+          borrower = bByNational[0];
+          console.log(`[M-Pesa] Found Borrower by National ID Match: ${borrower.id}`);
 
-      // 2. Try matching against National ID
-      if (!loan && cleanedRef) {
-        try {
-          const bByNational = await db(
-            `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
-            [cleanedRef, numericRef]
+          // Find the most recent relevant loan for this borrower
+          const lByBorrower = await db(
+            `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
+            [borrower.id]
           );
-          if (bByNational.length > 0) {
-            borrower = bByNational[0];
-            console.log(`[M-Pesa] Found Borrower by National ID: ${borrower.id}`);
-
-            // Find most recent relevant loan
-            const lByBorrower = await db(
-              `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
-              [borrower.id]
-            );
-            if (lByBorrower.length > 0) {
-              loan = lByBorrower[0];
-              console.log(`[M-Pesa] Matched Loan for Borrower: ${loan.id}`);
-            }
+          if (lByBorrower.length > 0) {
+            loan = lByBorrower[0];
+            console.log(`[M-Pesa] Automatically linked to Loan: ${loan.id}`);
           }
-        } catch (e: any) { console.error("[M-Pesa] National ID match error:", e.message); }
-      }
+        }
+      } catch (e: any) { console.error("[M-Pesa] National ID matching error:", e.message); }
     }
 
-    // B. Fallback: Match by phone number (MSISDN)
+    // B. Fallback: Match by Phone number (MSISDN)
     if (!loan && !borrower && MSISDN) {
       const phoneRaw = MSISDN.replace(/[^0-9]/g, "");
+      // Support various formats: 07..., 2547..., 7...
       const phone0 = phoneRaw.startsWith("254") ? "0" + phoneRaw.slice(3) : 
                      phoneRaw.startsWith("0") ? phoneRaw : "0" + phoneRaw;
       const phone254 = phoneRaw.startsWith("254") ? phoneRaw : "254" + phoneRaw.replace(/^0/, "");
@@ -247,7 +225,7 @@ export async function POST(req: Request) {
         );
         if (bByPhone.length > 0) {
           borrower = bByPhone[0];
-          console.log(`[M-Pesa] Found Borrower by Phone: ${borrower.id}`);
+          console.log(`[M-Pesa] Found Borrower by Phone Fallback: ${borrower.id}`);
 
           const lByBorrower = await db(
             `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
@@ -255,10 +233,10 @@ export async function POST(req: Request) {
           );
           if (lByBorrower.length > 0) {
             loan = lByBorrower[0];
-            console.log(`[M-Pesa] Matched Loan by Phone: ${loan.id}`);
+            console.log(`[M-Pesa] Automatically linked to Loan via phone: ${loan.id}`);
           }
         }
-      } catch (e: any) { console.error("[M-Pesa] Phone match error:", e.message); }
+      } catch (e: any) { console.error("[M-Pesa] Phone matching error:", e.message); }
     }
 
     // C. Check for Registration Fee Payment

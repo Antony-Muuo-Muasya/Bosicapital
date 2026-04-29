@@ -86,59 +86,38 @@ export async function POST(req: Request) {
     let loan: any = null;
     let borrower: any = null;
 
-    // Strategy A: Match by CheckoutRequestID (Most reliable!)
+    // Strategy A: Match by CheckoutRequestID (Most reliable!) using Account Number (National ID)
     if (checkoutID) {
       const savedReq = await db(
         `SELECT "billRefNumber" FROM "MpesaCallback" WHERE "checkoutRequestId" = $1`,
         [checkoutID]
       );
       
-      const billRef = savedReq.length > 0 ? savedReq[0].billRefNumber : null;
-      console.log(`[M-Pesa STK Callback] Saved BillRef from initiate: ${billRef}`);
+      const accountNum = savedReq.length > 0 ? savedReq[0].billRefNumber : null;
+      console.log(`[M-Pesa STK] Account Number linked to request: ${accountNum}`);
 
-      if (billRef) {
-        const cleanedRef = billRef.toUpperCase().replace(/[\s\-]/g, "");
-        const numericRef = billRef.replace(/[^0-9]/g, "");
+      if (accountNum) {
+        const cleanedAccount = accountNum.toUpperCase().replace(/[\s\-]/g, "");
+        const numericAccount = accountNum.replace(/[^0-9]/g, "");
 
-        // Try Loan ID Match
+        // Try matching as National ID
         try {
-          const lById = await db(
-            `SELECT l.*, b.id as "bId", b."fullName", b."organizationId" as "bOrgId" 
-             FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id 
-             WHERE (
-               UPPER(REGEXP_REPLACE(l.id, '[\\s\\-]', '', 'g')) = $1 OR 
-               UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $2 OR
-               UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $1
-             ) AND l.status IN ('Active', 'Approved', 'Pending Approval')`,
-            [cleanedRef, numericRef]
+          const bByNational = await db(
+            `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
+            [cleanedAccount, numericAccount]
           );
-          if (lById.length > 0) {
-            loan = lById[0];
-            borrower = { ...lById[0], id: lById[0].bId, organizationId: lById[0].bOrgId };
-            console.log("[M-Pesa STK Callback] Matched by checkout -> loan:", loan.id);
-          }
-        } catch (e: any) { console.error("[STK] Loan ID match error:", e.message); }
-
-        // Try National ID Match if no loan found yet
-        if (!loan) {
-          try {
-            const bByNational = await db(
-              `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
-              [cleanedRef, numericRef]
+          if (bByNational.length > 0) {
+            borrower = bByNational[0];
+            const lByBorrower = await db(
+              `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
+              [borrower.id]
             );
-            if (bByNational.length > 0) {
-              borrower = bByNational[0];
-              const lByBorrower = await db(
-                `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
-                [borrower.id]
-              );
-              if (lByBorrower.length > 0) {
-                loan = lByBorrower[0];
-                console.log("[M-Pesa STK Callback] Matched by checkout -> nationalId -> loan:", loan.id);
-              }
+            if (lByBorrower.length > 0) {
+              loan = lByBorrower[0];
+              console.log("[M-Pesa STK] Matched by Identification (Account Number) -> loan:", loan.id);
             }
-          } catch (e: any) { console.error("[STK] National ID match error:", e.message); }
-        }
+          }
+        } catch (e: any) { console.error("[STK] ID matching error:", e.message); }
       }
     }
 
@@ -161,7 +140,7 @@ export async function POST(req: Request) {
         );
         if (activeLoans.length > 0) {
           loan = activeLoans[0];
-          console.log("[M-Pesa STK Callback] Matched by phone fallback:", loan.id);
+          console.log("[M-Pesa STK] Matched by Phone Fallback:", loan.id);
         }
       }
     }

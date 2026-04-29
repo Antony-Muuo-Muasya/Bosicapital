@@ -76,9 +76,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 });
     }
 
-    // AccountReference: Prioritize National ID as requested for easy matching. Max 12 chars.
-    const rawRef = (nationalId || loanId || "").toString().replace(/[^a-zA-Z0-9]/g, "").substring(0, 12);
-    const accountRef = rawRef || "BosCapital";
+    // AccountReference: Strictly use National ID (Id Number) for standardized matching. Max 12 chars.
+    const accountRef = (nationalId || "").toString().replace(/[^a-zA-Z0-9]/g, "").substring(0, 12) || "BosCapital";
 
     // FIX 7: TransactionDesc max 13 chars (Safaricom strict limit)
     const transDesc = "LoanRepayment";
