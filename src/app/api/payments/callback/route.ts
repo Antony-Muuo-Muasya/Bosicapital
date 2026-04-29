@@ -177,78 +177,64 @@ export async function POST(req: Request) {
     // ---------------------------------------------------
     let loan: any = null;
     let borrower: any = null;
+    let isRegistrationFee = false;
 
-    // 3A. Match by BillRefNumber → Loan ID
+    // A. Match by BillRefNumber (Flexible)
     if (BillRefNumber) {
-      // Preserve hyphens so "L-XXXXXX" stays "L-XXXXXX" (only strip whitespace/special chars other than hyphen)
       const rawRef = BillRefNumber.trim();
-      // Strip spaces and hyphens for DB comparison on BOTH sides
-      const cleanedRef = rawRef.toUpperCase().replace(/[\s\-]/g, "");
+      const cleanedRef = rawRef.toUpperCase().replace(/[\s\-]/g, ""); // "L-123" -> "L123"
+      const numericRef = rawRef.replace(/[^0-9]/g, ""); // "L-123" -> "123"
 
-      console.log(`[M-Pesa] BillRefNumber raw="${rawRef}" cleaned="${cleanedRef}"`);
+      console.log(`[M-Pesa] BillRefNumber raw="${rawRef}" cleaned="${cleanedRef}" numeric="${numericRef}"`);
 
-      // Try loan ID match: normalize both sides by stripping spaces AND hyphens
+      // 1. Try matching against Loan ID (L-XXXXXX)
       try {
+        // Match either "L-XXXXXX", "LXXXXXX", or just "XXXXXX"
         const lById = await db(
-          `SELECT l.*, b."fullName", b.phone as "borrowerPhone", b.email as "borrowerEmail", b.id as "bId"
+          `SELECT l.*, b."fullName", b.phone as "borrowerPhone", b.email as "borrowerEmail", b.id as "bId", b."organizationId" as "bOrgId",
+                  b."registrationFeePaid", b."registrationFeeRequired", b."registrationFeeAmount"
            FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id
-           WHERE UPPER(REGEXP_REPLACE(l.id, '[\\s\\-]', '', 'g')) = $1 AND l.status = 'Active'`,
-          [cleanedRef]
+           WHERE (
+             UPPER(REGEXP_REPLACE(l.id, '[\\s\\-]', '', 'g')) = $1 OR 
+             UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $2 OR
+             UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $1
+           ) AND l.status IN ('Active', 'Approved', 'Pending Approval')`,
+          [cleanedRef, numericRef]
         );
         if (lById.length > 0) {
           loan = lById[0];
-          borrower = { ...lById[0], id: lById[0].bId };
+          borrower = { ...lById[0], id: lById[0].bId, organizationId: lById[0].bOrgId };
           console.log(`[M-Pesa] Matched by Loan ID: ${loan.id}`);
-        } else {
-          console.log(`[M-Pesa] No loan found for cleaned ref "${cleanedRef}"`);
         }
       } catch (e: any) { console.error("[M-Pesa] Loan ID match error:", e.message); }
 
-      // 3B. If not found by loan ID, try National ID
-      // BillRefNumber may be a numeric national ID (strip non-numeric to compare)
-      if (!loan) {
-        const numericRef = rawRef.replace(/[^0-9]/g, "");
+      // 2. Try matching against National ID
+      if (!loan && cleanedRef) {
         try {
           const bByNational = await db(
-            `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1`,
-            [cleanedRef]
+            `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
+            [cleanedRef, numericRef]
           );
           if (bByNational.length > 0) {
             borrower = bByNational[0];
+            console.log(`[M-Pesa] Found Borrower by National ID: ${borrower.id}`);
+
+            // Find most recent relevant loan
             const lByBorrower = await db(
-              `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`,
+              `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
               [borrower.id]
             );
             if (lByBorrower.length > 0) {
               loan = lByBorrower[0];
-              console.log(`[M-Pesa] Matched by National ID: "${rawRef}" → borrower: ${borrower.id}`);
-            } else {
-              console.log(`[M-Pesa] National ID match found borrower but no active loan: ${borrower.id}`);
-            }
-          } else if (numericRef) {
-            // Fallback: try matching national ID purely by numeric portion
-            const bByNumeric = await db(
-              `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $1`,
-              [numericRef]
-            );
-            if (bByNumeric.length > 0) {
-              borrower = bByNumeric[0];
-              const lByBorrower = await db(
-                `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`,
-                [borrower.id]
-              );
-              if (lByBorrower.length > 0) {
-                loan = lByBorrower[0];
-                console.log(`[M-Pesa] Matched by numeric National ID: "${numericRef}" → borrower: ${borrower.id}`);
-              }
+              console.log(`[M-Pesa] Matched Loan for Borrower: ${loan.id}`);
             }
           }
         } catch (e: any) { console.error("[M-Pesa] National ID match error:", e.message); }
       }
     }
 
-    // 3C. Fallback: match by phone number (MSISDN)
-    if (!loan && MSISDN) {
+    // B. Fallback: Match by phone number (MSISDN)
+    if (!loan && !borrower && MSISDN) {
       const phoneRaw = MSISDN.replace(/[^0-9]/g, "");
       const phone0 = phoneRaw.startsWith("254") ? "0" + phoneRaw.slice(3) : 
                      phoneRaw.startsWith("0") ? phoneRaw : "0" + phoneRaw;
@@ -261,22 +247,70 @@ export async function POST(req: Request) {
         );
         if (bByPhone.length > 0) {
           borrower = bByPhone[0];
+          console.log(`[M-Pesa] Found Borrower by Phone: ${borrower.id}`);
+
           const lByBorrower = await db(
-            `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`,
+            `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
             [borrower.id]
           );
           if (lByBorrower.length > 0) {
             loan = lByBorrower[0];
-            console.log(`[M-Pesa] Matched by Phone: ${phone0}`);
+            console.log(`[M-Pesa] Matched Loan by Phone: ${loan.id}`);
           }
         }
       } catch (e: any) { console.error("[M-Pesa] Phone match error:", e.message); }
     }
 
+    // C. Check for Registration Fee Payment
+    if (!loan && borrower && borrower.registrationFeePaid === false && borrower.registrationFeeRequired !== false) {
+      // If we found a borrower but no loan, check if they are paying registration fee
+      // Usually the registration fee is a specific amount, but we accept any payment as registration if they haven't paid it yet and have no active loan
+      console.log(`[M-Pesa] Borrower ${borrower.id} found but no active loan. Treating as Registration Fee payment.`);
+      isRegistrationFee = true;
+    }
+
     // ---------------------------------------------------
     // Step 4: Process payment or log failure
     // ---------------------------------------------------
-    if (loan && borrower) {
+    if (isRegistrationFee && borrower) {
+      try {
+        const regId = `reg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        const now = new Date().toISOString();
+
+        // 1. Log Registration Payment
+        await db(`
+          INSERT INTO "RegistrationPayment" (id, "organizationId", "borrowerId", amount, "paymentMethod", reference, "collectedBy", "createdAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [regId, borrower.organizationId, borrower.id, paymentAmount, 'Mobile Money', TransID, 'mpesa_system', now]);
+
+        // 2. Update Borrower
+        await db(`
+          UPDATE "Borrower"
+          SET "registrationFeePaid" = true,
+              "registrationFeePaidAt" = $2,
+              "registrationPaymentId" = $3
+          WHERE id = $1
+        `, [borrower.id, now, regId]);
+
+        await db(`UPDATE "MpesaCallback" SET status = 'Processed', "errorMessage" = 'Registration Fee' WHERE id = $1`, [mpesaId]);
+        console.log(`[M-Pesa] ✅ Registration Fee processed: ${regId}, KES ${paymentAmount}, Borrower: ${borrower.id}`);
+
+        // SMS Confirmation for Registration
+        try {
+          const firstName = borrower.fullName?.split(' ')[0] || FirstName || 'Customer';
+          const smsMessage = `Hello ${firstName}, we have received your Registration Fee of KES ${paymentAmount}. Receipt: ${TransID}. Your registration is now complete. Thank you for choosing Bosi Capital.`;
+          await sendSMS(MSISDN || '', smsMessage);
+        } catch (smsErr: any) { console.error("[M-Pesa] SMS failure:", smsErr.message); }
+
+        revalidatePath('/borrowers');
+        revalidatePath('/borrowers/' + borrower.id);
+
+      } catch (regErr: any) {
+        console.error("[M-Pesa] Error processing registration fee:", regErr.message);
+        await db(`UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE id = $1`, [mpesaId, regErr.message]);
+      }
+    } 
+    else if (loan && borrower) {
       try {
         // Apply payment to installments (oldest first)
         const unpaid = await db(
@@ -285,22 +319,26 @@ export async function POST(req: Request) {
         );
 
         let remaining = paymentAmount;
-        for (const inst of unpaid) {
-          if (remaining <= 0) break;
-          const due = Number(inst.expectedAmount) - Number(inst.paidAmount);
-          if (remaining >= due) {
-            await db(
-              `UPDATE "Installment" SET "paidAmount" = $2, status = 'Paid' WHERE id = $1`,
-              [inst.id, inst.expectedAmount]
-            );
-            remaining -= due;
-          } else {
-            await db(
-              `UPDATE "Installment" SET "paidAmount" = "paidAmount" + $2, status = 'Partial' WHERE id = $1`,
-              [inst.id, remaining]
-            );
-            remaining = 0;
+        if (unpaid.length > 0) {
+          for (const inst of unpaid) {
+            if (remaining <= 0) break;
+            const due = Number(inst.expectedAmount) - Number(inst.paidAmount);
+            if (remaining >= due) {
+              await db(
+                `UPDATE "Installment" SET "paidAmount" = $2, status = 'Paid' WHERE id = $1`,
+                [inst.id, inst.expectedAmount]
+              );
+              remaining -= due;
+            } else {
+              await db(
+                `UPDATE "Installment" SET "paidAmount" = "paidAmount" + $2, status = 'Partial' WHERE id = $1`,
+                [inst.id, remaining]
+              );
+              remaining = 0;
+            }
           }
+        } else {
+           console.log(`[M-Pesa] No unpaid installments for loan ${loan.id}. Excess payment of ${remaining} will be logged.`);
         }
 
         // Recalculate loan balance and status
@@ -309,11 +347,11 @@ export async function POST(req: Request) {
           [loan.id]
         );
         const totalPaid = Number(totals[0]?.paid || 0);
-        const balance = Number(loan.totalPayable) - totalPaid;
-        const newStatus = balance <= 0 ? "Completed" : "Active";
+        const balance = Math.max(0, Number(loan.totalPayable) - totalPaid);
+        const newStatus = balance <= 0 ? "Completed" : (loan.status === 'Approved' ? 'Active' : loan.status);
 
         await db(
-          `UPDATE "Loan" SET status = $2, "lastPaymentDate" = $3 WHERE id = $1`,
+          `UPDATE "Loan" SET "status" = $2, "lastPaymentDate" = $3 WHERE id = $1`,
           [loan.id, newStatus, new Date().toISOString()]
         );
 
@@ -343,13 +381,8 @@ export async function POST(req: Request) {
         await db(`UPDATE "MpesaCallback" SET status = 'Processed' WHERE id = $1`, [mpesaId]);
         console.log(`[M-Pesa] ✅ Payment processed: ${repId}, KES ${paymentAmount}, Loan: ${loan.id}`);
 
-        // Pusher real-time notification (optional)
-        if (
-          process.env.PUSHER_APP_ID &&
-          process.env.PUSHER_APP_ID !== 'YOUR_PUSHER_APP_ID' &&
-          process.env.NEXT_PUBLIC_PUSHER_KEY &&
-          process.env.NEXT_PUBLIC_PUSHER_KEY !== 'YOUR_PUSHER_KEY'
-        ) {
+        // Pusher real-time notification
+        if (process.env.PUSHER_APP_ID && process.env.PUSHER_APP_ID !== 'YOUR_PUSHER_APP_ID') {
           try {
             const Pusher = (await import('pusher')).default;
             const pusher = new Pusher({
@@ -365,16 +398,13 @@ export async function POST(req: Request) {
               borrowerName: borrower.fullName || `${FirstName || ''} ${LastName || ''}`.trim() || 'Customer',
               loanId: loan.id
             });
-          } catch (pusherError) {
-            console.error("[Pusher] Error triggering event:", pusherError);
-          }
+          } catch (pErr) { console.error("[Pusher] Error:", pErr); }
         }
 
-        // Cache revalidation so Next.js refreshes server-rendered pages
+        // Cache revalidation
         revalidatePath('/repayments');
         revalidatePath('/dashboard');
         revalidatePath(`/loans/${loan.id}`);
-        revalidatePath('/borrowers');
         revalidatePath('/borrowers/' + borrower.id);
 
         // Send SMS Confirmation
@@ -382,22 +412,17 @@ export async function POST(req: Request) {
           const firstName = borrower.fullName?.split(' ')[0] || FirstName || 'Customer';
           const smsMessage = `Hello ${firstName}, we have received your payment of KES ${paymentAmount}. Receipt: ${TransID}. Your new loan balance is KES ${balance}. Thank you for choosing Bosi Capital.`;
           await sendSMS(MSISDN || '', smsMessage);
-        } catch (smsErr: any) {
-          console.error("[M-Pesa Webhook] SMS failure:", smsErr.message);
-        }
+        } catch (smsErr: any) { console.error("[M-Pesa] SMS failure:", smsErr.message); }
 
       } catch (processErr: any) {
         console.error("[M-Pesa] Error processing payment:", processErr.message);
         try {
-          await db(
-            `UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE id = $1`,
-            [mpesaId, processErr.message]
-          );
+          await db(`UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE id = $1`, [mpesaId, processErr.message]);
         } catch { /* ignore */ }
       }
     } else {
       // No match found — log it clearly for debugging
-      const errorMsg = `Could not match loan/borrower. BillRef="${BillRefNumber}", MSISDN="${MSISDN}", TransID="${TransID}". Tip: ensure borrower's National ID or Loan ID matches the BillRefNumber exactly.`;
+      const errorMsg = `Could not match loan/borrower. BillRef="${BillRefNumber}", MSISDN="${MSISDN}", TransID="${TransID}". Tip: ensure borrower's National ID or Loan ID matches the BillRefNumber.`;
       console.warn(`[M-Pesa] ⚠️ ${errorMsg}`);
       try {
         await db(

@@ -89,35 +89,74 @@ export async function POST(req: Request) {
     // Strategy A: Match by CheckoutRequestID (Most reliable!)
     if (checkoutID) {
       const savedReq = await db(
-        `SELECT "billRefNumber" as "loanId" FROM "MpesaCallback" WHERE "checkoutRequestId" = $1`,
+        `SELECT "billRefNumber" FROM "MpesaCallback" WHERE "checkoutRequestId" = $1`,
         [checkoutID]
       );
-      if (savedReq.length > 0 && savedReq[0].loanId) {
-        const loanId = savedReq[0].loanId;
-        const lById = await db(
-          `SELECT l.*, b.id as "bId", b."fullName" FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id WHERE l.id = $1`,
-          [loanId]
-        );
-        if (lById.length > 0) {
-          loan = lById[0];
-          borrower = { ...lById[0], id: lById[0].bId };
-          console.log("[M-Pesa STK Callback] Matched by CheckoutRequestID:", loan.id);
+      
+      const billRef = savedReq.length > 0 ? savedReq[0].billRefNumber : null;
+      console.log(`[M-Pesa STK Callback] Saved BillRef from initiate: ${billRef}`);
+
+      if (billRef) {
+        const cleanedRef = billRef.toUpperCase().replace(/[\s\-]/g, "");
+        const numericRef = billRef.replace(/[^0-9]/g, "");
+
+        // Try Loan ID Match
+        try {
+          const lById = await db(
+            `SELECT l.*, b.id as "bId", b."fullName", b."organizationId" as "bOrgId" 
+             FROM "Loan" l JOIN "Borrower" b ON l."borrowerId" = b.id 
+             WHERE (
+               UPPER(REGEXP_REPLACE(l.id, '[\\s\\-]', '', 'g')) = $1 OR 
+               UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $2 OR
+               UPPER(REGEXP_REPLACE(l.id, '[\\s\\-L]', '', 'g')) = $1
+             ) AND l.status IN ('Active', 'Approved', 'Pending Approval')`,
+            [cleanedRef, numericRef]
+          );
+          if (lById.length > 0) {
+            loan = lById[0];
+            borrower = { ...lById[0], id: lById[0].bId, organizationId: lById[0].bOrgId };
+            console.log("[M-Pesa STK Callback] Matched by checkout -> loan:", loan.id);
+          }
+        } catch (e: any) { console.error("[STK] Loan ID match error:", e.message); }
+
+        // Try National ID Match if no loan found yet
+        if (!loan) {
+          try {
+            const bByNational = await db(
+              `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
+              [cleanedRef, numericRef]
+            );
+            if (bByNational.length > 0) {
+              borrower = bByNational[0];
+              const lByBorrower = await db(
+                `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
+                [borrower.id]
+              );
+              if (lByBorrower.length > 0) {
+                loan = lByBorrower[0];
+                console.log("[M-Pesa STK Callback] Matched by checkout -> nationalId -> loan:", loan.id);
+              }
+            }
+          } catch (e: any) { console.error("[STK] National ID match error:", e.message); }
         }
       }
     }
 
     // Strategy B: Match by Phone (Fallback)
-    if (!loan) {
-      const phone0 = phone.startsWith("254") ? "0" + phone.slice(3) : phone;
-      const phone254 = phone.startsWith("0") ? "254" + phone.slice(1) : phone;
+    if (!loan && phone) {
+      const phoneRaw = phone.replace(/[^0-9]/g, "");
+      const phone0 = phoneRaw.startsWith("254") ? "0" + phoneRaw.slice(3) : 
+                     phoneRaw.startsWith("0") ? phoneRaw : "0" + phoneRaw;
+      const phone254 = phoneRaw.startsWith("254") ? phoneRaw : "254" + phoneRaw.replace(/^0/, "");
+
       const bByPhone = await db(
-        `SELECT * FROM "Borrower" WHERE phone IN ($1,$2,$3,$4)`,
-        [phone, phone0, phone254, "+" + phone254]
+        `SELECT * FROM "Borrower" WHERE phone IN ($1,$2,$3,$4,$5)`,
+        [phone, phone0, phoneRaw, phone254, "+" + phone254]
       );
       if (bByPhone.length > 0) {
         borrower = bByPhone[0];
         const activeLoans = await db(
-          `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status = 'Active' ORDER BY "issueDate" DESC LIMIT 1`,
+          `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
           [borrower.id]
         );
         if (activeLoans.length > 0) {
