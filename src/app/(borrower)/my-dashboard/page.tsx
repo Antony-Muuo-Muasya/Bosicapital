@@ -4,6 +4,8 @@ import { useUserProfile } from '@/providers/user-profile';
 import { getBorrowers } from "@/actions/borrowers";
 import { getLoans } from "@/actions/loans";
 import { getInstallments } from "@/actions/installments";
+import { getRepayments } from "@/actions/repayments";
+
 import { getLoanProducts } from "@/actions/loan-products";
 import { getUserProfile } from "@/actions/users";
 
@@ -49,6 +51,8 @@ export default function MyDashboardPage() {
     const [installments, setInstallments] = useState<any[] | null>(null);
     const [loanProduct, setLoanProduct] = useState<any | null>(null);
     const [loanOfficer, setLoanOfficer] = useState<any | null>(null);
+    const [recentPayments, setRecentPayments] = useState<any[]>([]);
+
 
     useEffect(() => {
         setRandomTip(financialTips[Math.floor(Math.random() * financialTips.length)]);
@@ -89,7 +93,14 @@ export default function MyDashboardPage() {
                         }
                     }
                 }
+
+                // Recent Payments
+                const repRes = await getRepayments(b.organizationId, undefined, b.id);
+                if (repRes.success && repRes.repayments) {
+                    setRecentPayments(repRes.repayments.slice(0, 5) as any);
+                }
             }
+
         } catch (e) {
             console.error(e);
         } finally {
@@ -100,6 +111,31 @@ export default function MyDashboardPage() {
     useEffect(() => {
         if (user) {
             fetchMyDashboardData();
+
+            // Real-time updates via Pusher
+            const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
+            const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+            let pusher: any = null;
+
+            if (pusherKey && pusherCluster && pusherKey !== 'YOUR_PUSHER_KEY') {
+                const Pusher = require('pusher-js');
+                pusher = new Pusher(pusherKey, { cluster: pusherCluster });
+                const channel = pusher.subscribe('repayments-channel');
+                channel.bind('new-payment', (data: any) => {
+                    // Only refresh if the payment belongs to this borrower (security/relevance check)
+                    // Note: In a production app, use private channels with borrower-specific IDs
+                    // For now, we refresh and let the fetch handle filters
+                    console.log("[Borrower Dashboard] Real-time payment update");
+                    fetchMyDashboardData();
+                });
+            }
+
+            return () => {
+                if (pusher) {
+                    pusher.unsubscribe('repayments-channel');
+                    pusher.disconnect();
+                }
+            };
         }
     }, [user, fetchMyDashboardData]);
 
@@ -296,7 +332,41 @@ export default function MyDashboardPage() {
                             </Table>
                             </CardContent>
                         </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <CardTitle>Recent Payments</CardTitle>
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href="/my-loans">View All</Link>
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Reference</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {recentPayments.length > 0 ? recentPayments.map(rep => (
+                                            <TableRow key={rep.id}>
+                                                <TableCell>{new Date(rep.paymentDate).toLocaleDateString()}</TableCell>
+                                                <TableCell className="font-mono text-xs uppercase">{rep.transId || rep.id.substring(0,8)}</TableCell>
+                                                <TableCell className="text-right font-medium text-emerald-600">{formatCurrency(rep.amount)}</TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow><TableCell colSpan={3} className="text-center h-24">No payments recorded yet.</TableCell></TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
                         </>
+
                     )}
                     
                     {pendingLoan && (

@@ -90,21 +90,43 @@ export default function RepaymentsPage() {
       } catch (err) { console.error(err) } finally { setIsLoadingProducts(false) }
   }, [userProfile, organizationId]);
 
-  useEffect(() => {
-     if (!isProfileLoading && userProfile) {
-         fetchLoans();
-         fetchRepayments();
-         fetchBorrowers();
-         fetchProducts();
+   useEffect(() => {
+      if (!isProfileLoading && userProfile) {
+          fetchLoans();
+          fetchRepayments();
+          fetchBorrowers();
+          fetchProducts();
 
-         // Auto-polling for real-time dashboard updates every 5 seconds
-         const interval = setInterval(() => {
-             fetchRepayments();
-         }, 5000);
+          // Pusher real-time trigger
+          const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
+          const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+          let pusher: any = null;
 
-         return () => clearInterval(interval);
-     }
-  }, [isProfileLoading, userProfile, fetchLoans, fetchRepayments, fetchBorrowers, fetchProducts]);
+          if (pusherKey && pusherCluster && pusherKey !== 'YOUR_PUSHER_KEY') {
+            const Pusher = require('pusher-js');
+            pusher = new Pusher(pusherKey, { cluster: pusherCluster });
+            const channel = pusher.subscribe('repayments-channel');
+            channel.bind('new-payment', () => {
+              console.log("[Repayments] Real-time update triggered via Pusher");
+              fetchRepayments();
+              fetchLoans(); // Also refresh loans to show updated balances
+            });
+          }
+
+          // Fallback polling every 10 seconds
+          const interval = setInterval(() => {
+              fetchRepayments();
+          }, 10000);
+
+          return () => {
+              if (pusher) {
+                pusher.unsubscribe('repayments-channel');
+                pusher.disconnect();
+              }
+              clearInterval(interval);
+          }
+      }
+   }, [isProfileLoading, userProfile, fetchLoans, fetchRepayments, fetchBorrowers, fetchProducts]);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingRepayments || isLoadingBorrowers || isLoadingProducts;
 

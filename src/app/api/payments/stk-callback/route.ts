@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { sendSMS } from "@/lib/sms";
+import { pusher } from "@/lib/pusher";
+
 
 export async function POST(req: Request) {
   try {
@@ -196,6 +198,16 @@ export async function POST(req: Request) {
         revalidatePath('/dashboard');
         revalidatePath(`/loans/${loan.id}`);
         revalidatePath('/borrowers/' + borrower.id);
+
+        // Pusher Trigger for real-time update
+        try {
+          await pusher.trigger('repayments-channel', 'new-payment', {
+            borrowerName: borrower.fullName,
+            amount: amount,
+            type: 'STK Payment'
+          });
+        } catch (pErr: any) { console.error("[Pusher] trigger error:", pErr.message); }
+
 
         // 5. Send SMS Confirmation (Africa's Talking)
         try {

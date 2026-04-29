@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from 'next/cache';
 import { sendSMS } from '@/lib/sms';
+import { pusher } from '@/lib/pusher';
+
 
 // -------------------------------------------------------
 // Safaricom C2B Production Confirmation Callback Structure:
@@ -280,6 +282,15 @@ export async function POST(req: Request) {
           await sendSMS(MSISDN || '', smsMessage);
         } catch (smsErr: any) { console.error("[M-Pesa] SMS failure:", smsErr.message); }
 
+        // Pusher Trigger for real-time update
+        try {
+          await pusher.trigger('repayments-channel', 'new-payment', {
+            borrowerName: borrower.fullName,
+            amount: paymentAmount,
+            type: 'Registration Fee'
+          });
+        } catch (pErr: any) { console.error("[Pusher] trigger error:", pErr.message); }
+
         revalidatePath('/borrowers');
         revalidatePath('/borrowers/' + borrower.id);
 
@@ -359,26 +370,6 @@ export async function POST(req: Request) {
         await db(`UPDATE "MpesaCallback" SET status = 'Processed' WHERE id = $1`, [mpesaId]);
         console.log(`[M-Pesa] ✅ Payment processed: ${repId}, KES ${paymentAmount}, Loan: ${loan.id}`);
 
-        // Pusher real-time notification
-        if (process.env.PUSHER_APP_ID && process.env.PUSHER_APP_ID !== 'YOUR_PUSHER_APP_ID') {
-          try {
-            const Pusher = (await import('pusher')).default;
-            const pusher = new Pusher({
-              appId: process.env.PUSHER_APP_ID!,
-              key: process.env.NEXT_PUBLIC_PUSHER_KEY!,
-              secret: process.env.PUSHER_SECRET!,
-              cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-              useTLS: true,
-            });
-            await pusher.trigger('repayments-channel', 'new-payment', {
-              message: 'New payment received',
-              amount: paymentAmount,
-              borrowerName: borrower.fullName || `${FirstName || ''} ${LastName || ''}`.trim() || 'Customer',
-              loanId: loan.id
-            });
-          } catch (pErr) { console.error("[Pusher] Error:", pErr); }
-        }
-
         // Cache revalidation
         revalidatePath('/repayments');
         revalidatePath('/dashboard');
@@ -391,6 +382,16 @@ export async function POST(req: Request) {
           const smsMessage = `Hello ${firstName}, we have received your payment of KES ${paymentAmount}. Receipt: ${TransID}. Your new loan balance is KES ${balance}. Thank you for choosing Bosi Capital.`;
           await sendSMS(MSISDN || '', smsMessage);
         } catch (smsErr: any) { console.error("[M-Pesa] SMS failure:", smsErr.message); }
+
+        // Pusher Trigger for real-time update
+        try {
+          await pusher.trigger('repayments-channel', 'new-payment', {
+            borrowerName: borrower.fullName,
+            amount: paymentAmount,
+            type: 'Loan Repayment'
+          });
+        } catch (pErr: any) { console.error("[Pusher] trigger error:", pErr.message); }
+
 
       } catch (processErr: any) {
         console.error("[M-Pesa] Error processing payment:", processErr.message);
