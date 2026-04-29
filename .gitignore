@@ -37,3 +37,5 @@ functions/.env
 
 /src/generated/prisma
 tsconfig.tsbuildinfo
+
+.env*.local
