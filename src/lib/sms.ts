@@ -17,21 +17,21 @@ export async function sendSMS(to: string, message: string) {
   
   const url = `${baseURL}/version1/messaging`;
 
-  // Standardize phone number for Africa's Talking (must be +254XXXXXXXXX)
-  let formattedPhone = to.replace(/\s+/g, "").replace(/^\+/, "");
-  if (formattedPhone.startsWith("0")) {
-    formattedPhone = "254" + formattedPhone.slice(1);
-  } else if (formattedPhone.startsWith("7") && formattedPhone.length === 9) {
-    formattedPhone = "254" + formattedPhone;
+  // Standardize phone number for Africa's Talking (MUST be +254XXXXXXXXX)
+  let cleaned = to.toString().replace(/[^0-9]/g, ""); // Remove everything except digits
+  
+  if (cleaned.startsWith("0")) {
+    cleaned = "254" + cleaned.slice(1);
+  } else if (cleaned.startsWith("7") && cleaned.length === 9) {
+    cleaned = "254" + cleaned;
   }
   
-  if (!formattedPhone.startsWith("254")) {
-     // If it doesn't start with 254, assume it's already in international format or prepend if missing
-     // But for now, let's assume it should be +254
-     if (formattedPhone.length === 9) formattedPhone = "254" + formattedPhone;
-  }
+  // Ensure it starts with 254 and has 12 digits total
+  if (cleaned.length === 9) cleaned = "254" + cleaned;
   
-  const recipients = "+" + formattedPhone;
+  // Africa's Talking requires the PLUS sign
+  const recipients = "+" + cleaned;
+  console.log(`[SMS] Sending to: ${recipients}`);
 
   try {
     const params = new URLSearchParams();
