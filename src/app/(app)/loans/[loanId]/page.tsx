@@ -286,10 +286,6 @@ export default function LoanDetailPage() {
                                 <p className="text-xs text-muted-foreground uppercase font-semibold">Account Number (National ID)</p>
                                 <p className="text-lg font-bold tracking-tight text-primary select-all">{borrower?.nationalId || 'N/A'}</p>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground uppercase font-semibold">Loan ID (Reference)</p>
-                                <p className="text-sm font-mono text-muted-foreground select-all">{loan.id}</p>
-                            </div>
                             <p className="text-[11px] text-muted-foreground italic leading-relaxed">
                                 Use the National ID as the Account Number when paying via M-Pesa. The payment will be matched to this loan automatically.
                             </p>
