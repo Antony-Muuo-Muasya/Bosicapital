@@ -12,6 +12,9 @@ export async function GET() {
   const environment = process.env.MPESA_ENVIRONMENT || "";
   const callbackUrl = process.env.MPESA_CALLBACK_URL || "";
 
+  // List all available MPESA keys (for identifying typos in Vercel Dashboard)
+  const allKeys = Object.keys(process.env).filter(key => key.startsWith("MPESA_") || key === "PASSKEY");
+
   return NextResponse.json({
     status: "ok",
     mpesa: {
@@ -22,6 +25,7 @@ export async function GET() {
       MPESA_ENVIRONMENT: environment || "❌ MISSING OR EMPTY",
       MPESA_CALLBACK_URL: callbackUrl || "❌ MISSING OR EMPTY",
     },
+    detected_keys_in_vercel: allKeys,
     readyForStkPush: !!(consumerKey && consumerSecret && passkey && shortCode),
   });
 }
