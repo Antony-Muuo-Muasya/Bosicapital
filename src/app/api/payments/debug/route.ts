@@ -27,6 +27,11 @@ export async function GET() {
       MPESA_ENVIRONMENT: environment || "❌ MISSING",
       MPESA_CALLBACK_URL: callbackUrl || "❌ MISSING",
     },
+    sms_provider: {
+      username: process.env.AFRICAS_TALKING_USERNAME || "NOT SET",
+      apiKey: process.env.AFRICAS_TALKING_APIKEY ? `SET (${process.env.AFRICAS_TALKING_APIKEY.length} chars)` : "❌ MISSING",
+      isSandbox: (process.env.AFRICAS_TALKING_USERNAME || "").toLowerCase() === "sandbox"
+    },
     detected_keys: allKeys,
     recent_callbacks: recentCallbacks,
     ready: !!(consumerKey && consumerSecret && passkey && shortCode),

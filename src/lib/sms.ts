@@ -2,8 +2,8 @@
  * Africa's Talking SMS Utility
  */
 export async function sendSMS(to: string, message: string) {
-  const username = process.env.AFRICAS_TALKING_USERNAME || "sandbox";
-  const apiKey = process.env.AFRICAS_TALKING_APIKEY;
+  const username = (process.env.AFRICAS_TALKING_USERNAME || "sandbox").trim();
+  const apiKey = (process.env.AFRICAS_TALKING_APIKEY || "").trim();
 
   if (!apiKey || apiKey === "your_api_key") {
     console.warn("[SMS] Africa's Talking API key is not configured.");
