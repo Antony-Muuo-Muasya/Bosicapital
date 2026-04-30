@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from 'next/cache';
 import { sendSMS } from '@/lib/sms';
-import { pusher } from '@/lib/pusher';
 
 
 // -------------------------------------------------------
@@ -282,16 +281,8 @@ export async function POST(req: Request) {
           await sendSMS(MSISDN || '', smsMessage);
         } catch (smsErr: any) { console.error("[M-Pesa] SMS failure:", smsErr.message); }
 
-        // Pusher Trigger for real-time update
-        try {
-          await pusher.trigger('repayments-channel', 'new-payment', {
-            borrowerName: borrower.fullName,
-            amount: paymentAmount,
-            type: 'Registration Fee'
-          });
-        } catch (pErr: any) { console.error("[Pusher] trigger error:", pErr.message); }
-
         revalidatePath('/borrowers');
+
         revalidatePath('/borrowers/' + borrower.id);
 
       } catch (regErr: any) {
@@ -383,17 +374,8 @@ export async function POST(req: Request) {
           await sendSMS(MSISDN || '', smsMessage);
         } catch (smsErr: any) { console.error("[M-Pesa] SMS failure:", smsErr.message); }
 
-        // Pusher Trigger for real-time update
-        try {
-          await pusher.trigger('repayments-channel', 'new-payment', {
-            borrowerName: borrower.fullName,
-            amount: paymentAmount,
-            type: 'Loan Repayment'
-          });
-        } catch (pErr: any) { console.error("[Pusher] trigger error:", pErr.message); }
-
-
       } catch (processErr: any) {
+
         console.error("[M-Pesa] Error processing payment:", processErr.message);
         try {
           await db(`UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE id = $1`, [mpesaId, processErr.message]);

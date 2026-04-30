@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { sendSMS } from "@/lib/sms";
-import { pusher } from "@/lib/pusher";
-
 
 export async function POST(req: Request) {
   try {
@@ -65,7 +63,6 @@ export async function POST(req: Request) {
     // 2. Log/Update callback record
     try {
       if (checkoutID) {
-        // Update the record created during STK Initiation
         await db(
           `UPDATE "MpesaCallback" 
            SET "transId" = $1, msisdn = $2, "transAmount" = $3, "transTime" = $4, status = 'Pending'
@@ -88,7 +85,6 @@ export async function POST(req: Request) {
     let loan: any = null;
     let borrower: any = null;
 
-    // Strategy A: Match by CheckoutRequestID (Most reliable!) using Account Number (National ID)
     if (checkoutID) {
       const savedReq = await db(
         `SELECT "billRefNumber" FROM "MpesaCallback" WHERE "checkoutRequestId" = $1`,
@@ -96,13 +92,10 @@ export async function POST(req: Request) {
       );
       
       const accountNum = savedReq.length > 0 ? savedReq[0].billRefNumber : null;
-      console.log(`[M-Pesa STK] Account Number linked to request: ${accountNum}`);
-
       if (accountNum) {
         const cleanedAccount = accountNum.toUpperCase().replace(/[\s\-]/g, "");
         const numericAccount = accountNum.replace(/[^0-9]/g, "");
 
-        // Try matching as National ID
         try {
           const bByNational = await db(
             `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
@@ -116,23 +109,17 @@ export async function POST(req: Request) {
             );
             if (lByBorrower.length > 0) {
               loan = lByBorrower[0];
-              console.log("[M-Pesa STK] Matched by Identification (Account Number) -> loan:", loan.id);
             }
           }
         } catch (e: any) { console.error("[STK] ID matching error:", e.message); }
       }
     }
 
-    // Strategy B: Match by Phone (Fallback)
     if (!loan && phone) {
       const phoneRaw = phone.replace(/[^0-9]/g, "");
-      const phone0 = phoneRaw.startsWith("254") ? "0" + phoneRaw.slice(3) : 
-                     phoneRaw.startsWith("0") ? phoneRaw : "0" + phoneRaw;
-      const phone254 = phoneRaw.startsWith("254") ? phoneRaw : "254" + phoneRaw.replace(/^0/, "");
-
       const bByPhone = await db(
-        `SELECT * FROM "Borrower" WHERE phone IN ($1,$2,$3,$4,$5)`,
-        [phone, phone0, phoneRaw, phone254, "+" + phone254]
+        `SELECT * FROM "Borrower" WHERE phone IN ($1,$2,$3)`,
+        [phone, phoneRaw, "0" + phoneRaw.slice(-9)]
       );
       if (bByPhone.length > 0) {
         borrower = bByPhone[0];
@@ -142,7 +129,6 @@ export async function POST(req: Request) {
         );
         if (activeLoans.length > 0) {
           loan = activeLoans[0];
-          console.log("[M-Pesa STK] Matched by Phone Fallback:", loan.id);
         }
       }
     }
@@ -169,72 +155,68 @@ export async function POST(req: Request) {
         remaining -= paying;
       }
 
-      // Recalculate loan balance
       const allInst = await db(`SELECT COALESCE(SUM("paidAmount"), 0) as paid FROM "Installment" WHERE "loanId" = $1`, [loan.id]);
       const totalPaid = Number(allInst[0]?.paid || 0);
       const newBalance = Math.max(0, Number(loan.totalPayable) - totalPaid);
       const newStatus = newBalance <= 0 ? "Completed" : "Active";
 
       try {
-        const repId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const repId = `rep_${Date.now()}_stk`;
         await db(
           `INSERT INTO "Repayment" (
             id, "organizationId", "loanId", "borrowerId", "loanOfficerId", "transId",
             amount, "paymentDate", "collectedById", method, phone, "balanceAfterPayment"
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-          [
-            repId, loan.organizationId, loan.id, loan.borrowerId, loan.loanOfficerId,
-            mpesaReceipt, amount, new Date(), "mpesa_system", "Mobile Money", phone, newBalance,
-          ]
+          [repId, loan.organizationId, loan.id, loan.borrowerId, loan.loanOfficerId || 'mpesa_system', mpesaReceipt, amount, new Date(), "mpesa_system", "Mobile Money", phone, newBalance]
         );
 
         await db(`UPDATE "Loan" SET balance = $1, status = $2, "lastPaymentDate" = $3 WHERE id = $4`, [newBalance, newStatus, new Date(), loan.id]);
         await db(`UPDATE "MpesaCallback" SET status = 'Processed' WHERE "transId" = $1`, [mpesaReceipt]);
 
-        console.log("[M-Pesa STK Callback] ✅ Processed successfully. Receipt:", mpesaReceipt);
-
-        // Revalidate paths for real-time updates
         revalidatePath('/repayments');
         revalidatePath('/dashboard');
         revalidatePath(`/loans/${loan.id}`);
         revalidatePath('/borrowers/' + borrower.id);
 
-        // Pusher Trigger for real-time update
-        try {
-          await pusher.trigger('repayments-channel', 'new-payment', {
-            borrowerName: borrower.fullName,
-            amount: amount,
-            type: 'STK Payment'
-          });
-        } catch (pErr: any) { console.error("[Pusher] trigger error:", pErr.message); }
-
-
-        // 5. Send SMS Confirmation (Africa's Talking)
         try {
           const smsMessage = `Hello ${borrower.fullName.split(' ')[0]}, we have received your payment of KES ${amount}. Receipt: ${mpesaReceipt}. Your new loan balance is KES ${newBalance}. Thank you for choosing Bosi Capital.`;
           await sendSMS(phone, smsMessage);
-        } catch (smsErr: any) {
-          console.error("[M-Pesa STK Callback] SMS failure:", smsErr.message);
-        }
+        } catch (smsErr: any) { console.error("[SMS] failure:", smsErr.message); }
 
       } catch (procErr: any) {
-        console.error("[M-Pesa STK Callback] Failed to record repayment:", procErr.message);
-        await db(
-          `UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE "transId" = $1`,
-          [mpesaReceipt, "Database error: " + procErr.message]
-        ).catch(() => {});
+        console.error("Recording error:", procErr.message);
+        await db(`UPDATE "MpesaCallback" SET status = 'Failed', "errorMessage" = $2 WHERE "transId" = $1`, [mpesaReceipt, procErr.message]);
       }
 
+    } else if (borrower && borrower.registrationFeePaid === false) {
+      try {
+        const regId = `reg_${Date.now()}_stk`;
+        const now = new Date().toISOString();
+
+        await db(`INSERT INTO "RegistrationPayment" (id, "organizationId", "borrowerId", amount, "paymentMethod", reference, "collectedBy", "createdAt")
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [regId, borrower.organizationId, borrower.id, amount, 'Mobile Money', mpesaReceipt, 'mpesa_system', now]);
+
+        await db(`UPDATE "Borrower" SET "registrationFeePaid" = true, "registrationFeePaidAt" = $2, "registrationPaymentId" = $3 WHERE id = $1`, [borrower.id, now, regId]);
+        await db(`UPDATE "MpesaCallback" SET status = 'Processed', "errorMessage" = 'Registration Fee' WHERE "transId" = $1`, [mpesaReceipt]);
+
+        revalidatePath('/borrowers');
+        revalidatePath('/borrowers/' + borrower.id);
+
+        try {
+          const smsMessage = `Hello ${borrower.fullName.split(' ')[0]}, we have received your Registration Fee of KES ${amount}. Receipt: ${mpesaReceipt}. Thank you for choosing Bosi Capital.`;
+          await sendSMS(phone, smsMessage);
+        } catch (smsErr: any) { console.error("[SMS] failure:", smsErr.message); }
+
+      } catch (regErr: any) {
+        console.error("Reg error:", regErr.message);
+      }
     } else {
-      const reason = !borrower ? "No borrower matched" : "No active loan found";
-      await db(`UPDATE "MpesaCallback" SET status = 'Unmatched', "errorMessage" = $2 WHERE "transId" = $1`, [mpesaReceipt, reason]);
-      console.warn("[M-Pesa STK Callback] ⚠️ Unmatched:", reason, "Receipt:", mpesaReceipt);
+      await db(`UPDATE "MpesaCallback" SET status = 'Unmatched', "errorMessage" = $2 WHERE "transId" = $1`, [mpesaReceipt, "No active loan or reg fee"]);
     }
 
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   } catch (err: any) {
-    console.error("[M-Pesa STK Callback] Unexpected error:", err.message);
     return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
   }
 }

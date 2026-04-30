@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache';
 
 export async function getRepayments(organizationId: string, loanId?: string, borrowerId?: string) {
   try {
-    let query = `
+    // 1. Fetch Loan Repayments
+    let repQuery = `
       SELECT r.*, 
              l.status as "loanStatus", 
              lp.name as "productName",
@@ -16,30 +17,57 @@ export async function getRepayments(organizationId: string, loanId?: string, bor
       JOIN "Borrower" b ON r."borrowerId" = b.id
       WHERE r."organizationId" = $1
     `;
-    const params: any[] = [organizationId];
+    const repParams: any[] = [organizationId];
 
     if (loanId) {
-      query += ` AND r."loanId" = $${params.length + 1}`;
-      params.push(loanId);
+      repQuery += ` AND r."loanId" = $${repParams.length + 1}`;
+      repParams.push(loanId);
     }
     if (borrowerId) {
-      query += ` AND r."borrowerId" = $${params.length + 1}`;
-      params.push(borrowerId);
+      repQuery += ` AND r."borrowerId" = $${repParams.length + 1}`;
+      repParams.push(borrowerId);
+    }
+    repQuery += ` ORDER BY r."paymentDate" DESC`;
+    const repaymentsRaw = await db(repQuery, repParams);
+
+    // 2. Fetch Registration Payments (if no specific loanId is requested)
+    let regPayments: any[] = [];
+    if (!loanId) {
+      let regQuery = `SELECT * FROM "RegistrationPayment" WHERE "organizationId" = $1`;
+      const regParams: any[] = [organizationId];
+      if (borrowerId) {
+        regQuery += ` AND "borrowerId" = $2`;
+        regParams.push(borrowerId);
+      }
+      regPayments = await db(regQuery, regParams);
     }
 
-    query += ` ORDER BY r."paymentDate" DESC`;
-
-    const repaymentsRaw = await db(query, params);
-    
-    const repayments = repaymentsRaw.map((r: any) => ({
+    // 3. Merge and standardize
+    const formattedReps = repaymentsRaw.map((r: any) => ({
       ...r,
+      type: 'Loan Repayment',
       loan: { id: r.loanId, status: r.loanStatus, loanProduct: { name: r.productName } },
       borrower: { id: r.borrowerId, fullName: r.borrowerName }
     }));
 
-    return { success: true, repayments };
+    const formattedRegs = regPayments.map((rp: any) => ({
+      id: rp.id,
+      amount: rp.amount,
+      paymentDate: rp.createdAt,
+      transId: rp.reference,
+      method: rp.paymentMethod,
+      type: 'Registration Fee',
+      borrowerId: rp.borrowerId,
+      organizationId: rp.organizationId
+    }));
+
+    const allPayments = [...formattedReps, ...formattedRegs].sort((a, b) => 
+      new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+    );
+
+    return { success: true, repayments: allPayments };
   } catch (error: any) {
-    console.error("Failed to fetch repayments:", error);
+    console.error("Failed to fetch payments:", error);
     return { success: false, error: error.message };
   }
 }

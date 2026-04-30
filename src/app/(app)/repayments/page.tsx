@@ -97,34 +97,15 @@ export default function RepaymentsPage() {
           fetchBorrowers();
           fetchProducts();
 
-          // Pusher real-time trigger
-          const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
-          const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
-          let pusher: any = null;
-
-          if (pusherKey && pusherCluster && pusherKey !== 'YOUR_PUSHER_KEY') {
-            const Pusher = require('pusher-js');
-            pusher = new Pusher(pusherKey, { cluster: pusherCluster });
-            const channel = pusher.subscribe('repayments-channel');
-            channel.bind('new-payment', () => {
-              console.log("[Repayments] Real-time update triggered via Pusher");
-              fetchRepayments();
-              fetchLoans(); // Also refresh loans to show updated balances
-            });
-          }
-
           // Fallback polling every 10 seconds
           const interval = setInterval(() => {
               fetchRepayments();
           }, 10000);
 
           return () => {
-              if (pusher) {
-                pusher.unsubscribe('repayments-channel');
-                pusher.disconnect();
-              }
               clearInterval(interval);
           }
+
       }
    }, [isProfileLoading, userProfile, fetchLoans, fetchRepayments, fetchBorrowers, fetchProducts]);
 
@@ -134,21 +115,27 @@ export default function RepaymentsPage() {
     if (isLoading || !allRepayments || !allBorrowers || !visibleLoans || !loanProducts) return [];
 
     const visibleLoanIds = new Set(visibleLoans.map(l => l.id));
-    const repayments = allRepayments.filter(r => visibleLoanIds.has(r.loanId));
-
     const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
     const loansMap = new Map(visibleLoans.map(l => [l.id, l]));
     const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
 
-    return repayments.map(repayment => {
-      const loan = loansMap.get(repayment.loanId);
-      const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
+    // Filter: Include loan repayments if the loan is visible, OR all registration fees for the org
+    const filteredRepayments = allRepayments.filter((r: any) => {
+      if (r.type === 'Registration Fee') return true;
+      return visibleLoanIds.has(r.loanId);
+    });
+
+    return filteredRepayments.map((repayment: any) => {
+      const loan = repayment.loanId ? loansMap.get(repayment.loanId) : null;
+
+      const borrower = (repayment as any).borrowerId ? borrowersMap.get((repayment as any).borrowerId) : (loan ? borrowersMap.get(loan.borrowerId) : undefined);
       const product = loan ? loanProductsMap.get(loan.loanProductId) : undefined;
 
       return {
         ...repayment,
-        borrowerName: borrower?.fullName || 'Unknown Borrower',
-        loanProductName: product?.name || 'Unknown Product',
+        borrowerName: borrower?.fullName || (repayment as any).borrowerName || 'Unknown Borrower',
+        loanProductName: product?.name || repayment.type || 'Loan Repayment',
+        displayLoanId: repayment.loanId ? repayment.loanId.substring(0, 12) + '...' : 'Registration'
       };
     }).sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
   }, [allRepayments, allBorrowers, visibleLoans, loanProducts, isLoading]);
@@ -257,7 +244,7 @@ export default function RepaymentsPage() {
                   <TableRow key={repayment.id}>
                     <TableCell>
                       <div className="font-medium">{repayment.borrowerName}</div>
-                      <div className="text-sm text-muted-foreground">{repayment.loanId.substring(0,12)}...</div>
+                      <div className="text-sm text-muted-foreground">{repayment.displayLoanId}</div>
                     </TableCell>
                     <TableCell>{repayment.loanProductName}</TableCell>
                     <TableCell>{new Date(repayment.paymentDate).toLocaleDateString()}</TableCell>

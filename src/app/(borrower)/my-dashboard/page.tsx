@@ -111,31 +111,13 @@ export default function MyDashboardPage() {
     useEffect(() => {
         if (user) {
             fetchMyDashboardData();
+            
+            // Background polling every 15 seconds to keep data fresh without Pusher
+            const interval = setInterval(() => {
+                fetchMyDashboardData();
+            }, 15000);
 
-            // Real-time updates via Pusher
-            const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
-            const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
-            let pusher: any = null;
-
-            if (pusherKey && pusherCluster && pusherKey !== 'YOUR_PUSHER_KEY') {
-                const Pusher = require('pusher-js');
-                pusher = new Pusher(pusherKey, { cluster: pusherCluster });
-                const channel = pusher.subscribe('repayments-channel');
-                channel.bind('new-payment', (data: any) => {
-                    // Only refresh if the payment belongs to this borrower (security/relevance check)
-                    // Note: In a production app, use private channels with borrower-specific IDs
-                    // For now, we refresh and let the fetch handle filters
-                    console.log("[Borrower Dashboard] Real-time payment update");
-                    fetchMyDashboardData();
-                });
-            }
-
-            return () => {
-                if (pusher) {
-                    pusher.unsubscribe('repayments-channel');
-                    pusher.disconnect();
-                }
-            };
+            return () => clearInterval(interval);
         }
     }, [user, fetchMyDashboardData]);
 
@@ -347,6 +329,7 @@ export default function MyDashboardPage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Date</TableHead>
+                                            <TableHead>Type</TableHead>
                                             <TableHead>Reference</TableHead>
                                             <TableHead className="text-right">Amount</TableHead>
                                         </TableRow>
@@ -355,11 +338,12 @@ export default function MyDashboardPage() {
                                         {recentPayments.length > 0 ? recentPayments.map(rep => (
                                             <TableRow key={rep.id}>
                                                 <TableCell>{new Date(rep.paymentDate).toLocaleDateString()}</TableCell>
+                                                <TableCell><Badge variant="outline">{rep.type || 'Repayment'}</Badge></TableCell>
                                                 <TableCell className="font-mono text-xs uppercase">{rep.transId || rep.id.substring(0,8)}</TableCell>
                                                 <TableCell className="text-right font-medium text-emerald-600">{formatCurrency(rep.amount)}</TableCell>
                                             </TableRow>
                                         )) : (
-                                            <TableRow><TableCell colSpan={3} className="text-center h-24">No payments recorded yet.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={4} className="text-center h-24">No payments recorded yet.</TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>

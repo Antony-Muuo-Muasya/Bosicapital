@@ -4,7 +4,6 @@ import './globals.css';
 import { UserProfileProvider } from '@/providers/user-profile';
 import { ThemeProvider } from '@/components/theme-provider';
 import AuthProvider from '@/components/providers/session-provider';
-import RealTimeListener from '@/components/real-time-listener';
 
 
 export const metadata: Metadata = {
@@ -60,7 +59,6 @@ export default function RootLayout({
           <AuthProvider>
             <UserProfileProvider>
                 {children}
-                <RealTimeListener />
                 <Toaster />
             </UserProfileProvider>
           </AuthProvider>
