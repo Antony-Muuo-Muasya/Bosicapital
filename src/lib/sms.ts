@@ -53,7 +53,18 @@ export async function sendSMS(to: string, message: string) {
     console.log("[SMS] Africa's Talking response:", JSON.stringify(result));
 
     if (response.ok) {
-      return { success: true, result };
+      // Check individual recipient status
+      const recipientData = result.SMSMessageData?.Recipients?.[0];
+      const status = recipientData?.status;
+      
+      if (status === 'Success' || status === 'Sent') {
+        return { success: true, result };
+      } else {
+        return { 
+          success: false, 
+          error: `Provider Status: ${status || 'Unknown'}. Detail: ${recipientData?.errorMessage || 'Check your balance.'}` 
+        };
+      }
     } else {
       return { success: false, error: result };
     }
