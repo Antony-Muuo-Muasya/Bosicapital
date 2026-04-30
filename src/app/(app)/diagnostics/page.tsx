@@ -3,15 +3,27 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getDiagnosticInfo } from '@/actions/diagnostics';
+import { getDiagnosticInfo, manualRecon } from '@/actions/diagnostics';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, RefreshCcw, ShieldCheck, AlertCircle, Zap } from 'lucide-react';
+import { Loader2, RefreshCcw, ShieldCheck, AlertCircle, Zap, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function DiagnosticsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  const [form, setForm] = useState({
+    transId: '',
+    msisdn: '',
+    amount: '',
+    billRef: ''
+  });
 
   const load = async () => {
     setLoading(true);
@@ -21,6 +33,35 @@ export default function DiagnosticsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleManualSync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.transId || !form.amount || !form.billRef) {
+        return toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
+    }
+
+    setSubmitting(true);
+    try {
+        const res = await manualRecon({
+            transId: form.transId.trim().toUpperCase(),
+            msisdn: form.msisdn.trim(),
+            amount: Number(form.amount),
+            billRef: form.billRef.trim()
+        });
+
+        if (res.success) {
+            toast({ title: "Success", description: res.message });
+            setForm({ transId: '', msisdn: '', amount: '', billRef: '' });
+            load();
+        } else {
+            toast({ title: "Failed", description: res.message, variant: "destructive" });
+        }
+    } catch (err: any) {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+        setSubmitting(false);
+    }
+  };
 
   if (loading && !data) {
     return (
@@ -93,58 +134,97 @@ export default function DiagnosticsPage() {
         </Card>
       </div>
 
-      {/* RECENT CALLBACK LOGS (The Handshake Check) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <RefreshCcw className="h-5 w-5 text-muted-foreground" />
-            Recent M-Pesa Notifications (The "Handshake" History)
-          </CardTitle>
-          <CardDescription>
-            This shows every time Safaricom tries to talk to your server. If your payment is missing here, the notification never reached your website.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time Received</TableHead>
-                <TableHead>Transaction ID</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Error/Detail</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.callbacks.length > 0 ? data.callbacks.map((cb: any) => (
-                <TableRow key={cb.id}>
-                  <TableCell>{new Date(cb.createdAt).toLocaleString()}</TableCell>
-                  <TableCell className="font-mono text-xs">{cb.transId || 'PENDING'}</TableCell>
-                  <TableCell>{cb.transAmount}</TableCell>
-                  <TableCell>
-                    <Badge variant={cb.status === 'Processed' ? 'default' : cb.status === 'Failed' ? 'destructive' : 'secondary'}>
-                      {cb.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">
-                    {cb.errorMessage || 'No issues detected'}
-                  </TableCell>
-                </TableRow>
-              )) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <AlertCircle className="h-8 w-8" />
-                      <p>Safaricom hasn't sent any notifications yet.</p>
-                      <p className="text-xs">If you just paid, this means the notification was blocked or your URL is not registered.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* MANUAL RECONCILIATION FORM */}
+        <Card className="border-blue-500/20 bg-blue-500/5">
+            <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-blue-500" />
+                    Force Reconciliation
+                </CardTitle>
+                <CardDescription>
+                    If Safaricom failed to send a notification, use this to manually "claim" a receipt. The system will then automatically process the loan/registration and send the SMS.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleManualSync} className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>M-Pesa Code</Label>
+                        <Input 
+                            placeholder="e.g. RLK4Z9..." 
+                            value={form.transId} 
+                            onChange={e => setForm({...form, transId: e.target.value})} 
+                        />
                     </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <div className="space-y-2">
+                        <Label>Account No / ID No</Label>
+                        <Input 
+                            placeholder="National ID or Account" 
+                            value={form.billRef} 
+                            onChange={e => setForm({...form, billRef: e.target.value})} 
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Amount</Label>
+                        <Input 
+                            type="number" 
+                            placeholder="KES" 
+                            value={form.amount} 
+                            onChange={e => setForm({...form, amount: e.target.value})} 
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Phone No (Optional)</Label>
+                        <Input 
+                            placeholder="254..." 
+                            value={form.msisdn} 
+                            onChange={e => setForm({...form, msisdn: e.target.value})} 
+                        />
+                    </div>
+                    <Button type="submit" className="col-span-2 mt-2" disabled={submitting}>
+                        {submitting ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4" />}
+                        Process & Send SMS
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
+
+        {/* HANDSHAKE LOGS */}
+        <Card className="flex-1">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Handshake History</CardTitle>
+                <CardDescription>Latest notifications from Safaricom.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Code</TableHead>
+                            <TableHead>Status</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {data.callbacks.length > 0 ? data.callbacks.slice(0, 5).map((cb: any) => (
+                        <TableRow key={cb.id} className="text-xs">
+                            <TableCell>{new Date(cb.createdAt).toLocaleTimeString()}</TableCell>
+                            <TableCell className="font-mono">{cb.transId}</TableCell>
+                            <TableCell>
+                                <Badge variant={cb.status === 'Processed' ? 'default' : 'secondary'} className="scale-75">
+                                    {cb.status}
+                                </Badge>
+                            </TableCell>
+                        </TableRow>
+                        )) : (
+                        <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground py-10">No logs found</TableCell>
+                        </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

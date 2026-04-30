@@ -17,7 +17,6 @@ export async function getDiagnosticInfo() {
     callbacks: [],
   };
 
-  // 1. Test M-Pesa Connectivity (Get Token)
   try {
     const consumerKey = (process.env.MPESA_CONSUMER_KEY || "").trim();
     const consumerSecret = (process.env.MPESA_CONSUMER_SECRET || "").trim();
@@ -42,14 +41,13 @@ export async function getDiagnosticInfo() {
       }
     } else {
       info.mpesa.status = 'Misconfigured ⚠️';
-      info.mpesa.detail = 'Keys missing in environment variables';
+      info.mpesa.detail = 'Keys missing';
     }
   } catch (e: any) {
-    info.mpesa.status = 'Network Error ❌';
+    info.mpesa.status = 'Error ❌';
     info.mpesa.detail = e.message;
   }
 
-  // 2. Fetch Recent Callbacks (The "Handshake" History)
   try {
     info.callbacks = await db(`SELECT * FROM "MpesaCallback" ORDER BY "createdAt" DESC LIMIT 10`);
   } catch (e: any) {
@@ -57,4 +55,52 @@ export async function getDiagnosticInfo() {
   }
 
   return info;
+}
+
+export async function manualRecon(payload: {
+  transId: string;
+  msisdn: string;
+  amount: number;
+  billRef: string;
+}) {
+  try {
+    const { transId, msisdn, amount, billRef } = payload;
+    
+    // 1. Create a "virtual" callback record
+    const mId = `manual_${Date.now()}_${transId}`;
+    await db(
+      `INSERT INTO "MpesaCallback" (
+        id, "transId", msisdn, "transAmount", "billRefNumber", 
+        status, "transactionType", "errorMessage", "createdAt"
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [mId, transId, msisdn, String(amount), billRef, 'Manual_Pending', 'Manual Reconciliation', 'Manually entered by admin', new Date()]
+    );
+
+    // 2. Trigger the callback processing logic via an internal POST request
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://bosicapital.com';
+    const callbackPayload = {
+      TransactionType: "Pay Bill",
+      TransID: transId,
+      TransTime: new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14),
+      TransAmount: String(amount),
+      BusinessShortCode: process.env.MPESA_SHORTCODE || '4159879',
+      BillRefNumber: billRef,
+      MSISDN: msisdn,
+      FirstName: "Manual",
+      MiddleName: "Entry",
+      LastName: "Admin"
+    };
+
+    const res = await fetch(`${baseUrl}/api/payments/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(callbackPayload)
+    });
+
+    const result = await res.json();
+    return { success: true, message: "Transaction processed and matched!" };
+
+  } catch (e: any) {
+    return { success: false, message: e.message };
+  }
 }
