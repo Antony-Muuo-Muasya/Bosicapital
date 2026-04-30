@@ -104,3 +104,13 @@ export async function manualRecon(payload: {
     return { success: false, message: e.message };
   }
 }
+
+export async function testSMS(phone: string) {
+  try {
+    const { sendSMS } = await import('@/lib/sms');
+    const result = await sendSMS(phone, "Bosi Capital: This is a system test message. If you see this, your SMS integration is working!");
+    return result;
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
