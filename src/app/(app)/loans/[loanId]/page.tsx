@@ -41,6 +41,11 @@ export default function LoanDetailPage() {
     const [data, setData] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    // All hooks must be called unconditionally before any early returns
+    const [isPaying, setIsPaying] = useState(false);
+    const [payPhone, setPayPhone] = useState("");
+    const [payAmount, setPayAmount] = useState("");
+    const [mounted, setMounted] = useState(false);
 
     const fetchLoanData = useCallback(async () => {
         setIsLoading(true);
@@ -69,6 +74,8 @@ export default function LoanDetailPage() {
         }
     }, [error, router]);
 
+    useEffect(() => { setMounted(true); }, []);
+
     const loan = data;
     const product = loan?.loanProduct;
     const borrower = loan?.borrower;
@@ -96,8 +103,15 @@ export default function LoanDetailPage() {
         }
     }, [installments, loan]);
 
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => { setMounted(true); }, []);
+    // Prefill phone/amount when borrower data arrives
+    useEffect(() => {
+        if (borrower?.phone && !payPhone) {
+            setPayPhone(borrower.phone);
+        }
+        if (totalOutstanding > 0 && !payAmount) {
+            setPayAmount(String(totalOutstanding));
+        }
+    }, [borrower?.phone, totalOutstanding]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (isLoading) {
         return (
@@ -129,15 +143,13 @@ export default function LoanDetailPage() {
 
         const csvRows = [];
         
-        // 1. Header & Loan Details
         csvRows.push(`LOAN STATEMENT - ${product.name.toUpperCase()}`);
         csvRows.push(`Organization,Bosi Capital Limited`);
         csvRows.push(`Loan ID,${loan.id}`);
-        csvRows.push(`Borrower,${borrower.fullName}`);
+        csvRows.push(`Borrower,${borrower?.fullName || 'N/A'}`);
         csvRows.push(`Date Generated,${new Date().toLocaleString()}`);
         csvRows.push('');
 
-        // 2. Summary Stats
         csvRows.push('SUMMARY');
         csvRows.push(`Principal Amount,${loan.principal}`);
         csvRows.push(`Total Payable,${loan.totalPayable}`);
@@ -146,7 +158,6 @@ export default function LoanDetailPage() {
         csvRows.push(`Status,${loan.status}`);
         csvRows.push('');
 
-        // 3. Repayment Schedule
         csvRows.push('REPAYMENT SCHEDULE');
         csvRows.push('Installment #,Due Date,Expected Amount,Paid Amount,Status');
         sortedInstallments.forEach((inst: any) => {
@@ -154,7 +165,6 @@ export default function LoanDetailPage() {
         });
         csvRows.push('');
 
-        // 4. Payment History (Actual Transactions)
         if (loan.repayments && loan.repayments.length > 0) {
             csvRows.push('PAYMENT HISTORY');
             csvRows.push('Payment Date,Transaction ID,Amount,Method,Phone/Ref');
@@ -172,18 +182,6 @@ export default function LoanDetailPage() {
         link.click();
         document.body.removeChild(link);
     };
-
-    const [isPaying, setIsPaying] = useState(false);
-    const [payPhone, setPayPhone] = useState("");
-    const [payAmount, setPayAmount] = useState("");
-
-    // Automatically prefill the registered phone number once
-    useEffect(() => {
-        if (borrower?.phone) {
-            setPayPhone(borrower.phone);
-            setPayAmount(String(totalOutstanding));
-        }
-    }, [borrower?.phone, totalOutstanding]);
 
     const handleStkPush = async () => {
         if (!payPhone || !payAmount) return alert("Please enter phone and amount.");
