@@ -50,23 +50,24 @@ export async function syncLoanArrears() {
 export async function updateBorrowerScores() {
   try {
     const borrowers = await db(`SELECT id FROM "Borrower"`);
-    
+    let updatedCount = 0;
     for (const b of borrowers) {
         const installments = await db(`SELECT status FROM "Installment" WHERE "borrowerId" = $1`, [b.id]);
         if (installments.length === 0) continue;
 
         const total = installments.length;
-        const paidOnTime = installments.filter((i: any) => i.status === 'Paid').length; // Simplified check
+        const paidOnTime = installments.filter((i: any) => i.status === 'Paid').length;
         const score = Math.round((paidOnTime / total) * 100);
 
         await db(`UPDATE "Borrower" SET "creditScore" = $2 WHERE id = $1`, [b.id, score]);
+        updatedCount++;
     }
 
     revalidatePath('/borrowers');
-    return { success: true };
-  } catch (error: any) {
+    return { success: true, updatedCount, summary: `Recalculated scores for ${updatedCount} borrowers.` };
+} catch (error: any) {
     return { success: false, error: error.message };
-  }
+}
 }
 
 /**
@@ -101,7 +102,11 @@ export async function applyLateFees() {
         }
 
         revalidatePath('/loans');
-        return { success: true, count: lateInstallments.length };
+        return { 
+            success: true, 
+            count: lateInstallments.length, 
+            summary: `Applied late fees to ${lateInstallments.length} overdue installments. Total penalties: KES ${lateInstallments.reduce((acc: number, curr: any) => acc + Math.round(curr.expectedAmount * 0.05), 0)}` 
+        };
     } catch (error: any) {
         return { success: false, error: error.message };
     }
@@ -149,9 +154,9 @@ export async function triggerClearance(loanId: string) {
  */
 export async function runAutoTagging() {
     // Logic to tag borrowed as 'Elite' if creditScore > 90
-    await db(`UPDATE "Borrower" SET "tag" = 'Elite' WHERE "creditScore" > 90`);
-    await db(`UPDATE "Borrower" SET "tag" = 'At Risk' WHERE "creditScore" < 40`);
-    return { success: true };
+    const res1 = await db(`UPDATE "Borrower" SET "tag" = 'Elite' WHERE "creditScore" > 90`);
+    const res2 = await db(`UPDATE "Borrower" SET "tag" = 'At Risk' WHERE "creditScore" < 40`);
+    return { success: true, summary: "Tiering update complete. Borrowers segmented based on latest credit scores." };
 }
 
 /**

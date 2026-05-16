@@ -29,18 +29,31 @@ import {
 } from '@/actions/automation';
 import { Database } from 'lucide-react';
 
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogDescription,
+    DialogFooter
+} from '@/components/ui/dialog';
+
 export default function AutomationsPage() {
     const { toast } = useToast();
     const [running, setRunning] = useState<string | null>(null);
+    const [showResults, setShowResults] = useState(false);
+    const [resultsData, setResultsData] = useState<any>(null);
 
     const handleRun = async (id: string, action: () => Promise<any>) => {
         setRunning(id);
         try {
             const res = await action();
             if (res.success) {
+                setResultsData({ ...res, taskId: id });
+                setShowResults(true);
                 toast({
                     title: "Success",
-                    description: `Automation task completed successfully.`,
+                    description: `Automation task completed. Check results.`,
                 });
             } else {
                 toast({
@@ -210,6 +223,52 @@ export default function AutomationsPage() {
                     ))}
                 </div>
             </div>
+
+            <Dialog open={showResults} onOpenChange={setShowResults}>
+                <DialogContent className="sm:max-w-[450px]">
+                    <DialogHeader>
+                        <div className="mx-auto my-4 p-3 bg-primary/10 rounded-full text-primary w-fit">
+                            <Activity className="w-8 h-8" />
+                        </div>
+                        <DialogTitle className="text-center text-2xl">Automation Completed</DialogTitle>
+                        <DialogDescription className="text-center text-lg mt-2">
+                            The background task has finished successfully.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="py-6 border-y my-4">
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground uppercase tracking-wider font-semibold">Summary</span>
+                                <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">Success</Badge>
+                            </div>
+                            <p className="text-foreground leading-relaxed font-medium">
+                                {resultsData?.summary || "Operations completed successfully across all relevant records."}
+                            </p>
+                            
+                            {resultsData?.updatedCount !== undefined && (
+                                <div className="p-3 bg-muted rounded-md flex justify-between items-center">
+                                    <span className="text-sm">Records Affected</span>
+                                    <span className="font-bold text-primary">{resultsData.updatedCount}</span>
+                                </div>
+                            )}
+
+                            {resultsData?.matches !== undefined && (
+                                <div className="p-3 bg-muted rounded-md flex justify-between items-center">
+                                    <span className="text-sm">Pattern Matches Found</span>
+                                    <span className="font-bold text-primary">{resultsData.matches}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button className="w-full h-12 text-lg" onClick={() => setShowResults(false)}>
+                            Return to Dashboard
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
