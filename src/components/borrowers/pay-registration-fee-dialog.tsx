@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useUserProfile } from '@/providers/user-profile';
 import { payRegistrationFee } from '@/actions/borrowers';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Smartphone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
     Select,
@@ -58,10 +58,39 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-        paymentMethod: 'Cash',
+        paymentMethod: 'Mobile Money',
         reference: '',
     }
   });
+
+  const [isStkSubmitting, setIsStkSubmitting] = useState(false);
+
+  const handleStkPush = async () => {
+    if (!borrower) return;
+    setIsStkSubmitting(true);
+    try {
+        const res = await fetch("/api/payments/stk-push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                phone: borrower.phone, 
+                amount: registrationFeeAmount, 
+                loanId: `REG-${borrower.id}`, // Pseudo-loanId for matching
+                nationalId: borrower.nationalId 
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            toast({ title: 'STK Push Sent', description: 'Please ask the borrower to confirm on their phone.' });
+        } else {
+            throw new Error(data.error);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+        setIsStkSubmitting(false);
+    }
+  };
 
   const onSubmit = async (values: PaymentFormData) => {
     if (!user || !userProfile || !borrower) {
@@ -105,6 +134,31 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
             Record payment for {borrower.fullName}. Amount: {formatCurrency(registrationFeeAmount, 'KES')}
           </DialogDescription>
         </DialogHeader>
+        <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 mb-4">
+            <h4 className="text-sm font-bold flex items-center gap-2 mb-1">
+                <Smartphone className="h-4 w-4 text-primary" />
+                M-Pesa STK Push
+            </h4>
+            <p className="text-xs text-muted-foreground mb-3">
+                Send a payment request directly to the borrower&apos;s phone ({borrower.phone}).
+            </p>
+            <Button 
+                type="button" 
+                className="w-full" 
+                variant="secondary"
+                disabled={isStkSubmitting}
+                onClick={handleStkPush}
+            >
+                {isStkSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isStkSubmitting ? 'Sending Push...' : 'Send STK Push Prompt'}
+            </Button>
+        </div>
+
+        <div className="relative my-6 text-center">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+            <span className="relative bg-background px-2 text-[10px] uppercase text-muted-foreground font-bold italic">OR RECORD MANUALLY</span>
+        </div>
+
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField control={form.control} name="paymentMethod" render={({ field }) => (
@@ -115,9 +169,9 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
                                 <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                                <SelectItem value="Mobile Money">Mobile Money (M-Pesa)</SelectItem>
                                 <SelectItem value="Cash">Cash</SelectItem>
                                 <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                <SelectItem value="Mobile Money">Mobile Money</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -135,7 +189,7 @@ export function PayRegistrationFeeDialog({ open, onOpenChange, borrower }: PayRe
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Confirm Payment
+                        Record Manually
                     </Button>
                 </DialogFooter>
             </form>

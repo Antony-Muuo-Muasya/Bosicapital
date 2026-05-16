@@ -18,6 +18,8 @@ import { EditLoanDialog } from '@/components/loans/edit-loan-dialog';
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
+  borrowerPhone?: string;
+  nationalId?: string;
   loanProductName: string;
 };
 
@@ -126,12 +128,17 @@ export default function LoansPage() {
     const borrowersMap = new Map((borrowers || []).map(b => [b.id, b]));
     const loanProductsMap = new Map((loanProducts || []).map(p => [p.id, p]));
 
-    return loans.map(loan => ({
-      ...loan,
-      borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown Borrower',
-      borrowerPhotoUrl: borrowersMap.get(loan.borrowerId)?.photoUrl,
-      loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown Product',
-    })) as any;
+    return loans.map(loan => {
+      const b = borrowersMap.get(loan.borrowerId);
+      return {
+        ...loan,
+        borrowerName: b?.fullName || 'Unknown Borrower',
+        borrowerPhotoUrl: b?.photoUrl,
+        borrowerPhone: b?.phone,
+        nationalId: b?.nationalId,
+        loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown Product',
+      };
+    }) as any;
 
   }, [loans, borrowers, loanProducts]);
   

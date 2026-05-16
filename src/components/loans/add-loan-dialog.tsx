@@ -53,9 +53,10 @@ interface AddLoanDialogProps {
   loanProducts: LoanProduct[];
   isLoading: boolean;
   preselectedBorrower?: Borrower | null;
+  onSuccess?: () => void;
 }
 
-export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading, preselectedBorrower = null }: AddLoanDialogProps) {
+export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading, preselectedBorrower = null, onSuccess }: AddLoanDialogProps) {
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,6 +148,7 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
             toast({ title: 'Success', description: 'Loan submitted for approval.' });
             form.reset();
             onOpenChange(false);
+            if (onSuccess) onSuccess();
         } else {
              toast({ variant: 'destructive', title: 'Error', description: res.error || 'Failed to submit loan for approval.' });
         }

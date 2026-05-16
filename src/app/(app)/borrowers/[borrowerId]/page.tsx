@@ -12,6 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { AddLoanDialog } from '@/components/loans/add-loan-dialog';
 import { PlusCircle, Loader2, Phone, Mail, Fingerprint, Home as HomeIcon } from 'lucide-react';
 import type { Borrower, Loan, LoanProduct } from '@/lib/types';
@@ -109,10 +111,14 @@ export default function BorrowerDetailPage() {
     })).sort((a: any,b: any) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
   }, [loans, allLoanProducts]);
 
+  const activeLoans = useMemo(() => {
+    return loansWithDetails.filter(l => l.status === 'Active' || l.status === 'In Arrears');
+  }, [loansWithDetails]);
+
   const canInitiateNewLoan = useMemo(() => {
     if (!loans || !borrower) return false;
     if (!borrower.registrationFeePaid) return false;
-    return !loans.some(l => l.status === 'Active' || l.status === 'Pending Approval');
+    return !loans.some(l => l.status === 'Active' || l.status === 'Pending Approval' || l.status === 'In Arrears');
   }, [loans, borrower]);
 
   if (isLoading) {
@@ -166,11 +172,66 @@ export default function BorrowerDetailPage() {
             </Card>
             <InteractionHistory borrowerId={borrowerId} />
         </div>
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 space-y-6">
+            {activeLoans.length > 0 && (
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Active Loans
+                    </h3>
+                    {activeLoans.map(loan => {
+                        const paidAmount = loan.installments?.reduce((acc: number, inst: any) => acc + (inst.paidAmount || 0), 0) || 0;
+                        const totalExpected = loan.totalPayable || loan.principal;
+                        const progress = totalExpected > 0 ? (paidAmount / totalExpected) * 100 : 0;
+                        
+                        return (
+                            <Card key={loan.id} className="border-emerald-500/20 bg-emerald-50/5 hover:bg-emerald-50/10 transition-colors cursor-pointer overflow-hidden relative" onClick={() => router.push(`/loans/${loan.id}`)}>
+                                <div className="absolute top-0 right-0 p-4">
+                                    <Badge variant={loan.status === 'In Arrears' ? 'destructive' : 'default'} className="uppercase text-[10px] tracking-widest font-bold">
+                                        {loan.status}
+                                    </Badge>
+                                </div>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-lg">{loan.loanProductName}</CardTitle>
+                                    <CardDescription>Loan ID: {loan.id}</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div>
+                                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Principal</p>
+                                            <p className="text-sm font-semibold">{formatCurrency(loan.principal, 'KES')}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Total Payable</p>
+                                            <p className="text-sm font-semibold">{formatCurrency(totalExpected, 'KES')}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Paid to Date</p>
+                                            <p className="text-sm font-semibold text-emerald-600">{formatCurrency(paidAmount, 'KES')}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Remaining</p>
+                                            <p className="text-sm font-semibold text-primary">{formatCurrency(totalExpected - paidAmount, 'KES')}</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
+                                            <span>Repayment Progress</span>
+                                            <span>{Math.round(progress)}%</span>
+                                        </div>
+                                        <Progress value={progress} className="h-1.5" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            )}
+
             <Card>
                 <CardHeader>
                     <CardTitle>Loan History</CardTitle>
-                    <CardDescription>A record of all loans associated with this borrower.</CardDescription>
+                    <CardDescription>A complete log of all past and present loans.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
@@ -179,18 +240,18 @@ export default function BorrowerDetailPage() {
                                 <TableHead>Product</TableHead>
                                 <TableHead>Principal</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Issued On</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loansWithDetails.map(loan => (
                                 <TableRow key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)} className="cursor-pointer">
-                                    <TableCell>{loan.loanProductName}</TableCell>
+                                    <TableCell className="font-medium">{loan.loanProductName}</TableCell>
                                     <TableCell>{formatCurrency(loan.principal, 'KES')}</TableCell>
                                     <TableCell>
-                                        <Badge variant={getStatusVariant(loan.status)}>{loan.status}</Badge>
+                                        <Badge variant={getStatusVariant(loan.status)} className="capitalize">{loan.status}</Badge>
                                     </TableCell>
-                                    <TableCell>{new Date(loan.issueDate).toLocaleDateString()}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{new Date(loan.issueDate).toLocaleDateString()}</TableCell>
                                 </TableRow>
                             ))}
                             {!isLoading && loansWithDetails.length === 0 && (
@@ -214,6 +275,7 @@ export default function BorrowerDetailPage() {
         borrowers={[borrower]}
         loanProducts={allLoanProducts || []}
         isLoading={isLoading}
+        onSuccess={fetchLoans}
        />
     </>
   );

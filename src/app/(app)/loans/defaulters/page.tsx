@@ -1,5 +1,7 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
+import { MpesaPromptDialog } from '@/components/loans/mpesa-prompt-dialog';
+import { Smartphone } from 'lucide-react';
 import { useUserProfile } from '@/providers/user-profile';
 import { getLoans } from '@/actions/loans';
 import { getBorrowers } from '@/actions/borrowers';
@@ -32,6 +34,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 type DefaulterLoan = Loan & {
     borrowerName: string;
     borrowerPhotoUrl: string;
+    borrowerPhone: string;
+    nationalId: string;
     loanProductName: string;
     overdueAmount: number;
     daysOverdue: number;
@@ -71,7 +75,35 @@ export const defaulterColumns: ColumnDef<DefaulterLoan>[] = [
         header: 'Days Overdue',
         cell: ({ row }) => <Badge variant="destructive">{row.original.daysOverdue} days</Badge>,
     },
+    {
+        id: 'actions',
+        cell: ({ row }) => {
+            const loan = row.original;
+            return <DefaulterActions loan={loan} />;
+        }
+    }
 ];
+
+const DefaulterActions = ({ loan }: { loan: DefaulterLoan }) => {
+    const [isPromptOpen, setIsPromptOpen] = useState(false);
+    return (
+        <>
+            <Button size="sm" variant="outline" onClick={() => setIsPromptOpen(true)} className="gap-2">
+                <Smartphone className="h-4 w-4" />
+                Prompt
+            </Button>
+            <MpesaPromptDialog 
+                open={isPromptOpen}
+                onOpenChange={setIsPromptOpen}
+                loanId={loan.id}
+                borrowerName={loan.borrowerName}
+                phone={loan.borrowerPhone}
+                amount={loan.overdueAmount}
+                nationalId={loan.nationalId}
+            />
+        </>
+    );
+};
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -255,6 +287,8 @@ export default function DefaultersPage() {
                 ...loan,
                 borrowerName: borrower.fullName,
                 borrowerPhotoUrl: borrower.photoUrl || `https://picsum.photos/seed/${borrower.id}/400/400`,
+                borrowerPhone: borrower.phone,
+                nationalId: borrower.nationalId,
                 loanProductName: product,
                 overdueAmount: overdueInfo.overdueAmount,
                 daysOverdue: daysOverdue > 0 ? daysOverdue : 1,

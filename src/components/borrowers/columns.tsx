@@ -20,10 +20,11 @@ import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
 
 const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower, onRefresh }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void }) => {
-  const { userRole } = useUserProfile();
+  const { userRole, userProfile } = useUserProfile();
   const router = useRouter();
-  const canDelete = userRole?.id === 'admin';
-  const canEdit = userRole?.id === 'admin' || userRole?.id === 'manager' || userRole?.id === 'loan_officer';
+  const role = userRole?.id || userProfile?.roleId;
+  const canDelete = role === 'admin' || role === 'superadmin';
+  const canEdit = role === 'admin' || role === 'manager' || role === 'loan_officer' || role === 'superadmin';
 
 
   const handleDelete = async () => {

@@ -17,10 +17,15 @@ import { useUserProfile } from '@/providers/user-profile';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
+import { Smartphone } from 'lucide-react';
+import { MpesaPromptDialog } from './mpesa-prompt-dialog';
+import { useState } from 'react';
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
+  borrowerPhone?: string;
+  nationalId?: string;
   loanProductName: string;
 };
 
@@ -38,14 +43,16 @@ const getStatusVariant = (status: string) => {
 const LoanActions = ({ loan, onEdit, onRefresh }: { loan: LoanWithDetails, onEdit: (loan: LoanWithDetails) => void, onRefresh: () => void }) => {
   const { userProfile } = useUserProfile();
   const router = useRouter();
+  const [isPromptOpen, setIsPromptOpen] = useState(false);
 
   const handleDelete = () => {
     alert('For data integrity, loans cannot be deleted. Consider rejecting or archiving instead.');
   };
 
-  const canManage = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager';
+  const canManage = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager' || userProfile?.roleId === 'loan_officer' || userProfile?.roleId === 'superadmin';
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -62,6 +69,12 @@ const LoanActions = ({ loan, onEdit, onRefresh }: { loan: LoanWithDetails, onEdi
         <DropdownMenuItem onClick={() => router.push(`/loans/${loan.id}`)}>
             View Details
         </DropdownMenuItem>
+        {loan.status === 'Active' && (
+            <DropdownMenuItem onClick={() => setIsPromptOpen(true)}>
+                <Smartphone className="mr-2 h-4 w-4" />
+                Prompt M-Pesa Payment
+            </DropdownMenuItem>
+        )}
         {canManage && <DropdownMenuItem onClick={() => { onEdit(loan); }}>Edit Loan</DropdownMenuItem>}
         {userProfile?.roleId === 'admin' && (
              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
@@ -70,6 +83,16 @@ const LoanActions = ({ loan, onEdit, onRefresh }: { loan: LoanWithDetails, onEdi
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+    <MpesaPromptDialog 
+        open={isPromptOpen}
+        onOpenChange={setIsPromptOpen}
+        loanId={loan.id}
+        borrowerName={loan.borrowerName}
+        phone={loan.borrowerPhone || ''}
+        amount={loan.installmentAmount || 0}
+        nationalId={loan.nationalId || loan.id.split('-L')[0]}
+    />
+    </>
   );
 };
 
