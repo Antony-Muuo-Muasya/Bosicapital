@@ -82,7 +82,14 @@ export async function getLoan(id: string) {
 
 export async function createLoan(data: any) {
   try {
-    const id = `L-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const borrowerRes = await db(`SELECT "nationalId" FROM "Borrower" WHERE id = $1`, [data.borrowerId]);
+    const nationalId = borrowerRes[0]?.nationalId || 'BOSI';
+
+    const loansCountRes = await db(`SELECT COUNT(*) as count FROM "Loan" WHERE "borrowerId" = $1`, [data.borrowerId]);
+    const loanCount = parseInt(loansCountRes[0].count) + 1;
+
+    const id = `${nationalId}-L${loanCount}`;
+
     const keys = Object.keys(data);
     const columns = keys.map(k => `"${k}"`).join(", ");
     const placeholders = keys.map((_, i) => `$${i + 2}`).join(", ");
@@ -97,6 +104,7 @@ export async function createLoan(data: any) {
     revalidatePath('/loans');
     return { success: true, loan: result[0] };
   } catch (error: any) {
+    console.error("Create loan error:", error);
     return { success: false, error: error.message };
   }
 }
