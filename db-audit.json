@@ -3,23 +3,49 @@
     {
       "id": "cmnfsnr8t000fl404lf4tvoo6",
       "organizationId": "default",
+      "loanOfficerId": "cmn727x9x0005l5049owso5id",
       "status": "Active"
     },
     {
       "id": "loan_xmwon883u",
       "organizationId": "default",
+      "loanOfficerId": "cmn6zload0001kz04sts60odp",
       "status": "Active"
     }
   ],
   "repayments": [
     {
+      "id": "rep_1777536841640_3de8cp",
+      "organizationId": "default",
+      "loanId": "loan_xmwon883u",
+      "loanOfficerId": "cmn6zload0001kz04sts60odp",
+      "amount": 1
+    },
+    {
       "id": "rep_6ckp12gf3",
       "organizationId": "default",
       "loanId": "cmnfsnr8t000fl404lf4tvoo6",
+      "loanOfficerId": "cmn727x9x0005l5049owso5id",
       "amount": 500
     }
   ],
   "failedCallbacks": [
+    {
+      "id": "manual_1777536841190_UDUO62O79S",
+      "transactionType": "Manual Reconciliation",
+      "transId": "UDUO62O79S",
+      "transTime": null,
+      "transAmount": "1",
+      "businessShortCode": null,
+      "billRefNumber": "3485724",
+      "msisdn": "254707369702",
+      "firstName": null,
+      "middleName": null,
+      "lastName": null,
+      "status": "Manual_Pending",
+      "errorMessage": "Manually entered by admin",
+      "createdAt": "2026-04-30T05:14:01.190Z"
+    },
     {
       "id": "mpc_l1kjw66j5",
       "transactionType": "Pay Bill",
@@ -38,6 +64,38 @@
     }
   ],
   "allCallbacks": [
+    {
+      "id": "mpc_1777536841554_wxwg5b",
+      "transactionType": "Pay Bill",
+      "transId": "UDUO62O79S",
+      "transTime": "20260430081401",
+      "transAmount": "1",
+      "businessShortCode": "4159879",
+      "billRefNumber": "3485724",
+      "msisdn": "254707369702",
+      "firstName": "Manual",
+      "middleName": "Entry",
+      "lastName": "Admin",
+      "status": "Processed",
+      "errorMessage": null,
+      "createdAt": "2026-04-30T05:14:01.574Z"
+    },
+    {
+      "id": "manual_1777536841190_UDUO62O79S",
+      "transactionType": "Manual Reconciliation",
+      "transId": "UDUO62O79S",
+      "transTime": null,
+      "transAmount": "1",
+      "businessShortCode": null,
+      "billRefNumber": "3485724",
+      "msisdn": "254707369702",
+      "firstName": null,
+      "middleName": null,
+      "lastName": null,
+      "status": "Manual_Pending",
+      "errorMessage": "Manually entered by admin",
+      "createdAt": "2026-04-30T05:14:01.190Z"
+    },
     {
       "id": "mpc_1o4oe1jao",
       "transactionType": "Pay Bill",

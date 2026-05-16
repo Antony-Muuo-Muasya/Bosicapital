@@ -8,10 +8,22 @@ const pool = new Pool({
 
 async function main() {
   try {
-    // Check the organizationId value on loans
-    const loans = await pool.query(`SELECT id, "organizationId", status FROM "Loan" LIMIT 5`);
-    // Check the organizationId value on repayments
-    const repayments = await pool.query(`SELECT id, "organizationId", "loanId", amount FROM "Repayment" ORDER BY "paymentDate" DESC LIMIT 5`);
+    // Check the exact query used by getLoans
+    const loansQuery = `
+      SELECT l.*, 
+             lp.name as "productName", lp.category as "productCategory",
+             json_agg(i.*) as installments
+      FROM "Loan" l
+      LEFT JOIN "LoanProduct" lp ON l."loanProductId" = lp.id
+      LEFT JOIN "Installment" i ON l.id = i."loanId"
+      WHERE 1=1
+      GROUP BY l.id, lp.id ORDER BY l."issueDate" DESC
+    `;
+    const loans = await pool.query(loansQuery);
+    console.log('Query returned count:', loans.rows.length);
+    if (loans.rows.length > 0) {
+        console.log('First loan:', JSON.stringify(loans.rows[0], null, 2));
+    }
     // Check for callbacks that were not matched
     const failedCallbacks = await pool.query(`SELECT * FROM "MpesaCallback" WHERE status != 'Processed' ORDER BY "createdAt" DESC LIMIT 10`);
     // Check all MpesaCallbacks
