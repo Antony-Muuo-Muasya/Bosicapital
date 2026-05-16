@@ -234,7 +234,7 @@ function Header() {
                   <img src="/logo.png" alt="Bosi Capital Limited" width="196" className="rounded-md h-auto" />
                   <span className="font-headline text-xl">Bosi Capital Limited</span>
                 </Link>
-                <p className="text-[10px] text-primary/80 uppercase tracking-widest font-bold">Partnering for your financial success.</p>
+                <p className="text-[10px] text-primary/80 uppercase tracking-widest font-bold text-center">Partnering for your financial success.</p>
                 {user?.email && <p className="text-xs text-muted-foreground mt-1">{user.email}</p>}
               </div>
                <SidebarNav />
@@ -328,7 +328,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <img src="/logo.png" alt="Bosi Capital Limited" width="196" className="rounded-md h-auto" />
               <span className="font-headline text-xl">Bosi Capital Limited</span>
             </Link>
-            <p className="text-[10px] text-primary/80 uppercase tracking-widest font-bold -mt-1">Partnering for your financial success.</p>
+            <p className="text-[10px] text-primary/80 uppercase tracking-widest font-bold -mt-1 text-center">Partnering for your financial success.</p>
             {user?.email && <p className="text-xs text-muted-foreground mt-1">{user.email}</p>}
           </div>
           <div className="flex-1">
