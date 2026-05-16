@@ -98,11 +98,17 @@ export function AdminDashboard() {
     const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
     const monthLabels = last6Months.map(d => format(d, 'MMM yyyy'));
     
-    const disbursalData = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const [year, monthNum, day] = loan.issueDate.split('-').map(Number);
-        const issueDateObj = new Date(year, monthNum - 1, day);
-        const month = format(issueDateObj, 'MMM yyyy');
-        acc[month] = (acc[month] || 0) + loan.principal;
+    const disbursedStatuses = ['Active', 'Completed', 'In Arrears'];
+    const disbursalData = loans.filter(l => disbursedStatuses.includes(l.status)).reduce((acc, loan) => {
+        try {
+            const issueDateObj = new Date(loan.issueDate);
+            if (!isNaN(issueDateObj.getTime())) {
+                const month = format(issueDateObj, 'MMM yyyy');
+                acc[month] = (acc[month] || 0) + loan.principal;
+            }
+        } catch (e) {
+            console.error("Error parsing loan date:", loan.issueDate);
+        }
         return acc;
     }, {} as Record<string, number>);
     const disbursalTrendData = monthLabels.map(month => ({ name: month, total: disbursalData[month] || 0 }));
