@@ -104,7 +104,7 @@ export function AdminDashboard() {
             const issueDateObj = new Date(loan.issueDate);
             if (!isNaN(issueDateObj.getTime())) {
                 const month = format(issueDateObj, 'MMM yyyy');
-                acc[month] = (acc[month] || 0) + loan.principal;
+                acc[month] = (acc[month] || 0) + Number(loan.principal);
             }
         } catch (e) {
             console.error("Error parsing loan date:", loan.issueDate);
