@@ -8,9 +8,11 @@ export async function getLoans(organizationId?: string, borrowerId?: string, bra
     let query = `
       SELECT l.*, 
              lp.name as "productName", lp.category as "productCategory",
+             b."fullName" as "borrowerName", b."photoUrl" as "borrowerPhotoUrl", b.phone as "borrowerPhone", b."nationalId" as "borrowerNationalId",
              json_agg(i.*) as installments
       FROM "Loan" l
       LEFT JOIN "LoanProduct" lp ON l."loanProductId" = lp.id
+      LEFT JOIN "Borrower" b ON l."borrowerId" = b.id
       LEFT JOIN "Installment" i ON l.id = i."loanId"
       WHERE 1=1
     `;
@@ -34,7 +36,7 @@ export async function getLoans(organizationId?: string, borrowerId?: string, bra
       params.push(loanOfficerId);
     }
     
-    query += ` GROUP BY l.id, lp.id ORDER BY l."issueDate" DESC`;
+    query += ` GROUP BY l.id, lp.id, b.id ORDER BY l."issueDate" DESC`;
 
     const loansRaw = await db(query, params);
     

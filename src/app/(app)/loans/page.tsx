@@ -125,22 +125,20 @@ export default function LoansPage() {
   const loansWithDetails: LoanWithDetails[] = useMemo(() => {
     if (!loans) return [];
     
-    const borrowersMap = new Map((borrowers || []).map(b => [b.id, b]));
-    const loanProductsMap = new Map((loanProducts || []).map(p => [p.id, p]));
-
     return loans.map(loan => {
-      const b = borrowersMap.get(loan.borrowerId);
+      // If loan was fetched with joins, use that data. Otherwise fallback to maps for local consistency if needed.
+      // But getLoans now always returns these.
       return {
         ...loan,
-        borrowerName: b?.fullName || 'Unknown Borrower',
-        borrowerPhotoUrl: b?.photoUrl,
-        borrowerPhone: b?.phone,
-        nationalId: b?.nationalId,
-        loanProductName: loanProductsMap.get(loan.loanProductId)?.name || 'Unknown Product',
+        borrowerName: (loan as any).borrowerName || 'Unknown Borrower',
+        borrowerPhotoUrl: (loan as any).borrowerPhotoUrl,
+        borrowerPhone: (loan as any).borrowerPhone,
+        nationalId: (loan as any).borrowerNationalId,
+        loanProductName: (loan as any).productName || 'Unknown Product',
       };
     }) as any;
 
-  }, [loans, borrowers, loanProducts]);
+  }, [loans]);
   
   const handleEdit = useCallback((loan: LoanWithDetails) => {
     setEditingLoan(loan);

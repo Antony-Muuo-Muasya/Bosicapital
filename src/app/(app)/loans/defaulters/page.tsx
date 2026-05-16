@@ -186,8 +186,6 @@ export default function DefaultersPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [allInstallments, setAllInstallments] = useState<Installment[] | null>(null);
     const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
-    const [allBorrowers, setAllBorrowers] = useState<Borrower[] | null>(null);
-    const [allProducts, setAllProducts] = useState<LoanProduct[] | null>(null);
 
     const fetchDefaultersData = useCallback(async () => {
         if (!userProfile) return;
@@ -204,18 +202,6 @@ export default function DefaultersPage() {
             const loansRes = await getLoans(org);
             if (loansRes.success && loansRes.loans) {
                 setAllLoans(loansRes.loans as any);
-            }
-
-            // Borrowers
-            const borrowersRes = await getBorrowers(org);
-            if (borrowersRes.success && borrowersRes.borrowers) {
-                setAllBorrowers(borrowersRes.borrowers as any);
-            }
-
-            // Products
-            const productsRes = await getLoanProducts(org);
-            if (productsRes.success && productsRes.products) {
-                setAllProducts(productsRes.products as any);
             }
 
         } catch (e) {
@@ -241,7 +227,7 @@ export default function DefaultersPage() {
     }, [isProfileLoading, userProfile, fetchDefaultersData]);
 
     const defaulterLoans = useMemo(() => {
-        if (!allInstallments || !allLoans || !allBorrowers || !allProducts) return [];
+        if (!allInstallments || !allLoans) return [];
 
         // Client-side filtering for overdue installments
         const overdueInstallments = allInstallments.filter(inst => {
@@ -250,8 +236,6 @@ export default function DefaultersPage() {
         });
 
         const loansMap = new Map(allLoans.map(l => [l.id, l]));
-        const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
-        const productsMap = new Map(allProducts.map(p => [p.id, p.name]));
 
         let installments = overdueInstallments;
         if (userProfile?.roleId === 'manager' || userProfile?.roleId === 'loan_officer') {
@@ -275,27 +259,25 @@ export default function DefaultersPage() {
         
         return Object.keys(overdueByLoan).map(loanId => {
             const loan = loansMap.get(loanId);
-            const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
-            const product = loan ? productsMap.get(loan.loanProductId) : undefined;
             const overdueInfo = overdueByLoan[loanId];
 
-            if (!loan || !borrower || !product) return null;
+            if (!loan) return null;
             
             const daysOverdue = Math.floor((today.getTime() - overdueInfo.oldestDueDate.getTime()) / (1000 * 60 * 60 * 24));
 
             return {
                 ...loan,
-                borrowerName: borrower.fullName,
-                borrowerPhotoUrl: borrower.photoUrl || `https://picsum.photos/seed/${borrower.id}/400/400`,
-                borrowerPhone: borrower.phone,
-                nationalId: borrower.nationalId,
-                loanProductName: product,
+                borrowerName: (loan as any).borrowerName || 'Unknown Borrower',
+                borrowerPhotoUrl: (loan as any).borrowerPhotoUrl || `https://picsum.photos/seed/${loan.borrowerId}/400/400`,
+                borrowerPhone: (loan as any).borrowerPhone,
+                nationalId: (loan as any).borrowerNationalId,
+                loanProductName: (loan as any).productName || 'Unknown Product',
                 overdueAmount: overdueInfo.overdueAmount,
                 daysOverdue: daysOverdue > 0 ? daysOverdue : 1,
             }
         }).filter(Boolean) as DefaulterLoan[];
 
-    }, [allInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, today]);
+    }, [allInstallments, allLoans, userProfile, branchIds, today]);
 
 
   return (
