@@ -8,7 +8,7 @@ import AuthProvider from '@/components/providers/session-provider';
 
 export const metadata: Metadata = {
   title: 'Bosi Capital Limited',
-  description: 'Your trusted lending partner',
+  description: 'Partnering for your financial success.',
 };
 
 export default function RootLayout({
