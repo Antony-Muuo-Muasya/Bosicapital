@@ -161,26 +161,27 @@ export default function DefaultersPage() {
         if (!userProfile) return;
         setIsLoading(true);
         try {
+            const org = isSuperAdmin ? undefined : organizationId!;
             // Fetch all installments
-            const instRes = await getInstallments(organizationId!);
+            const instRes = await getInstallments(org);
             if (instRes.success && instRes.installments) {
                 setAllInstallments(instRes.installments as any);
             }
 
             // Loans
-            const loansRes = await getLoans(organizationId!);
+            const loansRes = await getLoans(org);
             if (loansRes.success && loansRes.loans) {
                 setAllLoans(loansRes.loans as any);
             }
 
             // Borrowers
-            const borrowersRes = await getBorrowers(organizationId!);
+            const borrowersRes = await getBorrowers(org);
             if (borrowersRes.success && borrowersRes.borrowers) {
                 setAllBorrowers(borrowersRes.borrowers as any);
             }
 
             // Products
-            const productsRes = await getLoanProducts(organizationId!);
+            const productsRes = await getLoanProducts(org);
             if (productsRes.success && productsRes.products) {
                 setAllProducts(productsRes.products as any);
             }
@@ -195,6 +196,15 @@ export default function DefaultersPage() {
     useEffect(() => {
         if (!isProfileLoading && userProfile) {
             fetchDefaultersData();
+        }
+    }, [isProfileLoading, userProfile, fetchDefaultersData]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            const interval = setInterval(() => {
+                fetchDefaultersData();
+            }, 30000); // 30 seconds
+            return () => clearInterval(interval);
         }
     }, [isProfileLoading, userProfile, fetchDefaultersData]);
 

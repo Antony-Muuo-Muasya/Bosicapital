@@ -175,26 +175,27 @@ export default function DueTodayPage() {
         if (!userProfile) return;
         setIsLoading(true);
         try {
+            const org = isSuperAdmin ? undefined : organizationId!;
             // Fetch installments due today
-            const instRes = await getInstallments(organizationId!, undefined, todayISO);
+            const instRes = await getInstallments(org, undefined, todayISO);
             if (instRes.success && instRes.installments) {
                 setDueInstallments(instRes.installments as any);
             }
 
             // Loans
-            const loansRes = await getLoans(organizationId!);
+            const loansRes = await getLoans(org);
             if (loansRes.success && loansRes.loans) {
                 setAllLoans(loansRes.loans as any);
             }
 
             // Borrowers
-            const borrowersRes = await getBorrowers(organizationId!);
+            const borrowersRes = await getBorrowers(org);
             if (borrowersRes.success && borrowersRes.borrowers) {
                 setAllBorrowers(borrowersRes.borrowers as any);
             }
 
             // Products
-            const productsRes = await getLoanProducts(organizationId!);
+            const productsRes = await getLoanProducts(org);
             if (productsRes.success && productsRes.products) {
                 setAllProducts(productsRes.products as any);
             }
@@ -209,6 +210,15 @@ export default function DueTodayPage() {
     useEffect(() => {
         if (!isProfileLoading && userProfile) {
             fetchDueTodayData();
+        }
+    }, [isProfileLoading, userProfile, fetchDueTodayData]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            const interval = setInterval(() => {
+                fetchDueTodayData();
+            }, 30000); // 30 seconds
+            return () => clearInterval(interval);
         }
     }, [isProfileLoading, userProfile, fetchDueTodayData]);
 

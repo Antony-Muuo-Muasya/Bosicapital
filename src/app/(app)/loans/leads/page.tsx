@@ -49,6 +49,15 @@ export default function LeadsPage() {
      }
   }, [isProfileLoading, userProfile, fetchLeads]);
 
+  useEffect(() => {
+    if (!isProfileLoading && userProfile) {
+      const interval = setInterval(() => {
+        fetchLeads();
+      }, 30000); // 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isProfileLoading, userProfile, fetchLeads]);
+
   const handleRecordPayment = useCallback((borrower: Borrower) => {
     setSelectedBorrower(borrower);
     setIsPaymentDialogOpen(true);

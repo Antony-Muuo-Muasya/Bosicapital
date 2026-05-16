@@ -42,19 +42,17 @@ export default function LoansPage() {
   const [isLoadingLoanOfficers, setIsLoadingLoanOfficers] = useState(true);
 
   const fetchLoansData = useCallback(async () => {
-      if (!userProfile || !organizationId) return;
+      if (!userProfile) return;
       setIsLoadingLoans(true);
       try {
-          if (!isSuperAdmin) {
-              const res = await getLoans(
-                  organizationId!, 
-                  undefined, 
-                  (roleId === 'manager' || roleId === 'loan_officer') ? branchIds : undefined,
-                  roleId === 'loan_officer' ? userId : undefined
-              );
-              if (res.success && res.loans) {
-                  setLoans(res.loans as any);
-              }
+          const res = await getLoans(
+              isSuperAdmin ? undefined : organizationId!, 
+              undefined, 
+              (roleId === 'manager' || roleId === 'loan_officer') ? branchIds : undefined,
+              roleId === 'loan_officer' ? userId : undefined
+          );
+          if (res.success && res.loans) {
+              setLoans(res.loans as any);
           }
       } catch(e) { console.error(e) } finally { setIsLoadingLoans(false) }
   }, [userProfile, isSuperAdmin, organizationId, roleId, branchIds, userId]);
@@ -111,6 +109,15 @@ export default function LoansPage() {
          fetchOfficersData();
      }
   }, [isProfileLoading, userProfile, fetchLoansData, fetchBorrowersData, fetchProductsData, fetchOfficersData, isAddDialogOpen]);
+
+  useEffect(() => {
+    if (!isProfileLoading && userProfile) {
+      const interval = setInterval(() => {
+        fetchLoansData();
+      }, 30000); // 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isProfileLoading, userProfile, fetchLoansData]);
 
 
   const loansWithDetails: LoanWithDetails[] = useMemo(() => {

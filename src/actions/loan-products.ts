@@ -3,9 +3,15 @@
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
-export async function getLoanProducts(organizationId: string) {
+export async function getLoanProducts(organizationId?: string) {
   try {
-    const products = await db(`SELECT * FROM "LoanProduct" WHERE "organizationId" = $1`, [organizationId]);
+    let query = `SELECT * FROM "LoanProduct" WHERE 1=1`;
+    const params: any[] = [];
+    if (organizationId) {
+        query += ` AND "organizationId" = $1`;
+        params.push(organizationId);
+    }
+    const products = await db(query, params);
     return { success: true, products };
   } catch (error: any) {
     return { success: false, error: error.message };

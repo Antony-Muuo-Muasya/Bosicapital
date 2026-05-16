@@ -55,6 +55,15 @@ export default function ActiveCustomersPage() {
      }
   }, [isProfileLoading, userProfile, fetchActiveCustomers]);
 
+  useEffect(() => {
+    if (!isProfileLoading && userProfile) {
+      const interval = setInterval(() => {
+        fetchActiveCustomers();
+      }, 30000); // 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isProfileLoading, userProfile, fetchActiveCustomers]);
+
   const handleRecordPayment = useCallback((borrower: Borrower) => {
     setSelectedBorrower(borrower);
     setIsPaymentDialogOpen(true);

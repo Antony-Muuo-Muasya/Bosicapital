@@ -3,7 +3,7 @@
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
-export async function getLoans(organizationId: string, borrowerId?: string, branchIds?: string[], loanOfficerId?: string) {
+export async function getLoans(organizationId?: string, borrowerId?: string, branchIds?: string[], loanOfficerId?: string) {
   try {
     let query = `
       SELECT l.*, 
@@ -12,9 +12,14 @@ export async function getLoans(organizationId: string, borrowerId?: string, bran
       FROM "Loan" l
       LEFT JOIN "LoanProduct" lp ON l."loanProductId" = lp.id
       LEFT JOIN "Installment" i ON l.id = i."loanId"
-      WHERE l."organizationId" = $1
+      WHERE 1=1
     `;
-    const params: any[] = [organizationId];
+    const params: any[] = [];
+
+    if (organizationId && organizationId !== 'undefined' && organizationId !== 'null') {
+      query += ` AND l."organizationId" = $${params.length + 1}`;
+      params.push(organizationId);
+    }
 
     if (borrowerId) {
       query += ` AND l."borrowerId" = $${params.length + 1}`;
