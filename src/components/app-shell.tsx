@@ -76,7 +76,6 @@ const allNavItems = [
   { href: '/users', label: 'Users', icon: UserCog, roles: ['admin', 'manager', 'superadmin'] },
   { href: '/branches', label: 'Branches', icon: Building, roles: ['admin', 'manager', 'superadmin'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin', 'superadmin'] },
-  { href: '/automations', label: 'Automations', icon: RefreshCw, roles: ['admin', 'superadmin'] },
 ];
 
 const NavLink = ({
