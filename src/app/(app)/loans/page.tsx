@@ -121,10 +121,10 @@ export default function LoansPage() {
 
 
   const loansWithDetails: LoanWithDetails[] = useMemo(() => {
-    if (!loans || !borrowers || !loanProducts) return [];
+    if (!loans) return [];
     
-    const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
-    const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
+    const borrowersMap = new Map((borrowers || []).map(b => [b.id, b]));
+    const loanProductsMap = new Map((loanProducts || []).map(p => [p.id, p]));
 
     return loans.map(loan => ({
       ...loan,
