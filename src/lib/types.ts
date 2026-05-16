@@ -60,6 +60,9 @@ export interface Borrower {
   registrationFeePaid: boolean;
   registrationFeePaidAt?: string | null;
   registrationPaymentId?: string | null;
+  creditScore?: number;
+  tag?: string;
+  eligibleAmount?: number;
 }
 
 export interface Loan {
@@ -78,6 +81,8 @@ export interface Loan {
   branchId: string;
   lastPaymentDate?: string;
   approvedById?: string;
+  clearanceCode?: string;
+  clearanceDate?: string;
 }
 
 export interface LoanProduct {
@@ -105,6 +110,8 @@ export interface Installment {
   expectedAmount: number;
   paidAmount: number;
   status: 'Paid' | 'Unpaid' | 'Partial' | 'Overdue';
+  penaltyApplied?: boolean;
+  penaltyAmount?: number;
 }
 
 export interface Repayment {

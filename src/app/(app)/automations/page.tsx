@@ -24,8 +24,10 @@ import {
     updateBorrowerScores, 
     applyLateFees, 
     runAutoTagging, 
-    runSystemDiagnostics 
+    runSystemDiagnostics,
+    runDatabaseMigration
 } from '@/actions/automation';
+import { Database } from 'lucide-react';
 
 export default function AutomationsPage() {
     const { toast } = useToast();
@@ -148,6 +150,23 @@ export default function AutomationsPage() {
                 description="Harness the power of AI and scheduled tasks to streamline your operations." 
             />
             <div className="p-4 md:p-6">
+                <Card className="mb-8 border-primary/20 bg-primary/5">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                        <div>
+                            <CardTitle className="text-xl">System Setup</CardTitle>
+                            <CardDescription>Initialize your database with the necessary fields for these automations.</CardDescription>
+                        </div>
+                        <Button 
+                            variant="default" 
+                            onClick={() => handleRun('migration', runDatabaseMigration)}
+                            disabled={!!running}
+                        >
+                            {running === 'migration' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                            Run Setup Migration
+                        </Button>
+                    </CardHeader>
+                </Card>
+
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {automations.map((a) => (
                         <Card key={a.id} className="relative overflow-hidden group hover:border-primary/50 transition-colors">

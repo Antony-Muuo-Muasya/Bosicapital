@@ -189,3 +189,28 @@ export async function applyLoyaltyRebates() {
 export async function runSystemDiagnostics() {
     return { success: true, status: 'Healthy' };
 }
+
+/**
+ * DATABASE MIGRATION: Add Automation Fields
+ */
+export async function runDatabaseMigration() {
+    try {
+        // Add fields to Borrower
+        await db(`ALTER TABLE "Borrower" ADD COLUMN IF NOT EXISTS "creditScore" INTEGER DEFAULT 0`);
+        await db(`ALTER TABLE "Borrower" ADD COLUMN IF NOT EXISTS "tag" TEXT`);
+        await db(`ALTER TABLE "Borrower" ADD COLUMN IF NOT EXISTS "eligibleAmount" DOUBLE PRECISION`);
+
+        // Add fields to Loan
+        await db(`ALTER TABLE "Loan" ADD COLUMN IF NOT EXISTS "clearanceCode" TEXT`);
+        await db(`ALTER TABLE "Loan" ADD COLUMN IF NOT EXISTS "clearanceDate" TIMESTAMP`);
+
+        // Add fields to Installment
+        await db(`ALTER TABLE "Installment" ADD COLUMN IF NOT EXISTS "penaltyApplied" BOOLEAN DEFAULT false`);
+        await db(`ALTER TABLE "Installment" ADD COLUMN IF NOT EXISTS "penaltyAmount" DOUBLE PRECISION DEFAULT 0`);
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Migration failed:", error);
+        return { success: false, error: error.message };
+    }
+}
