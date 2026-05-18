@@ -215,14 +215,28 @@ export default function ReportsPage() {
       if (!userProfile) return;
       setIsLoading(true);
       try {
-          const orgId = isSuperAdmin ? 'system' : organizationId!;
-          
-          // Loans
-          const loansRes = await getLoans(orgId, undefined, !isSuperAdmin ? branchIds : undefined);
-          if (loansRes.success && loansRes.loans) setLoans(loansRes.loans as any);
+          const orgId = userProfile.organizationId;
+          let loansRes;
+          let borrowersRes;
 
-          // Borrowers
-          const borrowersRes = await getBorrowers(orgId);
+          if (userProfile.roleId === 'superadmin') {
+              loansRes = await getLoans('system');
+              borrowersRes = await getBorrowers('system');
+          } else if (userProfile.roleId === 'admin') {
+              loansRes = await getLoans(orgId);
+              borrowersRes = await getBorrowers(orgId);
+          } else if (userProfile.roleId === 'manager') {
+              loansRes = await getLoans(orgId, undefined, userProfile.branchIds);
+              borrowersRes = await getBorrowers(orgId, undefined, undefined, userProfile.branchIds);
+          } else if (userProfile.roleId === 'loan_officer') {
+              loansRes = await getLoans(orgId, undefined, undefined, userProfile.id);
+              borrowersRes = await getBorrowers(orgId, undefined, userProfile.id);
+          } else {
+              loansRes = { success: true, loans: [] };
+              borrowersRes = { success: true, borrowers: [] };
+          }
+
+          if (loansRes.success && loansRes.loans) setLoans(loansRes.loans as any);
           if (borrowersRes.success && borrowersRes.borrowers) setBorrowers(borrowersRes.borrowers as any);
 
           // Products
@@ -238,7 +252,7 @@ export default function ReportsPage() {
       } finally {
           setIsLoading(false);
       }
-  }, [userProfile, isSuperAdmin, organizationId, branchIds]);
+  }, [userProfile, organizationId]);
 
   useEffect(() => {
     if (userProfile) {
@@ -254,14 +268,19 @@ export default function ReportsPage() {
 
     const borrowersMap = new Map(borrowers.map(b => [b.id, b]));
     const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
-    const loanBorrowerIds = new Set(loans.map(l => l.borrowerId));
-    const activeOrPendingBorrowerIds = new Set(
-        loans.filter(l => l.status === 'Active' || l.status === 'Pending Approval').map(l => l.borrowerId)
-    );
+    
+    // Map borrower ID to all their loans
+    const borrowerLoansMap = new Map<string, Loan[]>();
+    loans.forEach(loan => {
+      const list = borrowerLoansMap.get(loan.borrowerId) || [];
+      list.push(loan);
+      borrowerLoansMap.set(loan.borrowerId, list);
+    });
 
-    // 1. Active Loans Report
+    // 1. Active Loans Report:
+    // A loan is active if its status is 'Active' or 'In Arrears'
     const activeLoansData = loans
-      .filter(l => l.status === 'Active')
+      .filter(l => l.status === 'Active' || (l.status as string) === 'In Arrears')
       .map(loan => ({
         ...loan,
         borrowerName: borrowersMap.get(loan.borrowerId)?.fullName || 'Unknown',
@@ -272,14 +291,26 @@ export default function ReportsPage() {
             .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0]?.dueDate
       }));
 
-    // 2. Inactive Customers Report
-    const inactiveCustomersData = borrowers.filter(b => 
-        loanBorrowerIds.has(b.id) && 
-        !activeOrPendingBorrowerIds.has(b.id)
-    );
+    // 2. Inactive Customers Report:
+    // Borrowers who have loans in the system, but none are currently Active, In Arrears, or Pending Approval
+    const inactiveCustomersData = borrowers.filter(b => {
+      const bLoans = borrowerLoansMap.get(b.id) || [];
+      if (bLoans.length === 0) return false; // A lead, not an inactive customer
+      
+      const hasActiveOrPending = bLoans.some(l => 
+        l.status === 'Active' || 
+        (l.status as string) === 'In Arrears' || 
+        l.status === 'Pending Approval'
+      );
+      return !hasActiveOrPending;
+    });
     
-    // 3. Leads Report
-    const leadsData = borrowers.filter(b => b.registrationFeePaid && !loanBorrowerIds.has(b.id));
+    // 3. Leads Report:
+    // Registered borrowers who have not yet taken out any loans in the system
+    const leadsData = borrowers.filter(b => {
+      const bLoans = borrowerLoansMap.get(b.id) || [];
+      return bLoans.length === 0;
+    });
 
     return { activeLoans: activeLoansData, inactiveCustomers: inactiveCustomersData, leads: leadsData };
 
