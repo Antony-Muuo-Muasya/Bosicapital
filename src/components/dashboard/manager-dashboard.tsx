@@ -11,7 +11,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { DueLoansTable } from './due-loans-table';
 import { useMemo } from 'react';
 import { DueDateMonitor } from './due-date-monitor';
-import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
 import { formatCurrency } from '@/lib/utils';
 import { startOfToday, startOfMonth } from 'date-fns';
 import { ManagerStatsCards } from './manager/stats-cards';
@@ -231,21 +230,6 @@ export function ManagerDashboard() {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allInstallments, allBorrowers, loans]);
 
-  const aiInput = useMemo((): DueDateMonitoringInput => {
-    const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');
-    const upcoming = dueInstallmentsWithDetails.filter(i => i.status === 'Unpaid').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
-    const overdue = dueInstallmentsWithDetails.filter(i => i.status === 'Overdue').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
-
-    return {
-      repaymentHistory: history || 'No relevant repayment history.',
-      externalEvents: 'No major external events reported.',
-      upcomingSchedule: upcoming || 'No upcoming payments.',
-      overdueSchedule: overdue || 'No overdue payments.',
-      currentSchedule: 'All other loans are current.'
-    }
-  }, [dueInstallmentsWithDetails]);
-
-
   return (
     <>
       <PageHeader
@@ -305,7 +289,12 @@ export function ManagerDashboard() {
               <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
             </div>
             <div className="lg:col-span-3">
-              <DueDateMonitor aiInput={aiInput} />
+              <DueDateMonitor 
+                loans={loans}
+                borrowers={allBorrowers}
+                installments={allInstallments}
+                isLoading={isLoading}
+              />
             </div>
         </div>
       </div>
