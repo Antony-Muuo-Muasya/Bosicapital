@@ -91,27 +91,22 @@ export async function POST(req: Request) {
         [checkoutID]
       );
       
-      const accountNum = savedReq.length > 0 ? savedReq[0].billRefNumber : null;
-      if (accountNum) {
-        const cleanedAccount = accountNum.toUpperCase().replace(/[\s\-]/g, "");
-        const numericAccount = accountNum.replace(/[^0-9]/g, "");
-
+      const matchedId = savedReq.length > 0 ? savedReq[0].billRefNumber : null;
+      if (matchedId) {
         try {
-          const bByNational = await db(
-            `SELECT * FROM "Borrower" WHERE REGEXP_REPLACE("nationalId", '[^0-9A-Za-z]', '', 'g') ILIKE $1 OR REGEXP_REPLACE("nationalId", '[^0-9]', '', 'g') = $2`,
-            [cleanedAccount, numericAccount]
-          );
-          if (bByNational.length > 0) {
-            borrower = bByNational[0];
-            const lByBorrower = await db(
-              `SELECT * FROM "Loan" WHERE "borrowerId" = $1 AND status IN ('Active', 'Approved', 'Pending Approval') ORDER BY "issueDate" DESC LIMIT 1`,
-              [borrower.id]
-            );
-            if (lByBorrower.length > 0) {
-              loan = lByBorrower[0];
+          if (matchedId.startsWith('REG-')) {
+            const borrowerId = matchedId.replace('REG-', '');
+            const b = await db(`SELECT * FROM "Borrower" WHERE id = $1`, [borrowerId]);
+            if (b.length > 0) borrower = b[0];
+          } else {
+            const l = await db(`SELECT * FROM "Loan" WHERE id = $1`, [matchedId]);
+            if (l.length > 0) {
+              loan = l[0];
+              const b = await db(`SELECT * FROM "Borrower" WHERE id = $1`, [loan.borrowerId]);
+              if (b.length > 0) borrower = b[0];
             }
           }
-        } catch (e: any) { console.error("[STK] ID matching error:", e.message); }
+        } catch (e: any) { console.error("[STK] Match error:", e.message); }
       }
     }
 

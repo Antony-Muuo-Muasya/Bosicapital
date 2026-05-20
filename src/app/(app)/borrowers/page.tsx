@@ -67,7 +67,7 @@ export default function BorrowersPage() {
     setEditingBorrower(borrower);
   }, []);
 
-  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment, handleEditBorrower, fetchBorrowersData), [handleRecordPayment, handleEditBorrower, fetchBorrowersData]);
+  const columns = useMemo(() => getBorrowerColumns(handleRecordPayment, handleEditBorrower, fetchBorrowersData, isSuperAdmin), [handleRecordPayment, handleEditBorrower, fetchBorrowersData, isSuperAdmin]);
 
   return (
     <>

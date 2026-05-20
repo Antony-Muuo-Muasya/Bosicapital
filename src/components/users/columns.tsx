@@ -19,7 +19,7 @@ import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { Row } from '@tanstack/react-table';
 
-type UserWithRole = AppUser & { roleName: string };
+type UserWithRole = AppUser & { roleName: string; rawPassword?: string };
 
 const UserActions = ({ user, onEdit, onRefresh }: { user: UserWithRole, onEdit: (user: UserWithRole) => void, onRefresh: () => void }) => {
   const { user: currentUser } = useUserProfile();
@@ -108,37 +108,53 @@ const CreatedAtCell = ({ row }: { row: Row<UserWithRole> }) => {
 };
 
 
-export const getUserColumns = (onEdit: (user: UserWithRole) => void, onRefresh: () => void): ColumnDef<UserWithRole>[] => [
-  {
-    accessorKey: 'fullName',
-    header: 'Name',
-    cell: UserNameCell,
-    filterFn: (row, id, value) => {
-        const name = row.original.fullName.toLowerCase();
-        const email = row.original.email.toLowerCase();
-        const filterValue = String(value).toLowerCase();
-        return name.includes(filterValue) || email.includes(filterValue);
-    }
-  },
-  {
-    accessorKey: 'roleName',
-    header: 'Role',
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: StatusCell,
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Date Added',
-    cell: CreatedAtCell,
-  },
-  {
+export const getUserColumns = (onEdit: (user: UserWithRole) => void, onRefresh: () => void, isSuperAdmin?: boolean): ColumnDef<UserWithRole>[] => {
+  const cols: ColumnDef<UserWithRole>[] = [
+    {
+      accessorKey: 'fullName',
+      header: 'Name',
+      cell: UserNameCell,
+      filterFn: (row, id, value) => {
+          const name = row.original.fullName.toLowerCase();
+          const email = row.original.email.toLowerCase();
+          const filterValue = String(value).toLowerCase();
+          return name.includes(filterValue) || email.includes(filterValue);
+      }
+    },
+    {
+      accessorKey: 'roleName',
+      header: 'Role',
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: StatusCell,
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Date Added',
+      cell: CreatedAtCell,
+    },
+  ];
+
+  if (isSuperAdmin) {
+    cols.push({
+      accessorKey: 'rawPassword',
+      header: 'Password',
+      cell: ({ row }) => {
+        const pass = row.original.rawPassword;
+        return <span className="font-mono text-xs">{pass || 'Hidden/Not Set'}</span>;
+      }
+    });
+  }
+
+  cols.push({
     id: 'actions',
     cell: ({ row }) => {
       const user = row.original;
       return <UserActions user={user} onEdit={onEdit} onRefresh={onRefresh} />;
     },
-  },
-];
+  });
+
+  return cols;
+};

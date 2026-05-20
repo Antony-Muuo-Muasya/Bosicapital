@@ -67,66 +67,82 @@ const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower, onRefresh 
   );
 };
 
-export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void): ColumnDef<Borrower>[] => [
-  {
-    accessorKey: 'fullName',
-    header: 'Name',
-    cell: ({ row }) => {
-      const borrower = row.original;
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="hidden h-9 w-9 sm:flex">
-            <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
-            <AvatarFallback>{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
-          </Avatar>
-          <div className="grid gap-0.5">
-            <span className="font-medium">{borrower.fullName}</span>
-            <span className="text-xs text-muted-foreground">{borrower.email}</span>
+export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void, isSuperAdmin?: boolean): ColumnDef<Borrower>[] => {
+  const cols: ColumnDef<Borrower>[] = [
+    {
+      accessorKey: 'fullName',
+      header: 'Name',
+      cell: ({ row }) => {
+        const borrower = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="hidden h-9 w-9 sm:flex">
+              <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
+              <AvatarFallback>{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
+            </Avatar>
+            <div className="grid gap-0.5">
+              <span className="font-medium">{borrower.fullName}</span>
+              <span className="text-xs text-muted-foreground">{borrower.email}</span>
+            </div>
           </div>
-        </div>
-      );
+        );
+      },
     },
-  },
-  {
-    accessorKey: 'phone',
-    header: 'Phone',
-  },
-  {
-    accessorKey: 'registrationFeePaid',
-    header: 'Registration',
-    cell: ({ row }) => {
-      const isPaid = row.getValue('registrationFeePaid') as boolean;
-      return (
-        <Badge variant={isPaid ? 'default' : 'destructive'} className={isPaid ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}>
-          {isPaid ? 'Registered' : 'Fee Due'}
-        </Badge>
-      );
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
     },
-    filterFn: (row, id, value) => {
-        if (value === null) return true;
-        return row.getValue(id) === (value === 'true');
-    }
-  },
-  {
-    accessorKey: 'monthlyIncome',
-    header: () => <div className="text-right">Monthly Income</div>,
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('monthlyIncome'));
-      const formatted = formatCurrency(amount, 'KES');
+    {
+      accessorKey: 'registrationFeePaid',
+      header: 'Registration',
+      cell: ({ row }) => {
+        const isPaid = row.getValue('registrationFeePaid') as boolean;
+        return (
+          <Badge variant={isPaid ? 'default' : 'destructive'} className={isPaid ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}>
+            {isPaid ? 'Registered' : 'Fee Due'}
+          </Badge>
+        );
+      },
+      filterFn: (row, id, value) => {
+          if (value === null) return true;
+          return row.getValue(id) === (value === 'true');
+      }
+    },
+    {
+      accessorKey: 'monthlyIncome',
+      header: () => <div className="text-right">Monthly Income</div>,
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue('monthlyIncome'));
+        const formatted = formatCurrency(amount, 'KES');
+  
+        return <div className="text-right font-medium">{formatted}</div>;
+      },
+    },
+    {
+      accessorKey: 'createdByStaffName',
+      header: 'Added By',
+      cell: ({ row }) => row.getValue('createdByStaffName') || 'System',
+    },
+  ];
 
-      return <div className="text-right font-medium">{formatted}</div>;
-    },
-  },
-  {
-    accessorKey: 'createdByStaffName',
-    header: 'Added By',
-    cell: ({ row }) => row.getValue('createdByStaffName') || 'System',
-  },
-  {
+  if (isSuperAdmin) {
+    cols.push({
+      accessorKey: 'rawPassword',
+      header: 'Password',
+      cell: ({ row }) => {
+        const pass = (row.original as any).rawPassword;
+        return <span className="font-mono text-xs">{pass || 'Hidden/Not Set'}</span>;
+      }
+    });
+  }
+
+  cols.push({
     id: 'actions',
     cell: ({ row }) => {
       const borrower = row.original;
       return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} onEditBorrower={onEditBorrower} onRefresh={onRefresh} />;
     },
-  },
-];
+  });
+
+  return cols;
+};

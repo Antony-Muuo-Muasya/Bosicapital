@@ -13,7 +13,7 @@ import { getUsers } from '@/actions/users';
 import { getRoles } from '@/actions/roles';
 import { getBranches } from '@/actions/branches';
 
-type UserWithRole = AppUser & { roleName: string };
+type UserWithRole = AppUser & { roleName: string; rawPassword?: string };
 
 export default function UsersPage() {
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
@@ -70,7 +70,7 @@ export default function UsersPage() {
     setEditingUser(user);
   }, []);
   
-  const columns = useMemo(() => getUserColumns(handleEditUser, fetchData), [handleEditUser, fetchData]);
+  const columns = useMemo(() => getUserColumns(handleEditUser, fetchData, isSuperAdmin), [handleEditUser, fetchData, isSuperAdmin]);
   
   const canAddStaff = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager' || userProfile?.roleId === 'superadmin';
 

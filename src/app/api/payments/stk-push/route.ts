@@ -150,7 +150,7 @@ export async function POST(req: Request) {
             String(amountInt), 
             "Requested", 
             "STK Push", 
-            accountRef
+            loanId
           ]
         );
         console.log("[STK Push] Saved checkout request:", stkData.CheckoutRequestID, "for account:", accountRef);

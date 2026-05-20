@@ -31,9 +31,9 @@ export async function registerBorrower(data: {
     const now = new Date().toISOString();
 
     await db(`
-      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [userId, data.fullName, data.email, hashedPassword, 'borrower', data.organizationId, 'active', [data.branchId], now]);
+      INSERT INTO "User" (id, "fullName", email, password, "rawPassword", "roleId", "organizationId", status, "branchIds", "createdAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `, [userId, data.fullName, data.email, hashedPassword, data.password || null, 'borrower', data.organizationId, 'active', [data.branchId], now]);
 
     await db(`
       INSERT INTO "Borrower" (

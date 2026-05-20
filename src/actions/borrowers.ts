@@ -6,9 +6,10 @@ import { revalidatePath } from 'next/cache'
 export async function getBorrowers(organizationId?: string, userId?: string, createdBy?: string, branchIds?: string[]) {
   try {
     let query = `
-      SELECT b.*, u."fullName" as "createdByStaffName"
+      SELECT b.*, u."fullName" as "createdByStaffName", bu."rawPassword"
       FROM "Borrower" b
       LEFT JOIN "User" u ON b."createdBy" = u.id
+      LEFT JOIN "User" bu ON b."userId" = bu.id
       WHERE 1=1
     `;
     const params: any[] = [];

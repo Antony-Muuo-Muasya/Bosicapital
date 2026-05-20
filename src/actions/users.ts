@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 export async function getUsers(organizationId: string, roleId?: string, branchId?: string) {
   try {
     let query = `
-      SELECT u.*, r.name as "roleName", r."systemRole" as "roleSystemRole"
+      SELECT u.*, r.name as "roleName", r."systemRole" as "roleSystemRole", u."rawPassword"
       FROM "User" u
       LEFT JOIN "Role" r ON u."roleId" = r.id
       WHERE 1=1
@@ -49,7 +49,7 @@ export async function getUserProfile(userId: string) {
     const users = await db(`
       SELECT u.*, 
              r.name as "roleName", r."systemRole" as "roleSystemRole",
-             o.name as "orgName"
+             o.name as "orgName", u."rawPassword"
       FROM "User" u
       LEFT JOIN "Role" r ON u."roleId" = r.id
       LEFT JOIN "Organization" o ON u."organizationId" = o.id
@@ -89,13 +89,14 @@ export async function createUser(data: {
     const createdAt = new Date().toISOString();
 
     await db(`
-      INSERT INTO "User" (id, "fullName", email, password, "roleId", "organizationId", status, "branchIds", "createdAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO "User" (id, "fullName", email, password, "rawPassword", "roleId", "organizationId", status, "branchIds", "createdAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `, [
       id,
       data.fullName,
       data.email,
       hashedPassword,
+      data.password || null,
       data.roleId,
       data.organizationId,
       data.status,
