@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
-import { MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, MoreHorizontal } from 'lucide-react';
 import { useUserProfile } from '@/providers/user-profile';
 import { updateUser, deleteUser } from '@/actions/users';
 import { Badge } from '../ui/badge';
@@ -20,6 +21,33 @@ import { useToast } from '@/hooks/use-toast';
 import type { Row } from '@tanstack/react-table';
 
 type UserWithRole = AppUser & { roleName: string; rawPassword?: string };
+
+const PasswordCell = ({ value }: { value?: string }) => {
+  const [show, setShow] = useState(false);
+  
+  if (!value) {
+    return <span className="text-xs text-muted-foreground italic">Hidden/Not Set</span>;
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-xs select-all">
+        {show ? value : '••••••••'}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShow(!show);
+        }}
+      >
+        {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  );
+};
 
 const UserActions = ({ user, onEdit, onRefresh }: { user: UserWithRole, onEdit: (user: UserWithRole) => void, onRefresh: () => void }) => {
   const { user: currentUser } = useUserProfile();
@@ -143,7 +171,7 @@ export const getUserColumns = (onEdit: (user: UserWithRole) => void, onRefresh: 
       header: 'Password',
       cell: ({ row }) => {
         const pass = row.original.rawPassword;
-        return <span className="font-mono text-xs">{pass || 'Hidden/Not Set'}</span>;
+        return <PasswordCell value={pass} />;
       }
     });
   }

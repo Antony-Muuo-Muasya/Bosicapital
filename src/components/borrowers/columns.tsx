@@ -12,12 +12,40 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
-import { MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, MoreHorizontal } from 'lucide-react';
 import { useUserProfile } from '@/providers/user-profile';
 import { deleteBorrower } from '@/actions/borrowers';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
+
+const PasswordCell = ({ value }: { value?: string }) => {
+  const [show, setShow] = useState(false);
+  
+  if (!value) {
+    return <span className="text-xs text-muted-foreground italic">Hidden/Not Set</span>;
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-xs select-all">
+        {show ? value : '••••••••'}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShow(!show);
+        }}
+      >
+        {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  );
+};
 
 const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower, onRefresh }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void }) => {
   const { userRole, userProfile } = useUserProfile();
@@ -131,7 +159,7 @@ export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void
       header: 'Password',
       cell: ({ row }) => {
         const pass = (row.original as any).rawPassword;
-        return <span className="font-mono text-xs">{pass || 'Hidden/Not Set'}</span>;
+        return <PasswordCell value={pass} />;
       }
     });
   }
