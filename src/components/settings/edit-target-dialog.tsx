@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { updateTarget } from '@/actions/targets';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,7 +18,7 @@ const targetSchema = z.object({
   name: z.string().min(3, 'Target name is required.'),
   branchId: z.string().min(1, 'A branch must be selected.'),
   userId: z.string().optional(),
-  type: z.enum(['disbursal_amount', 'new_borrowers', 'portfolio_value']),
+  type: z.enum(['disbursal_amount', 'new_borrowers', 'portfolio_value', 'collection_rate']),
   value: z.coerce.number().positive('Target value must be a positive number.'),
   startDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid start date is required.' }),
   endDate: z.string().refine((val) => new Date(val).toString() !== 'Invalid Date', { message: 'A valid end date is required.' }),
@@ -39,36 +38,43 @@ interface EditTargetDialogProps {
 }
 
 export function EditTargetDialog({ target, branches, users, open, onOpenChange }: EditTargetDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<TargetFormData>({
     resolver: zodResolver(targetSchema),
     defaultValues: {
-        ...target,
+        name: target.name,
+        branchId: target.branchId,
         userId: target.userId || '',
+        type: target.type as any,
+        value: target.value,
+        startDate: target.startDate,
+        endDate: target.endDate,
     },
   });
 
-  const onSubmit = (values: TargetFormData) => {
+  const onSubmit = async (values: TargetFormData) => {
     setIsSubmitting(true);
-    const targetDocRef = doc(firestore, 'targets', target.id);
     
-    const updateData: Partial<TargetFormData> = { ...values };
+    const updateData: any = { ...values };
     if (updateData.userId === '' || updateData.userId === 'none') {
-      delete (updateData as any).userId;
+      delete updateData.userId;
     }
 
-    updateDocumentNonBlocking(targetDocRef, updateData)
-      .then(() => {
+    try {
+      const res = await updateTarget(target.id, updateData);
+      if (res.success) {
         toast({ title: 'Success', description: 'Target updated.' });
         onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update target.' });
-      })
-      .finally(() => setIsSubmitting(false));
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not update target.' });
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update target.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -130,6 +136,7 @@ export function EditTargetDialog({ target, branches, users, open, onOpenChange }
                                 <SelectItem value="disbursal_amount">Disbursal Amount (KES)</SelectItem>
                                 <SelectItem value="new_borrowers">New Borrowers (Count)</SelectItem>
                                 <SelectItem value="portfolio_value">Portfolio Value (KES)</SelectItem>
+                                <SelectItem value="collection_rate">Collection Rate (%)</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />

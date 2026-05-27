@@ -12,25 +12,55 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
-import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking, useUserProfile } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useState } from 'react';
+import { Eye, EyeOff, MoreHorizontal } from 'lucide-react';
+import { useUserProfile } from '@/providers/user-profile';
+import { deleteBorrower } from '@/actions/borrowers';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
 
-const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void }) => {
-  const firestore = useFirestore();
-  const { userRole } = useUserProfile();
+const PasswordCell = ({ value }: { value?: string }) => {
+  const [show, setShow] = useState(false);
+  
+  if (!value) {
+    return <span className="text-xs text-muted-foreground italic">Hidden/Not Set</span>;
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-xs select-all">
+        {show ? value : '••••••••'}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShow(!show);
+        }}
+      >
+        {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  );
+};
+
+const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower, onRefresh }: { borrower: Borrower, onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void }) => {
+  const { userRole, userProfile } = useUserProfile();
   const router = useRouter();
-  const canDelete = userRole?.id === 'admin';
-  const canEdit = userRole?.id === 'admin' || userRole?.id === 'manager' || userRole?.id === 'loan_officer';
+  const role = userRole?.id || userProfile?.roleId;
+  const canDelete = role === 'admin' || role === 'superadmin';
+  const canEdit = role === 'admin' || role === 'manager' || role === 'loan_officer' || role === 'superadmin';
 
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this borrower?')) {
-      const borrowerDocRef = doc(firestore, 'borrowers', borrower.id);
-      deleteDocumentNonBlocking(borrowerDocRef);
+      const res = await deleteBorrower(borrower.id);
+      if (res.success) {
+         onRefresh();
+      }
     }
   };
 
@@ -51,7 +81,7 @@ const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrow
           Copy borrower ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {!borrower.registrationFeePaid && userRole?.id !== 'user' && (
+        {!borrower.registrationFeePaid && userRole?.id !== 'borrower' && (
           <DropdownMenuItem onClick={() => onRecordPayment(borrower)}>
             Record Payment
           </DropdownMenuItem>
@@ -65,61 +95,82 @@ const BorrowerActions = ({ borrower, onRecordPayment, onEditBorrower }: { borrow
   );
 };
 
-export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void): ColumnDef<Borrower>[] => [
-  {
-    accessorKey: 'fullName',
-    header: 'Name',
-    cell: ({ row }) => {
-      const borrower = row.original;
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="hidden h-9 w-9 sm:flex">
-            <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
-            <AvatarFallback>{borrower.fullName.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="grid gap-0.5">
-            <span className="font-medium">{borrower.fullName}</span>
-            <span className="text-xs text-muted-foreground">{borrower.email}</span>
+export const getBorrowerColumns = (onRecordPayment: (borrower: Borrower) => void, onEditBorrower: (borrower: Borrower) => void, onRefresh: () => void, isSuperAdmin?: boolean): ColumnDef<Borrower>[] => {
+  const cols: ColumnDef<Borrower>[] = [
+    {
+      accessorKey: 'fullName',
+      header: 'Name',
+      cell: ({ row }) => {
+        const borrower = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="hidden h-9 w-9 sm:flex">
+              <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
+              <AvatarFallback>{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
+            </Avatar>
+            <div className="grid gap-0.5">
+              <span className="font-medium">{borrower.fullName}</span>
+              <span className="text-xs text-muted-foreground">{borrower.email}</span>
+            </div>
           </div>
-        </div>
-      );
+        );
+      },
     },
-  },
-  {
-    accessorKey: 'phone',
-    header: 'Phone',
-  },
-  {
-    accessorKey: 'registrationFeePaid',
-    header: 'Registration',
-    cell: ({ row }) => {
-      const isPaid = row.getValue('registrationFeePaid') as boolean;
-      return (
-        <Badge variant={isPaid ? 'default' : 'destructive'} className={isPaid ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}>
-          {isPaid ? 'Registered' : 'Fee Due'}
-        </Badge>
-      );
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
     },
-    filterFn: (row, id, value) => {
-        if (value === null) return true;
-        return row.getValue(id) === (value === 'true');
-    }
-  },
-  {
-    accessorKey: 'monthlyIncome',
-    header: () => <div className="text-right">Monthly Income</div>,
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('monthlyIncome'));
-      const formatted = formatCurrency(amount, 'KES');
+    {
+      accessorKey: 'registrationFeePaid',
+      header: 'Registration',
+      cell: ({ row }) => {
+        const isPaid = row.getValue('registrationFeePaid') as boolean;
+        return (
+          <Badge variant={isPaid ? 'default' : 'destructive'} className={isPaid ? 'bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30' : ''}>
+            {isPaid ? 'Registered' : 'Fee Due'}
+          </Badge>
+        );
+      },
+      filterFn: (row, id, value) => {
+          if (value === null) return true;
+          return row.getValue(id) === (value === 'true');
+      }
+    },
+    {
+      accessorKey: 'monthlyIncome',
+      header: () => <div className="text-right">Monthly Income</div>,
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue('monthlyIncome'));
+        const formatted = formatCurrency(amount, 'KES');
+  
+        return <div className="text-right font-medium">{formatted}</div>;
+      },
+    },
+    {
+      accessorKey: 'createdByStaffName',
+      header: 'Added By',
+      cell: ({ row }) => row.getValue('createdByStaffName') || 'System',
+    },
+  ];
 
-      return <div className="text-right font-medium">{formatted}</div>;
-    },
-  },
-  {
+  if (isSuperAdmin) {
+    cols.push({
+      accessorKey: 'rawPassword',
+      header: 'Password',
+      cell: ({ row }) => {
+        const pass = (row.original as any).rawPassword;
+        return <PasswordCell value={pass} />;
+      }
+    });
+  }
+
+  cols.push({
     id: 'actions',
     cell: ({ row }) => {
       const borrower = row.original;
-      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} onEditBorrower={onEditBorrower} />;
+      return <BorrowerActions borrower={borrower} onRecordPayment={onRecordPayment} onEditBorrower={onEditBorrower} onRefresh={onRefresh} />;
     },
-  },
-];
+  });
+
+  return cols;
+};

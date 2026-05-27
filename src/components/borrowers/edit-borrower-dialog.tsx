@@ -22,8 +22,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, writeBatch } from 'firebase/firestore';
+import { updateBorrower } from '@/actions/borrowers';
+import { getUserProfile, updateUser } from '@/actions/users';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -54,12 +54,24 @@ interface EditBorrowerDialogProps {
 }
 
 export function EditBorrowerDialog({ open, onOpenChange, borrower }: EditBorrowerDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(false);
 
-  const userRef = useMemoFirebase(() => borrower?.userId ? doc(firestore, 'users', borrower.userId) : null, [firestore, borrower?.userId]);
-  const { data: user, isLoading: isUserLoading } = useDoc<AppUser>(userRef);
+  useEffect(() => {
+    if (borrower?.userId) {
+        setIsUserLoading(true);
+        getUserProfile(borrower.userId)
+            .then(res => {
+                if (res.success && res.user) {
+                    setUser(res.user as any);
+                }
+            })
+            .catch(console.error)
+            .finally(() => setIsUserLoading(false));
+    }
+  }, [borrower?.userId]);
 
   const form = useForm<BorrowerFormData>({
     resolver: zodResolver(editBorrowerSchema),
@@ -86,13 +98,8 @@ export function EditBorrowerDialog({ open, onOpenChange, borrower }: EditBorrowe
     setIsSubmitting(true);
 
     try {
-        const batch = writeBatch(firestore);
-
-        const borrowerRef = doc(firestore, 'borrowers', borrower.id);
-        const userRef = doc(firestore, 'users', borrower.userId);
-        
         // Update borrower document
-        batch.update(borrowerRef, {
+        const borrowerRes = await updateBorrower(borrower.id, {
             fullName: values.fullName,
             phone: values.phone,
             address: values.address,
@@ -100,13 +107,15 @@ export function EditBorrowerDialog({ open, onOpenChange, borrower }: EditBorrowe
             monthlyIncome: values.monthlyIncome,
         });
 
+        if (!borrowerRes.success) throw new Error(borrowerRes.error);
+
         // Update user document
-        batch.update(userRef, {
+        const userRes = await updateUser(borrower.userId, {
             fullName: values.fullName,
             status: values.status,
         });
 
-        await batch.commit();
+        if (!userRes.success) throw new Error(userRes.error);
 
         toast({ title: 'Success', description: 'Borrower details updated successfully.' });
         onOpenChange(false);

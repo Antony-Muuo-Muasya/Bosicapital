@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { updateLoanProduct } from '@/actions/loan-products';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,7 +31,6 @@ interface EditLoanProductDialogProps {
 }
 
 export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanProductDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,20 +39,22 @@ export function EditLoanProductDialog({ product, open, onOpenChange }: EditLoanP
     defaultValues: product,
   });
 
-  const onSubmit = (values: ProductFormData) => {
+  const onSubmit = async (values: ProductFormData) => {
     setIsSubmitting(true);
 
-    const productDocRef = doc(firestore, 'loanProducts', product.id);
-    
-    updateDocumentNonBlocking(productDocRef, values)
-      .then(() => {
+    try {
+      const res = await updateLoanProduct(product.id, values);
+      if (res.success) {
         toast({ title: 'Success', description: 'Loan product updated.' });
         onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update product.' });
-      })
-      .finally(() => setIsSubmitting(false));
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not update product.' });
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update product.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

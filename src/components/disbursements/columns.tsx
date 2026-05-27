@@ -5,8 +5,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '../ui/button';
 import { CheckCircle, XCircle } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking, useUserProfile, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, writeBatch, collection } from 'firebase/firestore';
+import { useUserProfile } from '@/providers/user-profile';
+import { disburseLoan } from '@/actions/loans';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { add } from 'date-fns';
@@ -31,7 +31,6 @@ type LoanWithDetails = Loan & {
 };
 
 const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
-    const firestore = useFirestore();
     const { toast } = useToast();
     const { userRole } = useUserProfile();
 
@@ -44,7 +43,6 @@ const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
       if(isUpdating || !canDisburse) return;
 
       setIsUpdating(true);
-      const loanDocRef = doc(firestore, 'loans', loan.id);
       
       if (!loan.repaymentCycle) {
           toast({ variant: 'destructive', title: 'Error', description: 'Loan product details are missing.' });
@@ -54,53 +52,27 @@ const LoanDisbursementActions = ({ loan }: { loan: LoanWithDetails }) => {
       }
 
       try {
-          const batch = writeBatch(firestore);
           const newIssueDate = new Date().toISOString().split('T')[0];
+          const res = await disburseLoan(loan.id, {
+              issueDate: newIssueDate,
+              duration: loan.duration,
+              installmentAmount: loan.installmentAmount,
+              borrowerId: loan.borrowerId,
+              organizationId: loan.organizationId,
+              branchId: loan.branchId,
+              loanOfficerId: loan.loanOfficerId,
+              repaymentCycle: loan.repaymentCycle
+          });
 
-          batch.update(loanDocRef, { status: 'Active', issueDate: newIssueDate });
-
-          const installmentsColRef = collection(firestore, 'loans', loan.id, 'installments');
-          let currentDueDate = new Date(newIssueDate);
-
-          const numberOfInstallments = loan.duration;
-          
-          for (let i = 1; i <= numberOfInstallments; i++) {
-              const installmentRef = doc(installmentsColRef);
-              if (loan.repaymentCycle === 'Monthly') {
-                  currentDueDate = add(currentDueDate, { months: 1 });
-              } else {
-                  currentDueDate = add(currentDueDate, { weeks: 1 });
-              }
-
-              const newInstallmentData = {
-                  id: installmentRef.id,
-                  loanId: loan.id,
-                  borrowerId: loan.borrowerId,
-                  organizationId: loan.organizationId,
-                  branchId: loan.branchId,
-                  loanOfficerId: loan.loanOfficerId,
-                  installmentNumber: i,
-                  dueDate: currentDueDate.toISOString().split('T')[0],
-                  expectedAmount: loan.installmentAmount,
-                  paidAmount: 0,
-                  status: 'Unpaid',
-              };
-              batch.set(installmentRef, newInstallmentData);
+          if (res.success) {
+              toast({ title: 'Success', description: 'Loan has been disbursed and activated.' });
+          } else {
+              toast({ variant: 'destructive', title: 'Error', description: res.error || 'Failed to disburse loan.' });
           }
-
-          await batch.commit();
-          toast({ title: 'Success', description: 'Loan has been disbursed and activated.' });
 
       } catch(err: any) {
           console.error("Failed to disburse loan:", err);
-          const permissionError = new FirestorePermissionError({
-              path: loanDocRef.path,
-              operation: 'write', 
-              requestResourceData: { status: 'Active', issueDate: new Date().toISOString().split('T')[0] }
-          });
-          errorEmitter.emit('permission-error', permissionError);
-
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to disburse loan. Check permissions and data.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.' });
       } finally {
           setIsUpdating(false);
           setIsAlertOpen(false);
@@ -152,7 +124,7 @@ export const getDisbursementColumns = (): ColumnDef<LoanWithDetails>[] => [
         <div className="flex items-center gap-3">
           <Avatar className="hidden h-9 w-9 sm:flex">
             <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-            <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{loan.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
           </Avatar>
           <div className="grid gap-0.5">
             <span className="font-medium">{loan.borrowerName}</span>

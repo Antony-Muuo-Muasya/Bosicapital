@@ -1,12 +1,13 @@
 'use client';
+
 import { useState } from 'react';
 import type { Loan } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Eye } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking, useUserProfile } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUserProfile } from '@/providers/user-profile';
+import { updateApprovalStatus } from '@/actions/approvals';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -29,7 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import Image from 'next/image';
 
-
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
@@ -40,15 +40,14 @@ type LoanWithDetails = Loan & {
 };
 
 const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
-    const firestore = useFirestore();
     const { toast } = useToast();
-    const { user, userRole } = useUserProfile();
+    const { userProfile } = useUserProfile();
 
     const [isUpdating, setIsUpdating] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [actionToConfirm, setActionToConfirm] = useState<'Approved' | 'Rejected' | null>(null);
 
-    const canApprove = userRole?.id === 'manager' || userRole?.id === 'superadmin';
+    const canApprove = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager' || userProfile?.roleId === 'superadmin';
 
     const handleActionConfirmation = (status: 'Approved' | 'Rejected') => {
         setActionToConfirm(status);
@@ -56,10 +55,9 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
     };
   
     const handleUpdateStatus = async () => {
-      if(isUpdating || !actionToConfirm || !canApprove || !user) return;
+      if(isUpdating || !actionToConfirm || !canApprove || !userProfile) return;
 
       setIsUpdating(true);
-      const loanDocRef = doc(firestore, 'loans', loan.id);
       
       const resetState = () => {
         setIsUpdating(false);
@@ -67,28 +65,24 @@ const LoanApprovalActions = ({ loan }: { loan: LoanWithDetails }) => {
         setActionToConfirm(null);
       }
 
-      if (actionToConfirm === 'Rejected') {
-          updateDocumentNonBlocking(loanDocRef, { status: 'Rejected' })
-            .then(() => {
-              toast({ title: 'Success', description: `Loan has been rejected.` });
-            })
-            .catch(() => {
-              toast({ variant: 'destructive', title: 'Error', description: 'Failed to reject loan.' });
-            })
-            .finally(resetState);
-          return;
-      }
+      try {
+          // Trigger the Prisma Server Action instead of the legacy Firebase update
+          const res = await updateApprovalStatus(
+              loan.id, 
+              actionToConfirm, 
+              userProfile.id
+          );
 
-      if (actionToConfirm === 'Approved') {
-          updateDocumentNonBlocking(loanDocRef, { status: 'Approved', approvedById: user.uid })
-            .then(() => {
-              toast({ title: 'Success', description: 'Loan approved and sent for disbursement.' });
-            })
-            .catch(() => {
-              toast({ variant: 'destructive', title: 'Error', description: 'Failed to approve loan.' });
-            })
-            .finally(resetState);
-          return;
+          if (res.success) {
+              toast({ title: 'Success', description: `Loan has been ${actionToConfirm.toLowerCase()}.` });
+          } else {
+              toast({ variant: 'destructive', title: 'Error', description: res.error || `Failed to ${actionToConfirm.toLowerCase()} loan.` });
+          }
+      } catch (err) {
+          console.error(err);
+          toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred during status update.' });
+      } finally {
+          resetState();
       }
     };
   
@@ -182,7 +176,7 @@ export const getApprovalColumns = (): ColumnDef<LoanWithDetails>[] => [
         <div className="flex items-center gap-3">
           <Avatar className="hidden h-9 w-9 sm:flex">
             <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-            <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{loan.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
           </Avatar>
           <div className="grid gap-0.5">
             <span className="font-medium">{loan.borrowerName}</span>
@@ -193,7 +187,7 @@ export const getApprovalColumns = (): ColumnDef<LoanWithDetails>[] => [
     },
   },
   {
-    accessorKey: 'loanProductName',
+    accessorKey: 'loanProduct.name',
     header: 'Loan Product',
   },
   {

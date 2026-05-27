@@ -3,8 +3,7 @@ import type { Target } from '@/lib/types';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '../ui/button';
 import { MoreHorizontal, User, Building } from 'lucide-react';
-import { useFirestore, deleteDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { deleteTarget } from '@/actions/targets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -17,16 +16,18 @@ const typeLabels: Record<Target['type'], string> = {
     collection_rate: 'Collection Rate'
 }
 
-const TargetActions = ({ target, onEdit }: { target: Target, onEdit: (target: Target) => void }) => {
-  const firestore = useFirestore();
+const TargetActions = ({ target, onEdit, onRefresh }: { target: Target, onEdit: (target: Target) => void, onRefresh: () => void }) => {
   const { toast } = useToast();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm(`Are you sure you want to delete the "${target.name}" target?`)) {
-      const targetDocRef = doc(firestore, 'targets', target.id);
-      deleteDocumentNonBlocking(targetDocRef)
-        .then(() => toast({ title: 'Success', description: 'Target deleted.' }))
-        .catch(err => toast({ variant: 'destructive', title: 'Error', description: 'Could not delete target.' }));
+      const res = await deleteTarget(target.id);
+      if (res.success) {
+        toast({ title: 'Success', description: 'Target deleted.' });
+        onRefresh();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete target.' });
+      }
     }
   };
 
@@ -51,7 +52,7 @@ const TargetActions = ({ target, onEdit }: { target: Target, onEdit: (target: Ta
   );
 };
 
-export const getTargetsColumns = (onEdit: (target: Target) => void, branchesMap: Map<string, string>, usersMap: Map<string, string>): ColumnDef<Target>[] => [
+export const getTargetsColumns = (onEdit: (target: Target) => void, branchesMap: Map<string, string>, usersMap: Map<string, string>, onRefresh: () => void): ColumnDef<Target>[] => [
   {
     accessorKey: 'name',
     header: 'Target Name',
@@ -109,7 +110,7 @@ export const getTargetsColumns = (onEdit: (target: Target) => void, branchesMap:
     id: 'actions',
     cell: ({ row }) => {
       const target = row.original;
-      return <TargetActions target={target} onEdit={onEdit} />;
+      return <TargetActions target={target} onEdit={onEdit} onRefresh={onRefresh} />;
     },
   },
 ];

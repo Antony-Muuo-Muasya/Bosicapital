@@ -1,6 +1,6 @@
 'use client';
 
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { MapPin, Phone, Mail, Wallet } from 'lucide-react';
 
 export function AppFooter() {

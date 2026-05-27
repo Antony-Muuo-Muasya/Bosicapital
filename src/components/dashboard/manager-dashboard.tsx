@@ -1,57 +1,87 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Loan, Borrower, Installment, RegistrationPayment, Repayment } from '@/lib/types';
+import { useUserProfile } from '@/providers/user-profile';
+import { getManagerDashboardStats } from '@/actions/dashboard';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getBorrowers } from '@/actions/borrowers';
+import { getRoles } from '@/actions/roles';
+import { getBranches } from '@/actions/branches';
+import type { Loan, Borrower, Installment, Repayment, LoanProduct, Role, Branch } from '@/lib/types';
+import { useEffect, useState, useCallback } from 'react';
 import { DueLoansTable } from './due-loans-table';
 import { useMemo } from 'react';
 import { DueDateMonitor } from './due-date-monitor';
-import type { DueDateMonitoringInput } from '@/ai/flows/due-date-monitoring-tool';
 import { formatCurrency } from '@/lib/utils';
 import { startOfToday, startOfMonth } from 'date-fns';
 import { ManagerStatsCards } from './manager/stats-cards';
 import { LoansOverview } from './manager/loans-overview';
 import { CustomerOverview } from './manager/customer-overview';
 import { CollectionOverview } from './manager/collection-overview';
+import { Button } from '@/components/ui/button';
+import { UserPlus, PlusCircle, Users } from 'lucide-react';
+import { AddBorrowerDialog } from '../borrowers/add-borrower-dialog';
+import { AddLoanDialog } from '../loans/add-loan-dialog';
+import { AddStaffDialog } from '../users/add-staff-dialog';
 
 export function ManagerDashboard() {
-  const firestore = useFirestore();
-  const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
+  const { userProfile, isLoading: isProfileLoading } = useUserProfile();
   const organizationId = userProfile?.organizationId;
   const branchIds = userProfile?.branchIds || [];
 
-  // A manager should see loans for the branches they manage.
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || branchIds.length === 0) return null;
-    return query(collection(firestore, 'loans'), where('branchId', 'in', branchIds));
-  }, [firestore, JSON.stringify(branchIds)]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loans, setLoans] = useState<Loan[] | null>(null);
+  const [allBorrowers, setAllBorrowers] = useState<Borrower[] | null>(null);
+  const [allInstallments, setAllInstallments] = useState<Installment[] | null>(null);
+  const [allRepayments, setAllRepayments] = useState<Repayment[] | null>(null);
+  const [allLoanProducts, setAllLoanProducts] = useState<LoanProduct[] | null>(null);
+  const [allRoles, setAllRoles] = useState<Role[] | null>(null);
+  const [allBranches, setAllBranches] = useState<Branch[] | null>(null);
 
-  // Fetch all related data for the organization. We'll filter it client-side.
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+  const [isAddBorrowerOpen, setIsAddBorrowerOpen] = useState(false);
+  const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
+  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
 
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    return query(
-      collectionGroup(firestore, 'installments'),
-      where('organizationId', '==', organizationId)
-    );
-  }, [firestore, organizationId]);
+  const fetchDashboardStats = useCallback(async () => {
+      if (!userProfile || branchIds.length === 0 || !organizationId) return;
+      setIsLoading(true);
+      try {
+          const res = await getManagerDashboardStats(organizationId, branchIds);
+          if (res.success && res.data) {
+              setLoans(res.data.loans as any);
+              setAllBorrowers(res.data.borrowers as any);
+              setAllInstallments(res.data.installments as any);
+              setAllRepayments(res.data.repayments as any);
+          }
 
-  const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    return query(collection(firestore, 'repayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId]);
+          const [productsRes, rolesRes, branchesRes] = await Promise.all([
+            getLoanProducts(organizationId),
+            getRoles(organizationId),
+            getBranches(organizationId)
+          ]);
 
+          if (productsRes.success) setAllLoanProducts(productsRes.products as any);
+          if (rolesRes.success) setAllRoles(rolesRes.roles as any);
+          if (branchesRes.success) setAllBranches(branchesRes.branches as any);
 
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-  const { data: allBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
-  const { data: allInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
-  const { data: allRepayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsLoading(false);
+      }
+  }, [userProfile, organizationId, JSON.stringify(branchIds)]);
 
-  const isLoading = isProfileLoading || isLoadingLoans || isLoadingBorrowers || isLoadingInstallments || isLoadingRepayments;
+  useEffect(() => {
+     if (!isProfileLoading && userProfile) {
+         fetchDashboardStats();
+
+         // Set up real-time polling every 30 seconds
+         const interval = setInterval(() => {
+             fetchDashboardStats();
+         }, 30000);
+
+         return () => clearInterval(interval);
+     }
+  }, [isProfileLoading, userProfile, fetchDashboardStats]);
 
   const {
       outstandingLoanBalance,
@@ -76,7 +106,6 @@ export function ManagerDashboard() {
           return defaultResult;
       }
       
-      // Filter all data to only include records relevant to the manager's loans.
       const managerLoanIds = new Set(loans.map(l => l.id));
       const managerBorrowerIds = new Set(loans.map(l => l.borrowerId));
       const borrowers = allBorrowers.filter(b => managerBorrowerIds.has(b.id));
@@ -86,7 +115,6 @@ export function ManagerDashboard() {
       const today = startOfToday();
       const startOfMonthDate = startOfMonth(today);
   
-      // --- High level stats ---
       const totalCustomers = borrowers.length;
       let outstandingLoanBalance = 0;
       const activeLoanIds = new Set<string>();
@@ -102,7 +130,12 @@ export function ManagerDashboard() {
           }
       });
   
-      const overdueLoanIds = new Set(installments.filter(i => new Date(i.dueDate) < today && i.status !== 'Paid').map(i => i.loanId));
+      const overdueLoanIds = new Set(installments.filter(i => {
+           const [year, month, day] = i.dueDate.split('-').map(Number);
+           const dueDate = new Date(year, month - 1, day);
+           return dueDate < today && i.status !== 'Paid';
+      }).map(i => i.loanId));
+
       let performingLoanBalance = 0;
       activeLoanIds.forEach(loanId => {
           if (!overdueLoanIds.has(loanId)) {
@@ -117,7 +150,6 @@ export function ManagerDashboard() {
           }
       });
   
-      // --- Loans Overview stats ---
       const disbursedLoans = loans.filter(l => l.status === 'Active' || l.status === 'Completed').length;
       const todayISOString = today.toISOString().split('T')[0];
       const loansDueToday = installments.filter(i => i.dueDate === todayISOString).length;
@@ -127,7 +159,8 @@ export function ManagerDashboard() {
   
       installments.forEach(inst => {
           if (inst.status !== 'Paid') {
-              const dueDate = new Date(inst.dueDate);
+              const [year, month, day] = inst.dueDate.split('-').map(Number);
+              const dueDate = new Date(year, month - 1, day);
               if (dueDate < today) {
                   const arrear = inst.expectedAmount - inst.paidAmount;
                   outstandingTotalLoanArrears += arrear;
@@ -138,20 +171,19 @@ export function ManagerDashboard() {
           }
       });
   
-      // --- Customer Overview stats ---
       const allLoanBorrowerIds = new Set(loans.map(l => l.borrowerId));
       const activeLoanBorrowerIds = new Set(loans.filter(l => l.status === 'Active').map(l => l.borrowerId));
       const activeCustomers = activeLoanBorrowerIds.size;
       const inactiveCustomers = allLoanBorrowerIds.size - activeLoanBorrowerIds.size;
       
-      // --- Collection Overview stats ---
       const installmentsDueTodayList = installments.filter(i => i.dueDate === todayISOString);
       const expectedToday = installmentsDueTodayList.reduce((sum, i) => sum + i.expectedAmount, 0);
       const paidTodayForDues = repayments.filter(r => new Date(r.paymentDate).toISOString().split('T')[0] === todayISOString && installmentsDueTodayList.some(i => i.loanId === r.loanId)).reduce((sum, r) => sum + r.amount, 0);
       const todaysCollectionRate = expectedToday > 0 ? (paidTodayForDues / expectedToday) * 100 : 0;
       
       const installmentsDueThisMonth = installments.filter(i => {
-        const dueDate = new Date(i.dueDate);
+        const [year, month, day] = i.dueDate.split('-').map(Number);
+        const dueDate = new Date(year, month - 1, day);
         return dueDate >= startOfMonthDate && dueDate <= today
       });
       const expectedThisMonth = installmentsDueThisMonth.reduce((sum, i) => sum + i.expectedAmount, 0);
@@ -198,27 +230,34 @@ export function ManagerDashboard() {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [allInstallments, allBorrowers, loans]);
 
-  const aiInput = useMemo((): DueDateMonitoringInput => {
-    const history = dueInstallmentsWithDetails.map(i => `${i.borrowerName}: ${i.status} on ${i.dueDate} for ${formatCurrency(i.expectedAmount)}`).join('\n');
-    const upcoming = dueInstallmentsWithDetails.filter(i => i.status === 'Unpaid').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
-    const overdue = dueInstallmentsWithDetails.filter(i => i.status === 'Overdue').map(i => `${i.borrowerName} on ${i.dueDate}`).join(', ');
-
-    return {
-      repaymentHistory: history || 'No relevant repayment history.',
-      externalEvents: 'No major external events reported.',
-      upcomingSchedule: upcoming || 'No upcoming payments.',
-      overdueSchedule: overdue || 'No overdue payments.',
-      currentSchedule: 'All other loans are current.'
-    }
-  }, [dueInstallmentsWithDetails]);
-
-
   return (
     <>
       <PageHeader
         title="Manager Dashboard"
         description="Overview of your branch loan portfolio."
-      />
+      >
+          <div className='flex items-center gap-4'>
+            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full border border-border animate-pulse-slow">
+                <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Live Updates</span>
+            </div>
+            <Button onClick={() => setIsAddStaffOpen(true)}>
+                <Users className="mr-2 h-4 w-4" />
+                Add Staff
+            </Button>
+            <Button onClick={() => setIsAddBorrowerOpen(true)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Create Borrower
+            </Button>
+            <Button onClick={() => setIsAddLoanOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Loan
+            </Button>
+        </div>
+      </PageHeader>
       <div className="p-4 md:p-6 grid gap-6">
         <ManagerStatsCards 
             outstandingLoanBalance={outstandingLoanBalance}
@@ -250,10 +289,25 @@ export function ManagerDashboard() {
               <DueLoansTable dueInstallments={dueInstallmentsWithDetails} isLoading={isLoading} />
             </div>
             <div className="lg:col-span-3">
-              <DueDateMonitor aiInput={aiInput} />
+              <DueDateMonitor 
+                loans={loans}
+                borrowers={allBorrowers}
+                installments={allInstallments}
+                isLoading={isLoading}
+              />
             </div>
         </div>
       </div>
+
+      <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} roles={allRoles || []} branches={allBranches || []} />
+      <AddBorrowerDialog open={isAddBorrowerOpen} onOpenChange={setIsAddBorrowerOpen} />
+      <AddLoanDialog
+        open={isAddLoanOpen}
+        onOpenChange={setIsAddLoanOpen}
+        borrowers={allBorrowers || []}
+        loanProducts={allLoanProducts || []}
+        isLoading={isLoading}
+       />
     </>
   );
 }

@@ -5,22 +5,27 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useRouter } from 'next/navigation';
+import { Smartphone } from 'lucide-react';
+import { MpesaPromptDialog } from './mpesa-prompt-dialog';
+import { useState } from 'react';
 
 type LoanWithDetails = Loan & {
   borrowerName: string;
   borrowerPhotoUrl?: string;
+  borrowerPhone?: string;
+  nationalId?: string;
   loanProductName: string;
 };
 
@@ -35,17 +40,19 @@ const getStatusVariant = (status: string) => {
     }
   };
 
-const LoanActions = ({ loan, onEdit }: { loan: LoanWithDetails, onEdit: (loan: LoanWithDetails) => void }) => {
-  const { userRole } = useUserProfile();
+const LoanActions = ({ loan, onEdit, onRefresh }: { loan: LoanWithDetails, onEdit: (loan: LoanWithDetails) => void, onRefresh: () => void }) => {
+  const { userProfile } = useUserProfile();
   const router = useRouter();
+  const [isPromptOpen, setIsPromptOpen] = useState(false);
 
   const handleDelete = () => {
     alert('For data integrity, loans cannot be deleted. Consider rejecting or archiving instead.');
   };
 
-  const canManage = userRole?.id === 'admin' || userRole?.id === 'manager';
+  const canManage = userProfile?.roleId === 'admin' || userProfile?.roleId === 'manager' || userProfile?.roleId === 'loan_officer' || userProfile?.roleId === 'superadmin';
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -62,18 +69,39 @@ const LoanActions = ({ loan, onEdit }: { loan: LoanWithDetails, onEdit: (loan: L
         <DropdownMenuItem onClick={() => router.push(`/loans/${loan.id}`)}>
             View Details
         </DropdownMenuItem>
-        {canManage && <DropdownMenuItem onClick={() => onEdit(loan)}>Edit Loan</DropdownMenuItem>}
-        {userRole?.id === 'admin' && (
+        {loan.status === 'Active' && (
+            <DropdownMenuItem onClick={() => setIsPromptOpen(true)}>
+                <Smartphone className="mr-2 h-4 w-4" />
+                Prompt M-Pesa Payment
+            </DropdownMenuItem>
+        )}
+        {canManage && <DropdownMenuItem onClick={() => { onEdit(loan); }}>Edit Loan</DropdownMenuItem>}
+        {userProfile?.roleId === 'admin' && (
              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
                 Delete Loan
              </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+    <MpesaPromptDialog 
+        open={isPromptOpen}
+        onOpenChange={setIsPromptOpen}
+        loanId={loan.id}
+        borrowerName={loan.borrowerName}
+        phone={loan.borrowerPhone || ''}
+        amount={loan.installmentAmount || 0}
+        nationalId={loan.nationalId || loan.id.split('-L')[0]}
+    />
+    </>
   );
 };
 
-export const getColumns = (onEdit: (loan: LoanWithDetails) => void): ColumnDef<LoanWithDetails>[] => [
+export const getColumns = (onEdit: (loan: LoanWithDetails) => void, onRefresh: () => void): ColumnDef<LoanWithDetails>[] => [
+  {
+    accessorKey: 'id',
+    header: 'Loan ID',
+    cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.getValue('id')}</span>,
+  },
   {
     accessorKey: 'borrowerName',
     header: 'Borrower',
@@ -83,7 +111,7 @@ export const getColumns = (onEdit: (loan: LoanWithDetails) => void): ColumnDef<L
         <div className="flex items-center gap-3">
           <Avatar className="hidden h-9 w-9 sm:flex">
             <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-            <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{loan.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
           </Avatar>
           <div className="grid gap-0.5">
             <span className="font-medium">{loan.borrowerName}</span>
@@ -129,7 +157,7 @@ export const getColumns = (onEdit: (loan: LoanWithDetails) => void): ColumnDef<L
     id: 'actions',
     cell: ({ row }) => {
       const loan = row.original;
-      return <LoanActions loan={loan} onEdit={onEdit} />;
+      return <LoanActions loan={loan} onEdit={onEdit} onRefresh={onRefresh} />;
     },
   },
 ];

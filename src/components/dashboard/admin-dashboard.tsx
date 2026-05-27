@@ -2,12 +2,14 @@
 import { PageHeader } from '@/components/page-header';
 import { Button } from '../ui/button';
 import { PlusCircle, UserPlus, Building } from 'lucide-react';
-import { useState, useMemo } from 'react';
 import { AddLoanProductDialog } from '../settings/add-loan-product-dialog';
 import { useRouter } from 'next/navigation';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import { AddBranchDialog } from '@/components/settings/add-branch-dialog';
+import { AddBorrowerDialog } from '@/components/borrowers/add-borrower-dialog';
+import { useUserProfile } from '@/providers/user-profile';
+import { getAdminDashboardStats } from '@/actions/dashboard';
 import type { Loan, Borrower, LoanProduct, User, Branch, RegistrationPayment, Role, Installment, Repayment } from '@/lib/types';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { OverviewCards } from './overview-cards';
 import { PortfolioStatusChart } from './admin/portfolio-status-chart';
 import { DisbursalTrendChart } from './admin/disbursal-trend-chart';
@@ -23,89 +25,61 @@ import { subMonths, format } from 'date-fns';
 
 export function AdminDashboard() {
   const router = useRouter();
-  const firestore = useFirestore();
   const { userProfile, isLoading: isProfileLoading } = useUserProfile();
   const organizationId = userProfile?.organizationId;
   
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
+  const [isAddBorrowerOpen, setIsAddBorrowerOpen] = useState(false);
 
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
-  // Data queries
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'loans');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loans, setLoans] = useState<Loan[] | null>(null);
+  const [borrowers, setBorrowers] = useState<Borrower[] | null>(null);
+  const [loanProducts, setLoanProducts] = useState<LoanProduct[] | null>(null);
+  const [users, setUsers] = useState<User[] | null>(null);
+  const [branches, setBranches] = useState<Branch[] | null>(null);
+  const [regPayments, setRegPayments] = useState<RegistrationPayment[] | null>(null);
+  const [repayments, setRepayments] = useState<Repayment[] | null>(null);
+  const [roles, setRoles] = useState<Role[] | null>(null);
+  const [installments, setInstallments] = useState<Installment[] | null>(null);
 
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'borrowers');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
+  const fetchDashboardStats = useCallback(async () => {
+      if (!userProfile) return;
+      setIsLoading(true);
+      try {
+          const res = await getAdminDashboardStats(isSuperAdmin ? undefined : organizationId!);
+          if (res.success && res.data) {
+              setLoans(res.data.loans as any);
+              setBorrowers(res.data.borrowers as any);
+              setLoanProducts(res.data.loanProducts as any);
+              setUsers(res.data.users as any);
+              setBranches(res.data.branches as any);
+              setRegPayments(res.data.regPayments as any);
+              setRepayments(res.data.repayments as any);
+              setRoles(res.data.roles as any);
+              setInstallments(res.data.installments as any);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsLoading(false);
+      }
+  }, [userProfile, isSuperAdmin, organizationId]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'loanProducts');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
+  useEffect(() => {
+     if (!isProfileLoading && userProfile) {
+         fetchDashboardStats();
+         
+         // Set up real-time polling every 30 seconds
+         const interval = setInterval(() => {
+             fetchDashboardStats();
+         }, 30000);
 
-  const usersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'users');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'users'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-
-  const branchesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'branches');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'branches'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-
-  const regPaymentsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'registrationPayments');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'registrationPayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-  
-  const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collection(firestore, 'repayments');
-    if (!organizationId) return null;
-    return query(collection(firestore, 'repayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-
-  const rolesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    // Roles are global in this version
-    return collection(firestore, 'roles');
-  }, [firestore]);
-
-  const installmentsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    if (isSuperAdmin) return collectionGroup(firestore, 'installments');
-    if (!organizationId) return null;
-    return query(collectionGroup(firestore, 'installments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-
-
-  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
-  const { data: borrowers, isLoading: borrowersLoading } = useCollection<Borrower>(borrowersQuery);
-  const { data: loanProducts, isLoading: productsLoading } = useCollection<LoanProduct>(productsQuery);
-  const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
-  const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
-  const { data: regPayments, isLoading: regPaymentsLoading } = useCollection<RegistrationPayment>(regPaymentsQuery);
-  const { data: repayments, isLoading: repaymentsLoading } = useCollection<Repayment>(repaymentsQuery);
-  const { data: roles, isLoading: rolesLoading } = useCollection<Role>(rolesQuery);
-  const { data: installments, isLoading: installmentsLoading } = useCollection<Installment>(installmentsQuery);
-
-  const isLoading = isProfileLoading || loansLoading || borrowersLoading || productsLoading || usersLoading || branchesLoading || regPaymentsLoading || rolesLoading || installmentsLoading || repaymentsLoading;
+         return () => clearInterval(interval);
+     }
+  }, [isProfileLoading, userProfile, fetchDashboardStats]);
 
   const dashboardData = useMemo(() => {
     if (isLoading || !loans || !borrowers || !loanProducts || !users) return null;
@@ -124,11 +98,17 @@ export function AdminDashboard() {
     const last6Months = Array.from({ length: 6 }, (_, i) => subMonths(today, i)).reverse();
     const monthLabels = last6Months.map(d => format(d, 'MMM yyyy'));
     
-    const disbursalData = loans.filter(l => l.status === 'Active').reduce((acc, loan) => {
-        const [year, monthNum, day] = loan.issueDate.split('-').map(Number);
-        const issueDateObj = new Date(year, monthNum - 1, day);
-        const month = format(issueDateObj, 'MMM yyyy');
-        acc[month] = (acc[month] || 0) + loan.principal;
+    const disbursedStatuses = ['Active', 'Completed', 'In Arrears'];
+    const disbursalData = loans.filter(l => disbursedStatuses.includes(l.status)).reduce((acc, loan) => {
+        try {
+            const issueDateObj = new Date(loan.issueDate);
+            if (!isNaN(issueDateObj.getTime())) {
+                const month = format(issueDateObj, 'MMM yyyy');
+                acc[month] = (acc[month] || 0) + Number(loan.principal);
+            }
+        } catch (e) {
+            console.error("Error parsing loan date:", loan.issueDate);
+        }
         return acc;
     }, {} as Record<string, number>);
     const disbursalTrendData = monthLabels.map(month => ({ name: month, total: disbursalData[month] || 0 }));
@@ -180,14 +160,25 @@ export function AdminDashboard() {
         title={isSuperAdmin ? "Superadmin Dashboard" : "Admin Dashboard"}
         description={isSuperAdmin ? "Platform-wide overview of all organizations." : "Organization-wide overview of all lending activities."}
       >
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-4'>
+            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full border border-border animate-pulse-slow">
+                <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Live Updates</span>
+            </div>
             <Button variant="outline" onClick={() => router.push('/users')}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Manage Staff
             </Button>
-            <Button variant="outline" onClick={() => router.push('/branches')}>
+            <Button variant="outline" onClick={() => setIsAddBranchOpen(true)}>
                 <Building className="mr-2 h-4 w-4" />
-                Manage Branches
+                Create Branch
+            </Button>
+            <Button variant="secondary" onClick={() => setIsAddBorrowerOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Borrower
             </Button>
             <Button onClick={() => setIsAddProductOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
@@ -207,7 +198,7 @@ export function AdminDashboard() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <RecentActivity loans={loans} borrowers={borrowers} isLoading={isLoading} />
             <BranchPerformance loans={loans} branches={branches} isLoading={isLoading} />
-            <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData} isLoading={isLoading} />
+            <LoanOfficerLeaderboard leaderboardData={dashboardData?.leaderboardData || []} isLoading={isLoading} />
         </div>
          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <TopProducts loans={loans} loanProducts={loanProducts} isLoading={isLoading} />
@@ -225,6 +216,11 @@ export function AdminDashboard() {
          </div>
       </div>
       <AddLoanProductDialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen} />
+      <AddBranchDialog open={isAddBranchOpen} onOpenChange={setIsAddBranchOpen} />
+      <AddBorrowerDialog open={isAddBorrowerOpen} onOpenChange={(open) => {
+          setIsAddBorrowerOpen(open);
+          if (!open) fetchDashboardStats();
+      }} />
     </>
   );
 }

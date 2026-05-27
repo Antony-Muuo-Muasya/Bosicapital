@@ -1,15 +1,14 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, collection } from "firebase/firestore";
-import type { Loan, LoanProduct, Installment, Borrower } from '@/lib/types';
+import { getLoan } from "@/actions/loans";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, FileDown, Circle, CheckCircle, AlertCircle, User, Phone, Briefcase } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { startOfToday } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,54 +35,83 @@ const getInstallmentStatusConfig = (status: string) => {
 };
 
 export default function LoanDetailPage() {
+    const router = useRouter();
     const params = useParams() as { loanId: string };
     const loanId = params.loanId;
-    const firestore = useFirestore();
-    const router = useRouter();
+    const [data, setData] = useState<any | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    // All hooks must be called unconditionally before any early returns
+    const [isPaying, setIsPaying] = useState(false);
+    const [payPhone, setPayPhone] = useState("");
+    const [payAmount, setPayAmount] = useState("");
+    const [mounted, setMounted] = useState(false);
 
-    const loanRef = useMemoFirebase(() => doc(firestore, 'loans', loanId), [firestore, loanId]);
-    const { data: loan, isLoading: isLoadingLoan, error: loanError } = useDoc<Loan>(loanRef);
+    const fetchLoanData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const res = await getLoan(loanId);
+            if (res.success && res.loan) {
+                setData(res.loan);
+            } else {
+                setError(res.error || 'Loan not found');
+            }
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loanId]);
 
     useEffect(() => {
-        if (loanError) {
-            console.error("Permission denied or error fetching loan:", loanError.message);
+        fetchLoanData();
+    }, [fetchLoanData]);
+
+    useEffect(() => {
+        if (error && error.includes('not found')) {
+            console.error("Permission denied or error fetching loan:", error);
             router.replace('/access-denied');
         }
-    }, [loanError, router]);
+    }, [error, router]);
 
-    const productRef = useMemoFirebase(() => loan ? doc(firestore, 'loanProducts', loan.loanProductId) : null, [firestore, loan?.loanProductId]);
-    const { data: product, isLoading: isLoadingProduct } = useDoc<LoanProduct>(productRef);
+    useEffect(() => { setMounted(true); }, []);
 
-    const borrowerRef = useMemoFirebase(() => loan ? doc(firestore, 'borrowers', loan.borrowerId) : null, [firestore, loan?.borrowerId]);
-    const { data: borrower, isLoading: isLoadingBorrower } = useDoc<Borrower>(borrowerRef);
-
-    const installmentsQuery = useMemoFirebase(() => loanId ? collection(firestore, 'loans', loanId, 'installments') : null, [firestore, loanId]);
-    const { data: installments, isLoading: isLoadingInstallments } = useCollection<Installment>(installmentsQuery);
+    const loan = data;
+    const product = loan?.loanProduct;
+    const borrower = loan?.borrower;
+    const installments = loan?.installments;
     
     const sortedInstallments = useMemo(() => {
         if (!installments) return [];
         const today = startOfToday();
-        return installments.map(inst => {
-            const [year, month, day] = inst.dueDate.split('-').map(Number);
-            const dueDate = new Date(year, month - 1, day);
+        return installments.map((inst: any) => {
+            const dueDate = new Date(inst.dueDate);
             const isOverdue = dueDate < today && inst.status !== 'Paid';
             return {
                 ...inst,
                 status: isOverdue ? 'Overdue' : inst.status,
             };
-        }).sort((a,b) => a.installmentNumber - b.installmentNumber);
+        }).sort((a: any,b: any) => a.installmentNumber - b.installmentNumber);
     }, [installments]);
     
     const { totalPaid, totalOutstanding } = useMemo(() => {
         if (!installments || !loan) return { totalPaid: 0, totalOutstanding: 0 };
-        const paid = installments.reduce((acc, curr) => acc + curr.paidAmount, 0);
+        const paid = installments.reduce((acc: any, curr: any) => acc + curr.paidAmount, 0);
         return {
             totalPaid: paid,
-            totalOutstanding: loan.totalPayable - paid
+            totalOutstanding: (loan.totalPayable - paid) > 0 ? (loan.totalPayable - paid) : 0
         }
     }, [installments, loan]);
 
-    const isLoading = isLoadingLoan || isLoadingProduct || isLoadingInstallments || isLoadingBorrower;
+    // Prefill phone/amount when borrower data arrives
+    useEffect(() => {
+        if (borrower?.phone && !payPhone) {
+            setPayPhone(borrower.phone);
+        }
+        if (totalOutstanding > 0 && !payAmount) {
+            setPayAmount(String(totalOutstanding));
+        }
+    }, [borrower?.phone, totalOutstanding]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (isLoading) {
         return (
@@ -106,14 +134,87 @@ export default function LoanDetailPage() {
         )
     }
 
+    if (!mounted) {
+        return <div className="flex items-center justify-center h-screen"><Loader2 className="h-10 w-10 animate-spin" /></div>;
+    }
+
+    const handleDownload = () => {
+        if (!loan || !product || !sortedInstallments) return;
+
+        const csvRows = [];
+        
+        csvRows.push(`LOAN STATEMENT - ${product.name.toUpperCase()}`);
+        csvRows.push(`Organization,Bosi Capital Limited`);
+        csvRows.push(`Loan ID,${loan.id}`);
+        csvRows.push(`Borrower,${borrower?.fullName || 'N/A'}`);
+        csvRows.push(`Date Generated,${new Date().toLocaleString()}`);
+        csvRows.push('');
+
+        csvRows.push('SUMMARY');
+        csvRows.push(`Principal Amount,${loan.principal}`);
+        csvRows.push(`Total Payable,${loan.totalPayable}`);
+        csvRows.push(`Total Paid,${totalPaid}`);
+        csvRows.push(`Outstanding Balance,${totalOutstanding}`);
+        csvRows.push(`Status,${loan.status}`);
+        csvRows.push('');
+
+        csvRows.push('REPAYMENT SCHEDULE');
+        csvRows.push('Installment #,Due Date,Expected Amount,Paid Amount,Status');
+        sortedInstallments.forEach((inst: any) => {
+            csvRows.push(`${inst.installmentNumber},${inst.dueDate},${inst.expectedAmount},${inst.paidAmount},${inst.status}`);
+        });
+        csvRows.push('');
+
+        if (loan.repayments && loan.repayments.length > 0) {
+            csvRows.push('PAYMENT HISTORY');
+            csvRows.push('Payment Date,Transaction ID,Amount,Method,Phone/Ref');
+            loan.repayments.forEach((rep: any) => {
+                csvRows.push(`${new Date(rep.paymentDate).toLocaleDateString()},${rep.id},${rep.amount},${rep.method},${rep.phone || rep.reference || ''}`);
+            });
+        }
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Statement_${loan.id.substring(0,8)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleStkPush = async () => {
+        if (!payPhone || !payAmount) return alert("Please enter phone and amount.");
+        setIsPaying(true);
+        try {
+            const res = await fetch("/api/payments/stk-push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: payPhone, amount: payAmount, loanId: loan.id, nationalId: borrower?.nationalId })
+            });
+            const d = await res.json();
+            if (d.success) {
+                alert("STK Push sent! Please check the phone (" + payPhone + ") and enter the M-Pesa PIN.");
+                setPayAmount("");
+            } else {
+                alert("Failed: " + (d.error || "Please try again later."));
+                console.error(d);
+            }
+        } catch (e) {
+            alert("Error sending request.");
+        } finally {
+            setIsPaying(false);
+        }
+    };
+
     return (
         <div className="max-w-5xl mx-auto py-8 px-4 md:px-6">
-             <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${loan.id.substring(0, 8)}`}>
-                <Button variant="outline">
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Download Statement
-                </Button>
-            </PageHeader>
+                 <PageHeader title={product?.name || 'Loan Details'} description={`Details for loan #${String(loan.id).substring(0, 8)}`}>
+                    <Button variant="outline" onClick={handleDownload}>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download Statement
+                    </Button>
+                </PageHeader>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1 space-y-6">
@@ -123,8 +224,8 @@ export default function LoanDetailPage() {
                             <CardContent className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <Avatar className="h-12 w-12">
-                                        <AvatarImage src={borrower.photoUrl} alt={borrower.fullName} />
-                                        <AvatarFallback>{borrower.fullName.charAt(0)}</AvatarFallback>
+                                        <AvatarImage src={borrower.photoUrl || undefined} alt={borrower.fullName} />
+                                        <AvatarFallback className="text-xl">{borrower.fullName?.charAt(0) ?? '?'}</AvatarFallback>
                                     </Avatar>
                                     <div>
                                         <p className="font-semibold">{borrower.fullName}</p>
@@ -163,6 +264,68 @@ export default function LoanDetailPage() {
                              </div>
                         </CardContent>
                     </Card>
+
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader>
+                            <CardTitle className="text-primary flex items-center gap-2">
+                                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                                    <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+                                </svg>
+                                M-Pesa Repayment (STK Push)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Paybill Number</p>
+                                <p className="text-lg font-bold tracking-tight text-primary">4159879</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground uppercase font-semibold">Account Number (National ID)</p>
+                                <p className="text-lg font-bold tracking-tight text-primary select-all">{borrower?.nationalId || 'N/A'}</p>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground italic leading-relaxed">
+                                Use the National ID as the Account Number when paying via M-Pesa. The payment will be matched to this loan automatically.
+                            </p>
+                            
+                            <hr className="my-2 border-border" />
+                            
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold flex justify-between w-full">
+                                    <span>Send STK Prompt to Borrower</span>
+                                    {borrower?.phone && payPhone !== borrower.phone && (
+                                        <Badge 
+                                            variant="secondary" 
+                                            className="text-[9px] cursor-pointer hover:bg-secondary/80 py-0 h-4"
+                                            onClick={() => setPayPhone(borrower.phone)}
+                                        >
+                                            Reset to '{borrower.phone}'
+                                        </Badge>
+                                    )}
+                                </label>
+                                <div className="space-y-2">
+                                     <input 
+                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
+                                        placeholder="Phone (e.g. 0712345678)"
+                                        value={payPhone}
+                                        onChange={(e) => setPayPhone(e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="number"
+                                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
+                                            placeholder="Amount"
+                                            value={payAmount}
+                                            onChange={(e) => setPayAmount(e.target.value)}
+                                        />
+                                        <Button size="sm" className="h-9 whitespace-nowrap" onClick={handleStkPush} disabled={isPaying || !payPhone || !payAmount}>
+                                            {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Send Prompt"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <div className="md:col-span-2">
@@ -182,7 +345,7 @@ export default function LoanDetailPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {sortedInstallments.map(inst => {
+                                    {sortedInstallments.map((inst: any) => {
                                         const statusConfig = getInstallmentStatusConfig(inst.status);
                                         const Icon = statusConfig.icon;
                                         return (
@@ -192,7 +355,7 @@ export default function LoanDetailPage() {
                                             <TableCell>{formatCurrency(inst.expectedAmount, 'KES')}</TableCell>
                                             <TableCell>{formatCurrency(inst.paidAmount, 'KES')}</TableCell>
                                             <TableCell className="text-right">
-                                                <Badge variant={statusConfig.variant} className={cn('gap-1.5', statusConfig.className)}>
+                                                <Badge variant={statusConfig.variant as any} className={cn('gap-1.5', statusConfig.className)}>
                                                     <Icon className="h-3 w-3" />
                                                     {inst.status}
                                                 </Badge>

@@ -1,33 +1,34 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth, useUser } from '@/firebase';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { signIn } from 'next-auth/react';
 import Image from 'next/image';
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
+import { Suspense } from 'react';
 
-export default function LoginPage() {
-  const auth = useAuth();
+function LoginForm() {
   const router = useRouter();
-  const { user, isUserLoading } = useUser();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const logoUrl = "https://firebasestorage.googleapis.com/v0/b/studio-2397588411-6a237.firebasestorage.app/o/WhatsApp_Image_2026-02-11_at_4.10.39_PM-removebg-preview.png?alt=media&token=70d5cc88-c5e0-4cad-ba20-75cdf4230ef2";
+    const logoUrl = "/logo.png";
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -40,32 +41,36 @@ export default function LoginPage() {
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     setIsSubmitting(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      // On success, the useEffect will redirect the user.
+      const res = await signIn('credentials', {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+      });
+
+      if (res?.error) {
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description: res.error,
+        });
+      } else {
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back!',
+        });
+        router.push(callbackUrl);
+        router.refresh();
+      }
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: 'Invalid email or password. Please try again.',
+        description: 'An unexpected error occurred. Please try again.',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    if (!isUserLoading && user) {
-      router.push('/');
-    }
-  }, [user, isUserLoading, router]);
-
-  if (isUserLoading || user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -73,7 +78,7 @@ export default function LoginPage() {
         <div className="mb-6 flex justify-center">
           <Image
             src={logoUrl}
-            alt="Bosi Capital Logo"
+            alt="Bosi Capital Limited Logo"
             width={196}
             height={196}
             className="rounded-md"
@@ -83,10 +88,8 @@ export default function LoginPage() {
         </div>
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
-            <CardDescription className="!mt-4">
-              Enter your credentials to access your account.
-            </CardDescription>
+            <CardTitle className="text-2xl">Log In</CardTitle>
+            <CardDescription className="!mt-4">Enter your credentials to access your account.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -111,7 +114,25 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} autoComplete="new-password" />
+                        <div className="relative">
+                          <Input 
+                            type={showPassword ? "text" : "password"} 
+                            {...field} 
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -119,7 +140,7 @@ export default function LoginPage() {
                 />
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Login
+                  Log In
                 </Button>
               </form>
             </Form>
@@ -127,5 +148,17 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    }>
+        <LoginForm />
+    </Suspense>
   );
 }

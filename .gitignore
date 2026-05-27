@@ -34,3 +34,8 @@ functions/.env
 
 # vercel
 .vercel
+
+/src/generated/prisma
+tsconfig.tsbuildinfo
+
+.env*.local

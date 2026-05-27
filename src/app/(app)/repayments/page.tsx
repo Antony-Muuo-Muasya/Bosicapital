@@ -5,8 +5,12 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
 import type { Repayment, Borrower, Loan, LoanProduct } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useUserProfile } from '@/providers/user-profile';
+import { getRepayments } from '@/actions/repayments';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -20,53 +24,90 @@ import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function RepaymentsPage() {
-  const firestore = useFirestore();
   const { user, userProfile, isLoading: isProfileLoading } = useUserProfile();
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
   const organizationId = userProfile?.organizationId;
+  const roleId = userProfile?.roleId;
+  const branchIds = userProfile?.branchIds;
+  const userId = user?.id;
 
-  // Query for loans visible to the current user
-  const loansQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile || !user) return null;
-    const { roleId, branchIds } = userProfile;
-    const loansCol = collection(firestore, 'loans');
+  const [visibleLoans, setVisibleLoans] = useState<Loan[] | null>(null);
+  const [allRepayments, setAllRepayments] = useState<Repayment[] | null>(null);
+  const [allBorrowers, setAllBorrowers] = useState<Borrower[] | null>(null);
+  const [loanProducts, setLoanProducts] = useState<LoanProduct[] | null>(null);
 
-    if (isSuperAdmin) return loansCol;
-    if (roleId === 'admin') {
-      return query(loansCol, where('organizationId', '==', organizationId));
-    }
-    if (roleId === 'manager' && branchIds?.length > 0) {
-      return query(loansCol, where('organizationId', '==', organizationId), where('branchId', 'in', branchIds));
-    }
-    if (roleId === 'loan_officer') {
-      return query(loansCol, where('organizationId', '==', organizationId), where('loanOfficerId', '==', user.uid));
-    }
-    return null;
-  }, [firestore, user?.uid, organizationId, userProfile?.roleId, JSON.stringify(userProfile?.branchIds), isSuperAdmin]);
-  const { data: visibleLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
+  const [isLoadingLoans, setIsLoadingLoans] = useState(true);
+  const [isLoadingRepayments, setIsLoadingRepayments] = useState(true);
+  const [isLoadingBorrowers, setIsLoadingBorrowers] = useState(true);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
-  // Query all repayments for the organization. We will filter them on the client.
-  const repaymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    if (isSuperAdmin) return collection(firestore, 'repayments');
-    return query(collection(firestore, 'repayments'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-  const { data: allRepayments, isLoading: isLoadingRepayments } = useCollection<Repayment>(repaymentsQuery);
+  const fetchLoans = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingLoans(true);
+      try {
+          const res = await getLoans(
+              organizationId!, 
+              undefined, 
+              (roleId === 'manager' || roleId === 'loan_officer') ? branchIds : undefined,
+              roleId === 'loan_officer' ? userId : undefined
+          );
+          if (res.success && res.loans) {
+              setVisibleLoans(res.loans as any);
+          }
+      } catch (err) { console.error(err) } finally { setIsLoadingLoans(false) }
+  }, [userProfile, organizationId, roleId, branchIds, userId]);
 
-  // Query for all borrowers & products in the organization for data enrichment.
-  const borrowersQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    if (isSuperAdmin) return collection(firestore, 'borrowers');
-    return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-  const { data: allBorrowers, isLoading: isLoadingBorrowers } = useCollection<Borrower>(borrowersQuery);
+  const fetchRepayments = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingRepayments(true);
+      try {
+          const res = await getRepayments(organizationId!);
+          if (res.success && res.repayments) {
+              setAllRepayments(res.repayments as any);
+          }
+      } catch (err) { console.error(err) } finally { setIsLoadingRepayments(false) }
+  }, [userProfile, organizationId]);
 
-  const loanProductsQuery = useMemoFirebase(() => {
-    if (!firestore || !organizationId) return null;
-    if (isSuperAdmin) return collection(firestore, 'loanProducts');
-    return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-  }, [firestore, organizationId, isSuperAdmin]);
-  const { data: loanProducts, isLoading: isLoadingProducts } = useCollection<LoanProduct>(loanProductsQuery);
+  const fetchBorrowers = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingBorrowers(true);
+      try {
+          const res = await getBorrowers(organizationId!);
+          if (res.success && res.borrowers) {
+              setAllBorrowers(res.borrowers as any);
+          }
+      } catch (err) { console.error(err) } finally { setIsLoadingBorrowers(false) }
+  }, [userProfile, organizationId]);
+
+  const fetchProducts = useCallback(async () => {
+      if (!userProfile || !organizationId) return;
+      setIsLoadingProducts(true);
+      try {
+          const res = await getLoanProducts(organizationId!);
+          if (res.success && res.products) {
+              setLoanProducts(res.products as any);
+          }
+      } catch (err) { console.error(err) } finally { setIsLoadingProducts(false) }
+  }, [userProfile, organizationId]);
+
+   useEffect(() => {
+      if (!isProfileLoading && userProfile) {
+          fetchLoans();
+          fetchRepayments();
+          fetchBorrowers();
+          fetchProducts();
+
+          // Fallback polling every 10 seconds
+          const interval = setInterval(() => {
+              fetchRepayments();
+          }, 10000);
+
+          return () => {
+              clearInterval(interval);
+          }
+
+      }
+   }, [isProfileLoading, userProfile, fetchLoans, fetchRepayments, fetchBorrowers, fetchProducts]);
 
   const isLoading = isProfileLoading || isLoadingLoans || isLoadingRepayments || isLoadingBorrowers || isLoadingProducts;
 
@@ -74,21 +115,27 @@ export default function RepaymentsPage() {
     if (isLoading || !allRepayments || !allBorrowers || !visibleLoans || !loanProducts) return [];
 
     const visibleLoanIds = new Set(visibleLoans.map(l => l.id));
-    const repayments = allRepayments.filter(r => visibleLoanIds.has(r.loanId));
-
     const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
     const loansMap = new Map(visibleLoans.map(l => [l.id, l]));
     const loanProductsMap = new Map(loanProducts.map(p => [p.id, p]));
 
-    return repayments.map(repayment => {
-      const loan = loansMap.get(repayment.loanId);
-      const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
+    // Filter: Include loan repayments if the loan is visible, OR all registration fees for the org
+    const filteredRepayments = allRepayments.filter((r: any) => {
+      if (r.type === 'Registration Fee') return true;
+      return visibleLoanIds.has(r.loanId);
+    });
+
+    return filteredRepayments.map((repayment: any) => {
+      const loan = repayment.loanId ? loansMap.get(repayment.loanId) : null;
+
+      const borrower = (repayment as any).borrowerId ? borrowersMap.get((repayment as any).borrowerId) : (loan ? borrowersMap.get(loan.borrowerId) : undefined);
       const product = loan ? loanProductsMap.get(loan.loanProductId) : undefined;
 
       return {
         ...repayment,
-        borrowerName: borrower?.fullName || 'Unknown Borrower',
-        loanProductName: product?.name || 'Unknown Product',
+        borrowerName: borrower?.fullName || (repayment as any).borrowerName || 'Unknown Borrower',
+        loanProductName: product?.name || repayment.type || 'Loan Repayment',
+        displayLoanId: repayment.loanId ? repayment.loanId.substring(0, 12) + '...' : 'Registration'
       };
     }).sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
   }, [allRepayments, allBorrowers, visibleLoans, loanProducts, isLoading]);
@@ -129,11 +176,42 @@ export default function RepaymentsPage() {
   return (
     <>
       <PageHeader title="Repayments" description="Record and track all incoming payments.">
-        <Button variant="outline" onClick={handleExport} disabled={isLoading || !repaymentsWithDetails?.length}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Export Report
-        </Button>
+        <div className="flex flex-col md:flex-row gap-2 items-end">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold px-1">Missing a payment?</span>
+            <div className="flex gap-1">
+              <input 
+                id="mpesaCodeInput"
+                placeholder="M-Pesa Code (e.g. RLK4...)" 
+                className="h-9 px-3 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary w-48"
+              />
+              <Button 
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                   const code = (document.getElementById('mpesaCodeInput') as HTMLInputElement).value;
+                   if(!code) return alert('Enter M-Pesa Code');
+                   const res = await fetch('/api/payments/sync', {
+                     method: 'POST',
+                     body: JSON.stringify({ mpesaCode: code })
+                   });
+                   const data = await res.json();
+                   alert(data.success ? 'Payment Found & Processed!' : (data.error || 'Check again in 5 minutes'));
+                }}
+              >
+                Sync
+              </Button>
+            </div>
+          </div>
+          <div className="h-9 w-[1px] bg-border mx-2 hidden md:block" />
+          <Button variant="outline" onClick={handleExport} disabled={isLoading || !repaymentsWithDetails?.length} className="h-9">
+            <FileDown className="mr-2 h-4 w-4" />
+            Export Report
+          </Button>
+        </div>
       </PageHeader>
+
+
       <div className="p-4 md:p-6">
         <Card>
           <CardHeader>
@@ -166,7 +244,7 @@ export default function RepaymentsPage() {
                   <TableRow key={repayment.id}>
                     <TableCell>
                       <div className="font-medium">{repayment.borrowerName}</div>
-                      <div className="text-sm text-muted-foreground">{repayment.loanId.substring(0,12)}...</div>
+                      <div className="text-sm text-muted-foreground">{repayment.displayLoanId}</div>
                     </TableCell>
                     <TableCell>{repayment.loanProductName}</TableCell>
                     <TableCell>{new Date(repayment.paymentDate).toLocaleDateString()}</TableCell>

@@ -58,7 +58,7 @@ export function DisbursalTrendChart({ data, isLoading }: DisbursalTrendChartProp
                     <YAxis 
                         tickFormatter={(value) => formatCurrency(Number(value), 'KES').replace('KES', '').replace('.00', '')}
                     />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value), 'KES')} />} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value: any) => formatCurrency(Number(value), 'KES')} />} />
                     <Bar dataKey="total" fill="var(--color-total)" radius={4} />
                 </BarChart>
             </ChartContainer>

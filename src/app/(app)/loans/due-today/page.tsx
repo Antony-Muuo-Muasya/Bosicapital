@@ -1,9 +1,12 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
+import { useUserProfile } from '@/providers/user-profile';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getInstallments } from '@/actions/installments';
 import type { Loan, Borrower, Installment, LoanProduct } from '@/lib/types';
-import { useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startOfToday } from 'date-fns';
 import {
   ColumnDef,
@@ -52,7 +55,7 @@ export const dueTodayColumns: ColumnDef<DueInstallmentWithDetails>[] = [
           <div className="flex items-center gap-3">
             <Avatar className="hidden h-9 w-9 sm:flex">
               <AvatarImage src={installment.borrowerPhotoUrl} alt={installment.borrowerName} />
-              <AvatarFallback>{installment.borrowerName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{installment.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
             </Avatar>
             <div className="grid gap-0.5">
               <span className="font-medium">{installment.borrowerName}</span>
@@ -70,7 +73,7 @@ export const dueTodayColumns: ColumnDef<DueInstallmentWithDetails>[] = [
       accessorKey: 'expectedAmount',
       header: () => <div className="text-right">Amount Due</div>,
       cell: ({ row }) => {
-        const amount = parseFloat(row.original.expectedAmount) - parseFloat(row.original.paidAmount);
+        const amount = row.original.expectedAmount - row.original.paidAmount;
         return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
       },
     },
@@ -154,49 +157,70 @@ function DueTodayTable<TData, TValue>({
 }
 
 export default function DueTodayPage() {
-    const firestore = useFirestore();
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
 
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
     const organizationId = userProfile?.organizationId;
-    const branchIds = userProfile?.branchIds;
+    const branchIds = userProfile?.branchIds || [];
 
     const todayISO = startOfToday().toISOString().split('T')[0];
 
-    const dueTodayQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        const installmentsCol = collectionGroup(firestore, 'installments');
-        
-        return query(installmentsCol, where('dueDate', '==', todayISO));
-    }, [firestore, todayISO]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [dueInstallments, setDueInstallments] = useState<Installment[] | null>(null);
+    const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
+    const [allBorrowers, setAllBorrowers] = useState<Borrower[] | null>(null);
+    const [allProducts, setAllProducts] = useState<LoanProduct[] | null>(null);
 
-    const { data: dueInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(dueTodayQuery);
-    
-    const allLoansQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loans');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allLoans } = useCollection<Loan>(allLoansQuery);
+    const fetchDueTodayData = useCallback(async () => {
+        if (!userProfile) return;
+        setIsLoading(true);
+        try {
+            const org = isSuperAdmin ? undefined : organizationId!;
+            // Fetch installments due today
+            const instRes = await getInstallments(org, undefined, todayISO);
+            if (instRes.success && instRes.installments) {
+                setDueInstallments(instRes.installments as any);
+            }
 
-    const allBorrowersQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'borrowers');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allBorrowers } = useCollection<Borrower>(allBorrowersQuery);
+            // Loans
+            const loansRes = await getLoans(org);
+            if (loansRes.success && loansRes.loans) {
+                setAllLoans(loansRes.loans as any);
+            }
 
-    const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loanProducts');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allProducts } = useCollection<LoanProduct>(allProductsQuery);
+            // Borrowers
+            const borrowersRes = await getBorrowers(org);
+            if (borrowersRes.success && borrowersRes.borrowers) {
+                setAllBorrowers(borrowersRes.borrowers as any);
+            }
 
-    const isLoading = isProfileLoading || isLoadingInstallments;
+            // Products
+            const productsRes = await getLoanProducts(org);
+            if (productsRes.success && productsRes.products) {
+                setAllProducts(productsRes.products as any);
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [userProfile, organizationId, todayISO]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchDueTodayData();
+        }
+    }, [isProfileLoading, userProfile, fetchDueTodayData]);
+
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            const interval = setInterval(() => {
+                fetchDueTodayData();
+            }, 30000); // 30 seconds
+            return () => clearInterval(interval);
+        }
+    }, [isProfileLoading, userProfile, fetchDueTodayData]);
 
     const dueTodayWithDetails = useMemo(() => {
         if (!dueInstallments || !allLoans || !allBorrowers || !allProducts || !userProfile) return [];

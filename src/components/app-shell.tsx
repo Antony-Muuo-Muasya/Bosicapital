@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -47,9 +48,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useAuth, useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 import { ThemeToggle } from './theme-toggle';
 import { AppFooter } from './app-footer';
+import { signOut } from 'next-auth/react';
 
 
 const allNavItems = [
@@ -66,7 +68,7 @@ const allNavItems = [
       { href: '/loans/due-today', label: 'Due Today' },
     ]
   },
-  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['manager', 'superadmin'] },
+  { href: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['admin', 'manager', 'superadmin'] },
   { href: '/disbursements', label: 'Disbursements', icon: FileKey, roles: ['admin', 'superadmin'] },
   { href: '/borrowers', label: 'Borrowers', icon: Users, roles: ['admin', 'manager', 'loan_officer'] },
   { href: '/repayments', label: 'Repayments', icon: FileText, roles: ['admin', 'manager', 'loan_officer'] },
@@ -129,8 +131,8 @@ const CollapsibleNavLink = ({ item }: { item: typeof allNavItems[1] }) => {
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-1">
                 <div className="pl-9 space-y-1">
-                    {item.children.map(child => {
-                        const otherChildren = item.children.filter(c => c.href !== '/loans');
+                    {item.children?.map(child => {
+                        const otherChildren = item.children?.filter(c => c.href !== '/loans') || [];
                         const isOtherChildActive = otherChildren.some(c => pathname === c.href);
                         
                         let isActive = false;
@@ -159,14 +161,31 @@ const CollapsibleNavLink = ({ item }: { item: typeof allNavItems[1] }) => {
     )
 }
 
+function SidebarSkeleton() {
+    return (
+        <div className="grid items-start px-2 text-sm font-medium lg:px-4 space-y-2">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2">
+                    <Skeleton className="h-4 w-4 rounded-md" />
+                    <Skeleton className="h-4 w-[100px]" />
+                </div>
+            ))}
+        </div>
+    )
+}
+
 function SidebarNav() {
-  const { userRole } = useUserProfile();
+  const { userRole, isLoading } = useUserProfile();
 
   const visibleNavItems = React.useMemo(() => {
     if (!userRole) return [];
     if (userRole.id === 'superadmin') return allNavItems;
     return allNavItems.filter(item => item.roles.includes(userRole.id));
   }, [userRole]);
+
+  if (isLoading && !userRole) {
+      return <SidebarSkeleton />;
+  }
 
 
   return (
@@ -182,7 +201,6 @@ function SidebarNav() {
 }
 
 function Header() {
-  const auth = useAuth();
   const { user, userProfile, organization } = useUserProfile();
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   
@@ -193,9 +211,7 @@ function Header() {
       ? `${nameParts[0].charAt(0)}${nameParts[1].charAt(0)}`
       : user?.email?.charAt(0).toUpperCase() || 'U';
 
-  const displayLogoUrl = React.useMemo(() => {
-    return transformImageUrl(organization?.logoUrl);
-  }, [organization]);
+  const displayLogoUrl = '/logo.png';
 
 
   return (
@@ -214,11 +230,11 @@ function Header() {
                 className="flex flex-col items-center gap-2 text-lg font-semibold mb-4 text-center"
               >
                 <Link href="/dashboard" className="flex flex-col items-center gap-1">
-                  {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" style={{ height: 'auto' }} />}
-                  <span className="font-headline text-xl">{organization?.name || ''}</span>
-                  {organization?.slogan && <p className="text-xs text-muted-foreground -mt-1 font-normal">{organization.slogan}</p>}
+                  <img src="/logo.png" alt="Bosi Capital Limited" width="196" className="rounded-md h-auto" />
+                  <span className="font-headline text-xl">Bosi Capital Limited</span>
                 </Link>
-                {user?.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
+                <p className="text-[10px] text-primary/80 uppercase tracking-widest font-bold text-center">Partnering for your financial success.</p>
+                {user?.email && <p className="text-xs text-muted-foreground mt-1">{user.email}</p>}
               </div>
                <SidebarNav />
             </nav>
@@ -255,7 +271,7 @@ function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={userProfile?.avatarUrl || user?.photoURL || undefined} alt={displayName || ''} />
+                <AvatarImage src={userProfile?.avatarUrl || undefined} alt={displayName || ''} />
                 <AvatarFallback>{fallback}</AvatarFallback>
               </Avatar>
               <span className="sr-only">Toggle user menu</span>
@@ -269,7 +285,7 @@ function Header() {
             </DropdownMenuItem>
             <DropdownMenuItem>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => auth.signOut()}>
+            <DropdownMenuItem onClick={() => signOut()}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
@@ -300,9 +316,7 @@ function Header() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { organization, user } = useUserProfile();
 
-  const displayLogoUrl = React.useMemo(() => {
-    return transformImageUrl(organization?.logoUrl);
-  }, [organization]);
+  const displayLogoUrl = '/logo.png';
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -310,11 +324,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex flex-col items-center justify-center gap-2 border-b p-6">
             <Link href="/dashboard" className="flex flex-col items-center gap-1 font-semibold text-center">
-              {displayLogoUrl && <Image src={displayLogoUrl} alt={organization?.name || ''} width={196} height={196} className="rounded-md" style={{ height: 'auto' }} />}
-              <span className="font-headline text-xl">{organization?.name || ''}</span>
-              {organization?.slogan && <p className="text-xs text-muted-foreground -mt-1 font-normal">{organization.slogan}</p>}
+              <img src="/logo.png" alt="Bosi Capital Limited" width="196" className="rounded-md h-auto" />
+              <span className="font-headline text-xl">Bosi Capital Limited</span>
             </Link>
-            {user?.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
+            <p className="text-[10px] text-primary/80 uppercase tracking-widest font-bold -mt-1 text-center">Partnering for your financial success.</p>
+            {user?.email && <p className="text-xs text-muted-foreground mt-1">{user.email}</p>}
           </div>
           <div className="flex-1">
             <SidebarNav />

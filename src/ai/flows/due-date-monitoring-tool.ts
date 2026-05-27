@@ -1,18 +1,9 @@
 'use server';
 
-// This type is exported to prevent breaking the import in DueDateMonitor.tsx.
-// The actual AI functionality is commented out below to resolve dependency issues.
-export type DueDateMonitoringInput = {
-    repaymentHistory: string;
-    externalEvents: string;
-    upcomingSchedule: string;
-    overdueSchedule: string;
-    currentSchedule: string;
-};
+'use server';
 
-/*
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const DueDateMonitoringInputSchema = z.object({
   repaymentHistory: z
@@ -70,15 +61,15 @@ const dueDateMonitoringPrompt = ai.definePrompt({
   Include the risk assessment and recommendations in the output.`,
 });
 
-const dueDateMonitoringFlow = ai.defineFlow(
+export const dueDateMonitoringFlow = ai.defineFlow(
   {
     name: 'dueDateMonitoringFlow',
     inputSchema: DueDateMonitoringInputSchema,
     outputSchema: DueDateMonitoringOutputSchema,
   },
-  async input => {
+  async (input: any) => {
     const {output} = await dueDateMonitoringPrompt(input);
     return output!;
   }
 );
-*/
+

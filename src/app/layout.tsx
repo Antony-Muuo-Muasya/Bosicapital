@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { UserProfileProvider } from '@/providers/user-profile';
 import { ThemeProvider } from '@/components/theme-provider';
+import AuthProvider from '@/components/providers/session-provider';
+
 
 export const metadata: Metadata = {
-  title: 'Lending Platform',
-  description: 'Your trusted lending partner',
+  title: 'Bosi Capital Limited',
+  description: 'Partnering for your financial success.',
 };
 
 export default function RootLayout({
@@ -47,17 +49,19 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
-            {children}
-            <Toaster />
-          </FirebaseClientProvider>
+          <AuthProvider>
+            <UserProfileProvider>
+                {children}
+                <Toaster />
+            </UserProfileProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

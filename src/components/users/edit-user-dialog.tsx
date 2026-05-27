@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { updateUser } from '@/actions/users';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,7 +33,6 @@ interface EditUserDialogProps {
 }
 
 export function EditUserDialog({ user, roles, branches, open, onOpenChange }: EditUserDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,19 +46,22 @@ export function EditUserDialog({ user, roles, branches, open, onOpenChange }: Ed
     },
   });
 
-  const onSubmit = (values: UserFormData) => {
+  const onSubmit = async (values: UserFormData) => {
     setIsSubmitting(true);
-    const userDocRef = doc(firestore, 'users', user.id);
     
-    updateDocumentNonBlocking(userDocRef, values)
-      .then(() => {
+    try {
+      const res = await updateUser(user.id, values);
+      if (res.success) {
         toast({ title: 'Success', description: 'User updated successfully.' });
         onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update user.' });
-      })
-      .finally(() => setIsSubmitting(false));
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not update user.' });
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update user.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { updateBranch } from '@/actions/branches';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Branch } from '@/lib/types';
@@ -27,7 +26,6 @@ interface EditBranchDialogProps {
 }
 
 export function EditBranchDialog({ branch, open, onOpenChange }: EditBranchDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,19 +37,22 @@ export function EditBranchDialog({ branch, open, onOpenChange }: EditBranchDialo
     },
   });
 
-  const onSubmit = (values: BranchFormData) => {
+  const onSubmit = async (values: BranchFormData) => {
     setIsSubmitting(true);
-    const branchDocRef = doc(firestore, 'branches', branch.id);
     
-    updateDocumentNonBlocking(branchDocRef, values)
-      .then(() => {
+    try {
+      const res = await updateBranch(branch.id, values);
+      if (res.success) {
         toast({ title: 'Success', description: 'Branch updated.' });
         onOpenChange(false);
-      })
-      .catch(err => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update branch.' });
-      })
-      .finally(() => setIsSubmitting(false));
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'Could not update branch.' });
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update branch.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

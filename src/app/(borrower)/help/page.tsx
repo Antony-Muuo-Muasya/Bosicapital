@@ -3,12 +3,12 @@ import { PageHeader } from "@/components/page-header";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Phone, Mail, MapPin, Loader2 } from "lucide-react";
-import { useUserProfile } from "@/firebase";
+import { useUserProfile } from '@/providers/user-profile';
 
 const faqs = [
     {
         question: "How do I make a payment via M-Pesa?",
-        answer: "Go to your M-Pesa menu and select 'Lipa na M-Pesa', then 'Pay Bill'. Enter Business Number: 4159879. For the Account Number, please enter your National ID number. Enter the amount you wish to pay and complete the transaction with your M-Pesa PIN."
+        answer: "Go to your M-Pesa menu and select 'Lipa na M-Pesa', then 'Pay Bill'. Enter Business Number: 4159879. For the Account Number, please enter your National ID (ID Number). Enter the amount you wish to pay and complete the transaction with your M-Pesa PIN."
     },
     {
         question: "What happens if I miss a payment?",

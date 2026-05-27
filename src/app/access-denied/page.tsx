@@ -1,18 +1,18 @@
 'use client';
 
-import { AdooLogo } from '@/components/icons';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useUserProfile } from '@/firebase';
+import { useUserProfile } from '@/providers/user-profile';
 
 export default function AccessDeniedPage() {
     const router = useRouter();
     const { userProfile } = useUserProfile();
 
     const handleReturn = () => {
-        if (userProfile?.roleId === 'user') {
+        if (userProfile?.roleId === 'borrower') {
             router.push('/my-dashboard');
         } else {
             router.push('/dashboard');

@@ -1,9 +1,14 @@
 'use client';
 import { PageHeader } from '@/components/page-header';
-import { useCollection, useFirestore, useMemoFirebase, useUserProfile } from '@/firebase';
-import { collection, query, where, collectionGroup, documentId } from 'firebase/firestore';
+import { MpesaPromptDialog } from '@/components/loans/mpesa-prompt-dialog';
+import { Smartphone } from 'lucide-react';
+import { useUserProfile } from '@/providers/user-profile';
+import { getLoans } from '@/actions/loans';
+import { getBorrowers } from '@/actions/borrowers';
+import { getLoanProducts } from '@/actions/loan-products';
+import { getInstallments } from '@/actions/installments';
 import type { Loan, Borrower, Installment, LoanProduct } from '@/lib/types';
-import { useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startOfToday } from 'date-fns';
 import {
   ColumnDef,
@@ -29,6 +34,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 type DefaulterLoan = Loan & {
     borrowerName: string;
     borrowerPhotoUrl: string;
+    borrowerPhone: string;
+    nationalId: string;
     loanProductName: string;
     overdueAmount: number;
     daysOverdue: number;
@@ -44,7 +51,7 @@ export const defaulterColumns: ColumnDef<DefaulterLoan>[] = [
           <div className="flex items-center gap-3">
             <Avatar className="hidden h-9 w-9 sm:flex">
               <AvatarImage src={loan.borrowerPhotoUrl} alt={loan.borrowerName} />
-              <AvatarFallback>{loan.borrowerName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{loan.borrowerName?.charAt(0) ?? '?'}</AvatarFallback>
             </Avatar>
             <div className="grid gap-0.5">
               <span className="font-medium">{loan.borrowerName}</span>
@@ -68,7 +75,35 @@ export const defaulterColumns: ColumnDef<DefaulterLoan>[] = [
         header: 'Days Overdue',
         cell: ({ row }) => <Badge variant="destructive">{row.original.daysOverdue} days</Badge>,
     },
+    {
+        id: 'actions',
+        cell: ({ row }) => {
+            const loan = row.original;
+            return <DefaulterActions loan={loan} />;
+        }
+    }
 ];
+
+const DefaulterActions = ({ loan }: { loan: DefaulterLoan }) => {
+    const [isPromptOpen, setIsPromptOpen] = useState(false);
+    return (
+        <>
+            <Button size="sm" variant="outline" onClick={() => setIsPromptOpen(true)} className="gap-2">
+                <Smartphone className="h-4 w-4" />
+                Prompt
+            </Button>
+            <MpesaPromptDialog 
+                open={isPromptOpen}
+                onOpenChange={setIsPromptOpen}
+                loanId={loan.id}
+                borrowerName={loan.borrowerName}
+                phone={loan.borrowerPhone}
+                amount={loan.overdueAmount}
+                nationalId={loan.nationalId}
+            />
+        </>
+    );
+};
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -140,58 +175,59 @@ function DefaultersTable<TData, TValue>({
 }
 
 export default function DefaultersPage() {
-    const firestore = useFirestore();
     const { userProfile, isLoading: isProfileLoading } = useUserProfile();
 
     const isSuperAdmin = userProfile?.roleId === 'superadmin';
     const organizationId = userProfile?.organizationId;
-    const branchIds = userProfile?.branchIds;
+    const branchIds = userProfile?.branchIds || [];
 
     const today = startOfToday();
 
-    const allInstallmentsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        const installmentsCol = collectionGroup(firestore, 'installments');
-        
-        let q = query(installmentsCol);
+    const [isLoading, setIsLoading] = useState(true);
+    const [allInstallments, setAllInstallments] = useState<Installment[] | null>(null);
+    const [allLoans, setAllLoans] = useState<Loan[] | null>(null);
 
-        if (!isSuperAdmin && organizationId) {
-            q = query(q, where('organizationId', '==', organizationId));
+    const fetchDefaultersData = useCallback(async () => {
+        if (!userProfile) return;
+        setIsLoading(true);
+        try {
+            const org = isSuperAdmin ? undefined : organizationId!;
+            // Fetch all installments
+            const instRes = await getInstallments(org);
+            if (instRes.success && instRes.installments) {
+                setAllInstallments(instRes.installments as any);
+            }
+
+            // Loans
+            const loansRes = await getLoans(org);
+            if (loansRes.success && loansRes.loans) {
+                setAllLoans(loansRes.loans as any);
+            }
+
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
         }
-        return q;
-    }, [firestore, organizationId, isSuperAdmin]);
+    }, [userProfile, organizationId]);
 
-    const { data: allInstallments, isLoading: isLoadingInstallments } = useCollection<Installment>(allInstallmentsQuery);
-    
-    // Fetch all related data for enrichment
-    const allLoansQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loans');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loans'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allLoans } = useCollection<Loan>(allLoansQuery);
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            fetchDefaultersData();
+        }
+    }, [isProfileLoading, userProfile, fetchDefaultersData]);
 
-    const allBorrowersQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'borrowers');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'borrowers'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allBorrowers } = useCollection<Borrower>(allBorrowersQuery);
-
-    const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        if (isSuperAdmin) return collection(firestore, 'loanProducts');
-        if (!organizationId) return null;
-        return query(collection(firestore, 'loanProducts'), where('organizationId', '==', organizationId));
-    }, [firestore, organizationId, isSuperAdmin]);
-    const { data: allProducts } = useCollection<LoanProduct>(allProductsQuery);
-
-    const isLoading = isProfileLoading || isLoadingInstallments;
+    useEffect(() => {
+        if (!isProfileLoading && userProfile) {
+            const interval = setInterval(() => {
+                fetchDefaultersData();
+            }, 30000); // 30 seconds
+            return () => clearInterval(interval);
+        }
+    }, [isProfileLoading, userProfile, fetchDefaultersData]);
 
     const defaulterLoans = useMemo(() => {
-        if (!allInstallments || !allLoans || !allBorrowers || !allProducts) return [];
+        if (!allInstallments || !allLoans) return [];
 
         // Client-side filtering for overdue installments
         const overdueInstallments = allInstallments.filter(inst => {
@@ -200,8 +236,6 @@ export default function DefaultersPage() {
         });
 
         const loansMap = new Map(allLoans.map(l => [l.id, l]));
-        const borrowersMap = new Map(allBorrowers.map(b => [b.id, b]));
-        const productsMap = new Map(allProducts.map(p => [p.id, p.name]));
 
         let installments = overdueInstallments;
         if (userProfile?.roleId === 'manager' || userProfile?.roleId === 'loan_officer') {
@@ -225,25 +259,25 @@ export default function DefaultersPage() {
         
         return Object.keys(overdueByLoan).map(loanId => {
             const loan = loansMap.get(loanId);
-            const borrower = loan ? borrowersMap.get(loan.borrowerId) : undefined;
-            const product = loan ? productsMap.get(loan.loanProductId) : undefined;
             const overdueInfo = overdueByLoan[loanId];
 
-            if (!loan || !borrower || !product) return null;
+            if (!loan) return null;
             
             const daysOverdue = Math.floor((today.getTime() - overdueInfo.oldestDueDate.getTime()) / (1000 * 60 * 60 * 24));
 
             return {
                 ...loan,
-                borrowerName: borrower.fullName,
-                borrowerPhotoUrl: borrower.photoUrl || `https://picsum.photos/seed/${borrower.id}/400/400`,
-                loanProductName: product.name,
+                borrowerName: (loan as any).borrowerName || 'Unknown Borrower',
+                borrowerPhotoUrl: (loan as any).borrowerPhotoUrl || `https://picsum.photos/seed/${loan.borrowerId}/400/400`,
+                borrowerPhone: (loan as any).borrowerPhone,
+                nationalId: (loan as any).borrowerNationalId,
+                loanProductName: (loan as any).productName || 'Unknown Product',
                 overdueAmount: overdueInfo.overdueAmount,
                 daysOverdue: daysOverdue > 0 ? daysOverdue : 1,
             }
         }).filter(Boolean) as DefaulterLoan[];
 
-    }, [allInstallments, allLoans, allBorrowers, allProducts, userProfile, branchIds, today]);
+    }, [allInstallments, allLoans, userProfile, branchIds, today]);
 
 
   return (

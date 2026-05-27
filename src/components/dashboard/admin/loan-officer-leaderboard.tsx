@@ -63,7 +63,7 @@ export function LoanOfficerLeaderboard({ leaderboardData, isLoading }: LoanOffic
                                     <span className="font-bold text-muted-foreground w-4">{index+1}{index === 0 && <Trophy className="inline-block h-4 w-4 text-amber-400 ml-1"/>}</span>
                                     <Avatar className="hidden h-9 w-9 sm:flex">
                                         <AvatarImage src={officer.officerAvatar} alt={officer.officerName} />
-                                        <AvatarFallback>{officer.officerName.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback>{officer.officerName?.charAt(0) ?? '?'}</AvatarFallback>
                                     </Avatar>
                                     <div className="grid gap-0.5">
                                         <span className="font-medium">{officer.officerName}</span>

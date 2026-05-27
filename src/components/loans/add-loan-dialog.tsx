@@ -22,8 +22,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useUserProfile, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useUserProfile } from '@/providers/user-profile';
+import { createLoan } from '@/actions/loans';
 import { Loader2, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -53,10 +53,10 @@ interface AddLoanDialogProps {
   loanProducts: LoanProduct[];
   isLoading: boolean;
   preselectedBorrower?: Borrower | null;
+  onSuccess?: () => void;
 }
 
-export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading, preselectedBorrower = null }: AddLoanDialogProps) {
-  const firestore = useFirestore();
+export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isLoading, preselectedBorrower = null, onSuccess }: AddLoanDialogProps) {
   const { user, userProfile } = useUserProfile();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,20 +117,17 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
 
 
   const onSubmit = async (values: LoanFormData) => {
-    if (!user || !firestore || !selectedProduct || !userProfile || !userProfile.branchIds?.[0]) {
+    if (!user || !selectedProduct || !userProfile || !userProfile.branchIds?.[0]) {
         toast({ variant: 'destructive', title: 'Error', description: 'Missing required information or branch assignment.' });
         return;
     }
     setIsSubmitting(true);
-
-    const loanRef = doc(collection(firestore, 'loans'));
     
     const totalPayable = values.principal * 1.25;
     const numberOfInstallments = selectedProduct.duration;
     const installmentAmount = totalPayable / numberOfInstallments;
 
     const newLoanData = {
-      id: loanRef.id,
       organizationId: userProfile.organizationId,
       borrowerId: values.borrowerId,
       loanProductId: values.loanProductId,
@@ -141,23 +138,26 @@ export function AddLoanDialog({ open, onOpenChange, borrowers, loanProducts, isL
       installmentAmount: installmentAmount,
       issueDate: new Date().toISOString().split('T')[0], // This is the request date
       status: 'Pending Approval',
-      loanOfficerId: user.uid,
+      loanOfficerId: user.id,
       branchId: userProfile.branchIds[0],
     };
     
-    setDocumentNonBlocking(loanRef, newLoanData, { merge: false })
-      .then(() => {
-        toast({ title: 'Success', description: 'Loan submitted for approval.' });
-        form.reset();
-        onOpenChange(false);
-      })
-      .catch((err) => {
-          console.error("Error creating loan:", err);
-          toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit loan for approval.' });
-      })
-      .finally(() => {
-          setIsSubmitting(false);
-      });
+    try {
+        const res = await createLoan(newLoanData);
+        if (res.success) {
+            toast({ title: 'Success', description: 'Loan submitted for approval.' });
+            form.reset();
+            onOpenChange(false);
+            if (onSuccess) onSuccess();
+        } else {
+             toast({ variant: 'destructive', title: 'Error', description: res.error || 'Failed to submit loan for approval.' });
+        }
+    } catch (err) {
+        console.error("Error creating loan:", err);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit loan for approval.' });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
