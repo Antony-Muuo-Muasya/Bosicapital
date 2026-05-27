@@ -41,9 +41,9 @@ export function ManagerDashboard() {
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
 
-  const fetchDashboardStats = useCallback(async () => {
+  const fetchDashboardStats = useCallback(async (silent = false) => {
       if (!userProfile || branchIds.length === 0 || !organizationId) return;
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       try {
           const res = await getManagerDashboardStats(organizationId, branchIds);
           if (res.success && res.data) {
@@ -66,7 +66,7 @@ export function ManagerDashboard() {
       } catch (e) {
           console.error(e);
       } finally {
-          setIsLoading(false);
+          if (!silent) setIsLoading(false);
       }
   }, [userProfile, organizationId, JSON.stringify(branchIds)]);
 
@@ -76,7 +76,7 @@ export function ManagerDashboard() {
 
          // Set up real-time polling every 30 seconds
          const interval = setInterval(() => {
-             fetchDashboardStats();
+             fetchDashboardStats(true);
          }, 30000);
 
          return () => clearInterval(interval);

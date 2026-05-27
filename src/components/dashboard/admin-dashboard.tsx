@@ -45,9 +45,9 @@ export function AdminDashboard() {
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [installments, setInstallments] = useState<Installment[] | null>(null);
 
-  const fetchDashboardStats = useCallback(async () => {
+  const fetchDashboardStats = useCallback(async (silent = false) => {
       if (!userProfile) return;
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       try {
           const res = await getAdminDashboardStats(isSuperAdmin ? undefined : organizationId!);
           if (res.success && res.data) {
@@ -64,7 +64,7 @@ export function AdminDashboard() {
       } catch (e) {
           console.error(e);
       } finally {
-          setIsLoading(false);
+          if (!silent) setIsLoading(false);
       }
   }, [userProfile, isSuperAdmin, organizationId]);
 
@@ -74,7 +74,7 @@ export function AdminDashboard() {
          
          // Set up real-time polling every 30 seconds
          const interval = setInterval(() => {
-             fetchDashboardStats();
+             fetchDashboardStats(true);
          }, 30000);
 
          return () => clearInterval(interval);

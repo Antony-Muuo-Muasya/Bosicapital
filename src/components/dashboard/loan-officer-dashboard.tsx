@@ -43,9 +43,9 @@ export function LoanOfficerDashboard() {
   const [installments, setInstallments] = useState<Installment[] | null>(null);
   const [targets, setTargets] = useState<any[] | null>(null);
 
-  const fetchDashboardStats = useCallback(async () => {
+  const fetchDashboardStats = useCallback(async (silent = false) => {
       if (!userProfile || !user || !organizationId) return;
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       try {
           const res = await getLoanOfficerDashboardStats(organizationId, user.id);
           if (res.success && res.data) {
@@ -69,13 +69,19 @@ export function LoanOfficerDashboard() {
       } catch (e) {
           console.error(e);
       } finally {
-          setIsLoading(false);
+          if (!silent) setIsLoading(false);
       }
   }, [userProfile, user, organizationId]);
 
   useEffect(() => {
      if (!isProfileLoading && userProfile) {
          fetchDashboardStats();
+         
+         const interval = setInterval(() => {
+             fetchDashboardStats(true);
+         }, 30000);
+
+         return () => clearInterval(interval);
      }
   }, [isProfileLoading, userProfile, fetchDashboardStats]);
 
