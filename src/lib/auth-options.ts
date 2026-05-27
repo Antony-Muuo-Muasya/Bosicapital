@@ -30,7 +30,7 @@ export const authOptions: NextAuthOptions = {
           FROM "User" u
           LEFT JOIN "Role" r ON u."roleId" = r.id
           LEFT JOIN "Organization" o ON u."organizationId" = o.id
-          WHERE u.email = $1
+          WHERE LOWER(u.email) = LOWER($1)
         `, [credentials.email]);
 
         const user = users[0];
