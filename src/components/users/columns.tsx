@@ -13,17 +13,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { MoreHorizontal } from 'lucide-react';
-import { useFirestore, updateDocumentNonBlocking, useUserProfile, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, updateDocumentNonBlocking, useUserProfile, deleteDocumentNonBlocking, useAuth } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { Row } from '@tanstack/react-table';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 type UserWithRole = AppUser & { roleName: string };
 
 const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: UserWithRole) => void }) => {
   const firestore = useFirestore();
-  const { user: currentUser } = useUserProfile();
+  const auth = useAuth();
+  const { user: currentUser, userProfile } = useUserProfile();
   const { toast } = useToast();
 
   const handleStatusToggle = () => {
@@ -49,7 +51,19 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
     }
   };
 
+  const handleSendResetEmail = () => {
+    if (confirm(`Are you sure you want to send a password reset email to ${user.fullName}?`)) {
+      sendPasswordResetEmail(auth, user.email)
+        .then(() => toast({ title: 'Success', description: `Password reset email sent to ${user.email}.` }))
+        .catch((error) => {
+          console.error("Error sending password reset email:", error);
+          toast({ title: 'Error', variant: 'destructive', description: 'Failed to send password reset email.' });
+        });
+    }
+  };
+
   const isCurrentUser = currentUser?.uid === user.id;
+  const isSuperAdmin = userProfile?.roleId === 'superadmin';
 
   return (
     <DropdownMenu>
@@ -67,6 +81,11 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
         <DropdownMenuItem onClick={handleStatusToggle} disabled={isCurrentUser}>
           {user.status === 'active' ? 'Suspend User' : 'Reactivate User'}
         </DropdownMenuItem>
+        {isSuperAdmin && (
+          <DropdownMenuItem onClick={handleSendResetEmail}>
+            Send Password Reset Email
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleDelete} disabled={isCurrentUser} className="text-destructive">
           Delete User

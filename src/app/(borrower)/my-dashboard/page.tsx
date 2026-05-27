@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow, startOfToday } from 'date-fns';
+import { PayNowDialog } from "@/components/borrowers/pay-now-dialog";
 
 const financialTips = [
     "Create a monthly budget and stick to it.",
@@ -40,6 +41,7 @@ export default function MyDashboardPage() {
     const firestore = useFirestore();
     const { user, userProfile } = useUserProfile();
     const [randomTip, setRandomTip] = useState<string | undefined>();
+    const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
 
     useEffect(() => {
         setRandomTip(financialTips[Math.floor(Math.random() * financialTips.length)]);
@@ -199,9 +201,14 @@ export default function MyDashboardPage() {
                                     <CardTitle className="text-xl">{loanProduct.name}</CardTitle>
                                     <CardDescription>Your active loan progress.</CardDescription>
                                     </div>
-                                    <Button asChild variant="secondary" size="sm">
-                                    <Link href={`/my-loans/${activeLoan.id}`}>View Details</Link>
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button onClick={() => setIsPayDialogOpen(true)} size="sm">
+                                            Pay Now
+                                        </Button>
+                                        <Button asChild variant="secondary" size="sm">
+                                            <Link href={`/my-loans/${activeLoan.id}`}>View Details</Link>
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-2">
@@ -317,6 +324,15 @@ export default function MyDashboardPage() {
                     </Card>
                 </div>
             </div>
+            {activeLoan && borrower && (
+                <PayNowDialog
+                    open={isPayDialogOpen}
+                    onOpenChange={setIsPayDialogOpen}
+                    borrower={borrower}
+                    activeLoan={activeLoan}
+                    nextInstallmentAmount={nextInstallmentAmount}
+                />
+            )}
         </div>
     )
 }
