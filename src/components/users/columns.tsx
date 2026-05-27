@@ -64,6 +64,8 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
 
   const isCurrentUser = currentUser?.uid === user.id;
   const isSuperAdmin = userProfile?.roleId === 'superadmin';
+  const isTargetSuperAdmin = user.roleId === 'superadmin';
+  const isDisabled = isCurrentUser || (!isSuperAdmin && isTargetSuperAdmin);
 
   return (
     <DropdownMenu>
@@ -75,10 +77,10 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => onEdit(user)} disabled={isCurrentUser}>
+        <DropdownMenuItem onClick={() => onEdit(user)} disabled={isDisabled}>
           Edit User
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleStatusToggle} disabled={isCurrentUser}>
+        <DropdownMenuItem onClick={handleStatusToggle} disabled={isDisabled}>
           {user.status === 'active' ? 'Suspend User' : 'Reactivate User'}
         </DropdownMenuItem>
         {isSuperAdmin && (
@@ -87,7 +89,7 @@ const UserActions = ({ user, onEdit }: { user: UserWithRole, onEdit: (user: User
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleDelete} disabled={isCurrentUser} className="text-destructive">
+        <DropdownMenuItem onClick={handleDelete} disabled={isDisabled} className={isDisabled ? "" : "text-destructive"}>
           Delete User
         </DropdownMenuItem>
       </DropdownMenuContent>
